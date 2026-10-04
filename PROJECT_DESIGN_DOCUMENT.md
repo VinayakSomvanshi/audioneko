@@ -54,7 +54,7 @@ The application eliminates recurring subscription costs, server maintenance over
 |                                                                                                                       |
 |  +-----------------------------------------------------------------------------------------------------------------+  |
 |  |                                  EDGE MONOLITH: Hono on Workers with Static Assets                              |  |
-|  |   - Better Auth (Passkeys/WebAuthn)               - Signed HMAC Stream Dispenser                                |  |
+|  |   - Better Auth (Invites & Email/Password)        - Signed HMAC Stream Dispenser                                |  |
 |  |   - Google Drive RSA-SHA256 Token Mint            - Chapter & ID3 Byte-Range Metadata Engine                    |  |
 |  |   - Audiobookshelf (ABS) API Compatibility        - MiniSearch In-Memory Engine                                 |  |
 |  +-----------------------+----------------------------------+----------------------------------+-------------------+  |
@@ -358,34 +358,35 @@ The Worker extracts chapter markers and cover art from 1 GB+ M4B files in **unde
 
 ### 4.1 Authentication Engine Comparison
 
-| Auth Framework | Edge Runtime Compatibility | Native WebAuthn / Passkeys | Storage Adapter | Dependency Footprint | Recommendation |
+| Auth Framework | Edge Runtime Compatibility | Primary Auth Model | Storage Adapter | Dependency Footprint | Recommendation |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Better Auth** | **Native Cloudflare Workers (Web Standards)** | **First-class plugin (`@better-auth/passkey`)** | **D1 via Drizzle ORM** | **Minimal / Edge-optimized** | **CLEAR WINNER** |
-| **Cloudflare Access (Zero Trust)** | Edge native (Network layer) | Yes (via Google Workspace/OTP) | Cloudflare managed | Zero client code | Viable, but lacks consumer PWA polish |
-| **Lucia Auth (v3 code patterns)** | Native | Requires manual WebAuthn crypto assembly | Custom D1 queries | Extremely low | Too much boilerplate |
+| **Better Auth** | **Native Cloudflare Workers (Web Standards)** | **Email/Password + Invites (Passkeys in Future Scope)** | **D1 via Drizzle ORM** | **Minimal / Edge-optimized** | **CLEAR WINNER** |
+| **Cloudflare Access (Zero Trust)** | Edge native (Network layer) | Google Workspace/OTP | Cloudflare managed | Zero client code | Viable, but lacks consumer PWA polish |
+| **Lucia Auth (v3 code patterns)** | Native | Custom password hashing | Custom D1 queries | Extremely low | Too much boilerplate |
 | **Auth.js (NextAuth v5)** | Fragile on standalone Workers | Complex configuration | Prisma / Drizzle | Heavy Node.js shims | Poor edge DX |
-| **Supabase / Clerk Auth** | External API hops | Dependent on 3rd-party plan | External cloud | Network overhead | Violates non-Cloudflare constraint |
+| **Supabase / Clerk Auth** | External API hops | Proprietary hosted forms | External cloud | Network overhead | Violates non-Cloudflare constraint |
 
-> **Decision**: **Better Auth with Drizzle D1 Adapter & Passkey Plugin**.  
-> **One-Line Reason**: Provides frictionless WebAuthn biometric passkeys (FaceID/TouchID/Windows Hello) stored natively in D1 with zero third-party dependencies or external auth redirects.
+> **Decision**: **Better Auth with Drizzle D1 Adapter (Email/Password + Cryptographic Invites)**.  
+> **One-Line Reason**: Delivers native, zero-external-dependency authentication with PBKDF2/argon2 password security on Cloudflare D1, gated by single-use 256-bit cryptographic invite links.  
+> **Note on Passkeys / WebAuthn**: Biometric WebAuthn passkeys are intentionally deferred to future scope / stretch backlog per product preferences.
 
 ```
                                   AUTHENTICATION FLOW
 
      Listener                               Browser (PWA)                     Edge Worker (Better Auth)
         |                                         |                                       |
-        |--- 1. Tap "Sign in with Passkey" ------>|                                       |
-        |                                         |--- 2. GET /api/auth/passkey/generate->|
-        |                                         |                                       |-- Mint WebAuthn Challenge
-        |                                         |<-- 3. Return Challenge & RP ID -------|
+        |--- 1. Open Invite Link (/join?token=...)>|                                      |
+        |                                         |--- 2. GET /api/invites/verify ------->|
+        |                                         |       (Check token hash & expiry)     |-- Validate D1 Invites Table
+        |                                         |<-- 3. Token Valid / Render Form ------|
         |                                         |                                       |
-        |<- 4. Prompt FaceID / TouchID / Pin -----|                                       |
-        |--- 5. Biometric Approval -------------->|                                       |
-        |                                         |--- 6. POST /api/auth/passkey/verify ->|
-        |                                         |       (Signed Authenticator Data)     |-- Verify Sig with Stored PubKey
+        |--- 4. Submit Name, Email, Password ---->|                                       |
+        |                                         |--- 5. POST /api/auth/sign-up/email -->|
+        |                                         |       (Payload + Validated Invite)    |-- Hash Password & Create User
+        |                                         |                                       |-- Increment Token used_count
         |                                         |                                       |-- Create Session in D1
-        |                                         |<-- 7. Set-Cookie: __Secure-Session ---|
-        |<- 8. Seamless Redirect to Library ------|       (HttpOnly, SameSite=Strict)     |
+        |                                         |<-- 6. Set-Cookie: __Secure-Session ---|
+        |<- 7. Seamless Redirect to Library ------|       (HttpOnly, SameSite=Strict)     |
 ```
 
 ### 4.2 Security Architecture & Controls
@@ -439,7 +440,9 @@ The Worker extracts chapter markers and cover art from 1 GB+ M4B files in **unde
 
 ```mermaid
 erDiagram
-    USERS ||--o{ PASSKEYS : owns
+    USERS ||--o{ ACCOUNTS : authenticates_with
+    USERS ||--o{ INVITES : issues
+    USERS ||--o{ PASSKEYS : owns_future_scope
     USERS ||--o{ SESSIONS : establishes
     USERS ||--o{ PROGRESS : tracks
     USERS ||--o{ BOOKMARKS : creates
@@ -743,7 +746,7 @@ graph TD
 
 ### 8.1 Screen Inventory & Interface Architecture
 1.  **Authentication & Onboarding**:
-    *   Minimalist obsidian surface. "One-Tap Sign In" using platform WebAuthn passkey.
+    *   Minimalist obsidian surface. Clean Sign In & Sign Up using Email/Username & Password gated by single-use invite tokens.
     *   First-run onboarding: Media permission, offline storage allocation prompt, haptic test.
 2.  **The Library**:
     *   Sticky frosted glass navigation bar with instant search input.
@@ -847,7 +850,7 @@ graph TD
                                            v
 +---------------------------------------------------------------------------------------+
 |  PHASE 2: Core Audio Player & Authentication (Days 8–14)                              |
-|  - Better Auth WebAuthn passkey registration & invite system                          |
+|  - Better Auth email/password authentication & invite system                          |
 |  - Responsive PWA UI with Tailwind v4 & shadcn/ui                                      |
 |  - Audio engine: Web Audio DSP, pitch correction, MediaSession lock-screen controls    |
 |  - Chapter parsing engine for M4B & MP3 files                                         |
@@ -891,7 +894,7 @@ audioneko/
 │   │   └── vite.config.ts
 │   ├── server/                      # Edge Backend (Hono on Cloudflare Workers)
 │   │   ├── src/
-│   │   │   ├── auth/                # Better Auth configuration & Passkey plugin
+│   │   │   ├── auth/                # Better Auth email/password & cryptographic invite engine
 │   │   │   ├── drive/               # Google Drive RS256 token minter, range proxy
 │   │   │   ├── db/                  # Drizzle ORM schema, relations, migrations
 │   │   │   ├── realtime/            # Durable Object SyncRoom WebSocket class
@@ -935,7 +938,7 @@ audioneko/
 | **Database** | **Cloudflare D1 (SQLite)** | Turso / Supabase | Native zero-latency co-location with Workers inside Cloudflare's edge network. |
 | **ORM** | **Drizzle ORM** | Prisma | Zero runtime overhead and native compilation to D1 prepared statements. |
 | **Realtime Sync** | **Cloudflare Durable Objects (SQLite)** | SSE over KV | Stateful hibernatable WebSockets with zero database polling overhead. |
-| **Authentication** | **Better Auth (Passkeys/WebAuthn)** | Clerk / Auth.js | Zero third-party redirects; biometric FaceID/TouchID stored directly in D1. |
+| **Authentication** | **Better Auth (Email/Password + Invites)** | Clerk / Auth.js | Zero third-party redirects; PBKDF2 hashed credentials in D1 gated by single-use invites. |
 | **Audio Storage** | **Google Drive (Cold) + R2 (Active Shelf)**| Direct Drive Only | Eliminates Drive 403 quota exhaustion while staying within R2's 10 GB free cap. |
 | **Client Audio Cache**| **Origin Private File System (OPFS)** | IndexedDB Blobs | High-throughput, multi-gigabyte binary file storage immune to browser eviction. |
 | **AI Inference** | **Cloudflare Workers AI (Whisper / Llama)**| OpenAI API | 100% free within 10,000 daily neuron allocation with zero API keys or credit cards. |
