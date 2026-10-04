@@ -1,0 +1,182 @@
+@import "tailwindcss";
+
+/* ========================================================
+   audioneko: Obsidian Minimalist Design System
+   Inspired by sober-thoughts: clean, high-contrast, tactile,
+   crisp 1px borders, zero cloudy/muddy glassmorphism.
+   ======================================================== */
+
+:root {
+  /* Light mode */
+  --bg: oklch(0.97 0 0);
+  --bg-surface: oklch(0.92 0.003 15);
+  --bg-elevated: oklch(0.87 0.005 15);
+  --text: oklch(0.12 0 0);
+  --text-muted: oklch(0.42 0 0);
+  --text-subtle: oklch(0.55 0 0);
+  --border: oklch(0.83 0.004 15);
+  --accent: oklch(0.52 0.2 22);
+  --accent-light: oklch(0.62 0.2 22);
+  --accent-bg: oklch(0.52 0.2 22 / 0.08);
+  --code-bg: oklch(0.9 0.005 15);
+}
+
+/* Dark mode (default for audioneko obsidian aesthetic) */
+:root.dark {
+  --bg: oklch(0.085 0 0);
+  --bg-surface: oklch(0.12 0.008 15);
+  --bg-elevated: oklch(0.165 0.008 15);
+  --text: oklch(0.92 0 0);
+  --text-muted: oklch(0.63 0 0);
+  --text-subtle: oklch(0.52 0 0);
+  --border: oklch(0.21 0.01 15);
+  --accent: oklch(0.66 0.21 22);
+  --accent-light: oklch(0.76 0.21 22);
+  --accent-bg: oklch(0.66 0.21 22 / 0.12);
+  --code-bg: oklch(0.13 0.008 15);
+}
+
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", "Fira Code", monospace;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--bg-surface);
+  --color-elevated: var(--bg-elevated);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-subtle: var(--text-subtle);
+  --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-accent-bg: var(--accent-bg);
+  --color-code: var(--code-bg);
+}
+
+/* ============================================
+   Base Typography & Smooth Scrolling
+   ============================================ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-sans);
+  background-color: var(--bg);
+  color: var(--text);
+  scroll-behavior: smooth;
+  font-size: 16px;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Minimalist Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-subtle);
+}
+
+/* Selection */
+::selection {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+/* Focus Visible */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Logo Pulsing Micro-Dot */
+.logo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  animation: logopulse 2.8s ease-in-out infinite;
+}
+
+@keyframes logopulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+}
+
+/* Tactile Surface Cards & Containers */
+.surface-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.surface-card:hover {
+  border-color: var(--text-subtle);
+}
+
+.elevated-card {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Audio Wave Animation Bar */
+@keyframes wavebounce {
+  0%,
+  100% {
+    height: 4px;
+  }
+  50% {
+    height: 16px;
+  }
+}
+
+.wave-bar {
+  width: 3px;
+  background-color: var(--accent);
+  border-radius: 2px;
+  animation: wavebounce 1.2s ease-in-out infinite;
+}
+
+.wave-bar:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.wave-bar:nth-child(3) {
+  animation-delay: 0.4s;
+}
+.wave-bar:nth-child(4) {
+  animation-delay: 0.1s;
+}
