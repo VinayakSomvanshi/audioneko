@@ -8,9 +8,9 @@
 
 | Metric | Status | Details |
 | :--- | :--- | :--- |
-| **Current Phase** | **Phase 1: Foundation & Data Engine** | Token minter, shared types, and D1 database ready |
-| **Active Step** | **Step 1.5: 2 MB Chunk Range Proxy & Edge Cache API** | Implementing range proxy and edge caching |
-| **Total Milestones** | **4 Phases / 18 Core Steps** | 4 steps completed |
+| **Current Phase** | **Phase 1: Foundation & Data Engine** | Range proxy, Edge Cache, and D1 database ready |
+| **Active Step** | **Step 1.6: Streaming Metadata & Chapter Extraction** | Building ISO-BMFF / ID3 byte-range parsers |
+| **Total Milestones** | **4 Phases / 18 Core Steps** | 5 steps completed |
 | **Free-Tier Safety** | **Verified & Compliant (100%)** | All services within $0.00/mo envelope |
 | **Git Repository** | **Connected to GitHub** | `main` branch synced with `origin` |
 
@@ -40,11 +40,13 @@
   - [x] Implement Web Crypto RSA-SHA256 JWT minting (`src/drive/token.ts`)
   - [x] Implement KV caching for Bearer access token (55-minute TTL)
   - [x] Unit tests for token signing and expiry handling (`src/drive/token.test.ts`)
-- [ ] **Step 1.5: 2 MB Chunk Range Proxy & Edge Cache API**
-  - [ ] Implement Hono streaming endpoint (`/api/stream/:fileId`)
-  - [ ] Byte-range alignment to uniform 2 MB chunk boundaries
-  - [ ] Cloudflare Edge Cache API integration (`caches.default`)
-  - [ ] Partial Content (`206 Partial Content`) header synthesizer
+- [x] **Step 1.5: 2 MB Chunk Range Proxy & Edge Cache API**
+  - [x] Implement Hono streaming endpoint (`/api/stream/:fileId`) with `GET` and `HEAD` support
+  - [x] Byte-range alignment to uniform 2 MB chunk boundaries
+  - [x] Cloudflare Edge Cache API integration (`caches.default`)
+  - [x] R2 Active Shelf fast-path streaming integration (Tier 2)
+  - [x] Partial Content (`206 Partial Content`) header synthesizer
+  - [x] Unit tests verifying range parsing, chunk boundary logic, and HEAD headers (`src/drive/stream.test.ts`)
 - [ ] **Step 1.6: Streaming Metadata & Chapter Extraction**
   - [ ] ISO-BMFF / MP4 atom parser for `.m4b` chapters (`moov.trak.mdia.minf.stbl`)
   - [ ] ID3v2.3 / ID3v2.4 frame parser for `.mp3` chapter markers (`CHAP` / `CTOC`)
@@ -124,3 +126,4 @@
 | **2026-10-04 22:41** | **Progress Tracker** | Created live `PROGRESS.md` tracking all 4 phases and 18 steps. |
 | **2026-10-04 22:44** | **Step 1.3: D1 Database Core** | Created `packages/server`, `wrangler.jsonc`, 16-table Drizzle ORM schema, and generated SQL migrations. |
 | **2026-10-04 22:46** | **Step 1.4: Google Token Minter** | Implemented zero-dependency Web Crypto RSA-SHA256 JWT minter with KV caching; 4 Vitest unit tests passed. |
+| **2026-10-04 22:49** | **Step 1.5: 2 MB Chunk Range Proxy** | Built 4-tier hybrid streaming engine with Edge Cache API, R2 fast-path, and range alignment; 7 Vitest tests passed. |
