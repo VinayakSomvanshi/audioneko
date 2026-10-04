@@ -80,11 +80,12 @@
   - [x] AudioWorklet for dynamic RMS silence trimming (Smart Speed)
   - [x] Loudness normalization compressor targeting $-16\text{ LUFS}$
   - [x] Integrated into AudioContext state, MiniPlayer toggles, and unit tested (39 total tests passing)
-- [ ] **Step 2.5: Media Session, Lock Screen & Waveform Scrubber**
-  - [ ] `navigator.mediaSession` metadata and hardware media key handlers
-  - [ ] Decelerated vertical-drag waveform scrubbing bar
-  - [ ] Smart sleep timer with shake-to-extend accelerometer integration
-  - [ ] Picture-in-Picture (PiP) audio canvas visualizer
+- [x] **Step 2.5: Media Session, Lock Screen & Waveform Scrubber**
+  - [x] `navigator.mediaSession` metadata, lock screen timeline position state, and hardware media key handlers (`play`, `pause`, `seekto`, `seekbackward`, `seekforward`, `previoustrack`, `nexttrack`)
+  - [x] Decelerated vertical-drag waveform scrubbing bar (`1x`, `½x`, `¼x`, `0.1x` fine tiers) with chapter boundary markers and keyboard seeking
+  - [x] Smart sleep timer (presets 5, 15, 30, 45, 60m or End of Chapter) with smooth 30s linear volume fade-out and shake-to-extend accelerometer listener
+  - [x] Picture-in-Picture (PiP) audio canvas visualizer streaming live Web Audio analyser frequency spectrum and cover artwork
+  - [x] Obsidian tactile `FullPlayerModal` component and MiniPlayer integration with 55 unit and integration tests passing across monorepo
 
 ---
 

@@ -23,6 +23,7 @@ export class AudioEngine {
   private sibilanceFilter: BiquadFilterNode | null = null;
   private compressorNode: DynamicsCompressorNode | null = null;
   private gainNode: GainNode | null = null;
+  private analyserNode: AnalyserNode | null = null;
   private workletNode: AudioWorkletNode | null = null;
 
   private isInitialized = false;
@@ -89,6 +90,11 @@ export class AudioEngine {
       this.sibilanceFilter.connect(this.compressorNode);
       this.compressorNode.connect(this.gainNode);
       this.gainNode.connect(this.ctx.destination);
+
+      // Analyser Node for Visualizers & PiP frequency spectrum
+      this.analyserNode = this.ctx.createAnalyser();
+      this.analyserNode.fftSize = 128;
+      this.gainNode.connect(this.analyserNode);
 
       // 4. Try loading Smart Speed AudioWorklet
       try {
@@ -240,6 +246,13 @@ export class AudioEngine {
       this.compressorNode.threshold.linearRampToValueAtTime(0, now + 0.02);
       this.compressorNode.ratio.linearRampToValueAtTime(1, now + 0.02);
     }
+  }
+
+  public getFrequencyData(): Uint8Array | null {
+    if (!this.analyserNode) return null;
+    const buffer = new Uint8Array(this.analyserNode.frequencyBinCount);
+    this.analyserNode.getByteFrequencyData(buffer);
+    return buffer;
   }
 
   public getSettings(): DspSettings {

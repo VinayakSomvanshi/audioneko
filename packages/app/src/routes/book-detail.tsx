@@ -121,7 +121,7 @@ export function BookDetailPage() {
           <div className="flex flex-wrap items-center gap-3 pt-2">
             <button
               type="button"
-              onClick={() => playBook(mockBook)}
+              onClick={() => playBook(mockBook, 0, MOCK_CHAPTERS)}
               className="px-6 py-2.5 rounded bg-accent text-bg text-xs font-mono font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
             >
               <Play className="w-4 h-4 fill-current" />
@@ -161,7 +161,7 @@ export function BookDetailPage() {
               className="w-full text-left p-3.5 flex items-center justify-between hover:bg-elevated/40 transition-colors group cursor-pointer"
               onClick={() => {
                 if (currentBook?.id !== mockBook.id) {
-                  playBook(mockBook, ch.startTime);
+                  playBook(mockBook, ch.startTime, MOCK_CHAPTERS);
                 } else {
                   seekTo(ch.startTime);
                 }
