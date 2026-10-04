@@ -8,9 +8,9 @@
 
 | Metric | Status | Details |
 | :--- | :--- | :--- |
-| **Current Phase** | **Phase 1: Foundation & Data Engine** | Monorepo, shared types, and D1 database ready |
-| **Active Step** | **Step 1.4: Google Service Account Token Minter** | Setting up Web Crypto RS256 token minting |
-| **Total Milestones** | **4 Phases / 18 Core Steps** | 3 steps completed |
+| **Current Phase** | **Phase 1: Foundation & Data Engine** | Token minter, shared types, and D1 database ready |
+| **Active Step** | **Step 1.5: 2 MB Chunk Range Proxy & Edge Cache API** | Implementing range proxy and edge caching |
+| **Total Milestones** | **4 Phases / 18 Core Steps** | 4 steps completed |
 | **Free-Tier Safety** | **Verified & Compliant (100%)** | All services within $0.00/mo envelope |
 | **Git Repository** | **Connected to GitHub** | `main` branch synced with `origin` |
 
@@ -36,10 +36,10 @@
   - [x] Implement Drizzle ORM schema for D1 SQLite (`src/db/schema.ts`) with 16 tables
   - [x] Configure `drizzle.config.ts` for database migrations
   - [x] Generate initial SQL migration files via `drizzle-kit generate`
-- [ ] **Step 1.4: Zero-Dependency Google Service Account Token Minter**
-  - [ ] Implement Web Crypto RSA-SHA256 JWT minting (`src/drive/token.ts`)
-  - [ ] Implement KV caching for Bearer access token (55-minute TTL)
-  - [ ] Unit tests for token signing and expiry handling
+- [x] **Step 1.4: Zero-Dependency Google Service Account Token Minter**
+  - [x] Implement Web Crypto RSA-SHA256 JWT minting (`src/drive/token.ts`)
+  - [x] Implement KV caching for Bearer access token (55-minute TTL)
+  - [x] Unit tests for token signing and expiry handling (`src/drive/token.test.ts`)
 - [ ] **Step 1.5: 2 MB Chunk Range Proxy & Edge Cache API**
   - [ ] Implement Hono streaming endpoint (`/api/stream/:fileId`)
   - [ ] Byte-range alignment to uniform 2 MB chunk boundaries
@@ -123,3 +123,4 @@
 | **2026-10-04 22:39** | **Shared Package** | Created `packages/shared` with domain schemas (`schema.ts`) and API contracts (`contracts.ts`). Typechecked and linted. |
 | **2026-10-04 22:41** | **Progress Tracker** | Created live `PROGRESS.md` tracking all 4 phases and 18 steps. |
 | **2026-10-04 22:44** | **Step 1.3: D1 Database Core** | Created `packages/server`, `wrangler.jsonc`, 16-table Drizzle ORM schema, and generated SQL migrations. |
+| **2026-10-04 22:46** | **Step 1.4: Google Token Minter** | Implemented zero-dependency Web Crypto RSA-SHA256 JWT minter with KV caching; 4 Vitest unit tests passed. |
