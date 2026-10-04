@@ -8,9 +8,9 @@
 
 | Metric | Status | Details |
 | :--- | :--- | :--- |
-| **Current Phase** | **Phase 1: Foundation & Data Engine** | Monorepo established; shared contracts complete |
-| **Active Step** | **Step 1.3: Edge Server Core & Drizzle D1 Schema** | Setting up `packages/server` |
-| **Total Milestones** | **4 Phases / 18 Core Steps** | 2 steps completed |
+| **Current Phase** | **Phase 1: Foundation & Data Engine** | Monorepo, shared types, and D1 database ready |
+| **Active Step** | **Step 1.4: Google Service Account Token Minter** | Setting up Web Crypto RS256 token minting |
+| **Total Milestones** | **4 Phases / 18 Core Steps** | 3 steps completed |
 | **Free-Tier Safety** | **Verified & Compliant (100%)** | All services within $0.00/mo envelope |
 | **Git Repository** | **Connected to GitHub** | `main` branch synced with `origin` |
 
@@ -30,12 +30,12 @@
   - [x] Define domain interfaces: `Book`, `Chapter`, `AudioFile`, `Series`, `Progress`, `Bookmark`, `Clip`, `Shelf`, `SyncMessage` (`src/schema.ts`)
   - [x] Define API request & response contracts (`src/contracts.ts`)
   - [x] Compile and verify with `tsc --noEmit` and Biome
-- [ ] **Step 1.3: Edge Server Core & Drizzle D1 Database**
-  - [ ] Initialize `packages/server/` workspace package
-  - [ ] Configure `wrangler.jsonc` with D1 (`DB`), R2 (`R2`), KV (`KV`), and Durable Objects (`SYNC_ROOM`)
-  - [ ] Implement Drizzle ORM schema for D1 SQLite (`src/db/schema.ts`)
-  - [ ] Configure `drizzle.config.ts` for database migrations
-  - [ ] Generate initial SQL migration files
+- [x] **Step 1.3: Edge Server Core & Drizzle D1 Database**
+  - [x] Initialize `packages/server/` workspace package
+  - [x] Configure `wrangler.jsonc` with D1 (`DB`), R2 (`R2`), KV (`KV`), and Durable Objects (`SYNC_ROOM`)
+  - [x] Implement Drizzle ORM schema for D1 SQLite (`src/db/schema.ts`) with 16 tables
+  - [x] Configure `drizzle.config.ts` for database migrations
+  - [x] Generate initial SQL migration files via `drizzle-kit generate`
 - [ ] **Step 1.4: Zero-Dependency Google Service Account Token Minter**
   - [ ] Implement Web Crypto RSA-SHA256 JWT minting (`src/drive/token.ts`)
   - [ ] Implement KV caching for Bearer access token (55-minute TTL)
@@ -122,3 +122,4 @@
 | **2026-10-04 22:36** | **Tooling Setup** | Installed `pnpm` 12.9.1, configured `pnpm-workspace.yaml`, `turbo.json`, `biome.json`, and root `tsconfig.json`. |
 | **2026-10-04 22:39** | **Shared Package** | Created `packages/shared` with domain schemas (`schema.ts`) and API contracts (`contracts.ts`). Typechecked and linted. |
 | **2026-10-04 22:41** | **Progress Tracker** | Created live `PROGRESS.md` tracking all 4 phases and 18 steps. |
+| **2026-10-04 22:44** | **Step 1.3: D1 Database Core** | Created `packages/server`, `wrangler.jsonc`, 16-table Drizzle ORM schema, and generated SQL migrations. |
