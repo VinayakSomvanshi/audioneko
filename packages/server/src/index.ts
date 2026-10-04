@@ -28,3 +28,5 @@ export * from "./types";
 export * from "./db";
 export * from "./drive/token";
 export * from "./drive/stream";
+export * from "./drive/metadata";
+export * from "./drive/enrich";

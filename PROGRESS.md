@@ -8,9 +8,9 @@
 
 | Metric | Status | Details |
 | :--- | :--- | :--- |
-| **Current Phase** | **Phase 1: Foundation & Data Engine** | Range proxy, Edge Cache, and D1 database ready |
-| **Active Step** | **Step 1.6: Streaming Metadata & Chapter Extraction** | Building ISO-BMFF / ID3 byte-range parsers |
-| **Total Milestones** | **4 Phases / 18 Core Steps** | 5 steps completed |
+| **Current Phase** | **Phase 2: Authentication, Security & UI Shell** | Phase 1 Complete; starting Better Auth with Passkeys |
+| **Active Step** | **Step 2.1: Better Auth with Passkeys & D1** | Integrating WebAuthn biometric login with Hono |
+| **Total Milestones** | **4 Phases / 18 Core Steps** | 6 steps completed (Phase 1 100% complete) |
 | **Free-Tier Safety** | **Verified & Compliant (100%)** | All services within $0.00/mo envelope |
 | **Git Repository** | **Connected to GitHub** | `main` branch synced with `origin` |
 
@@ -18,7 +18,7 @@
 
 ## 🗂️ Phased Implementation Checklist
 
-### Phase 1: Foundation, Workspace & Core Data Engine
+### Phase 1: Foundation, Workspace & Core Data Engine (100% Complete)
 - [x] **Step 1.1: Root Monorepo Architecture & Tooling**
   - [x] Configure `pnpm` workspace (`pnpm-workspace.yaml`) with script permission policies
   - [x] Configure Turborepo build & dev pipeline (`turbo.json`)
@@ -47,10 +47,11 @@
   - [x] R2 Active Shelf fast-path streaming integration (Tier 2)
   - [x] Partial Content (`206 Partial Content`) header synthesizer
   - [x] Unit tests verifying range parsing, chunk boundary logic, and HEAD headers (`src/drive/stream.test.ts`)
-- [ ] **Step 1.6: Streaming Metadata & Chapter Extraction**
-  - [ ] ISO-BMFF / MP4 atom parser for `.m4b` chapters (`moov.trak.mdia.minf.stbl`)
-  - [ ] ID3v2.3 / ID3v2.4 frame parser for `.mp3` chapter markers (`CHAP` / `CTOC`)
-  - [ ] Embedded cover art extraction (`APIC` / `covr`) without full-file downloads
+- [x] **Step 1.6: Streaming Metadata & Chapter Extraction + External Enrichment**
+  - [x] ISO-BMFF / MP4 atom parser for `.m4b` chapters (`chpl`, `mvhd`) and covers (`covr`)
+  - [x] ID3v2.3 / ID3v2.4 frame parser for `.mp3` chapter markers (`CHAP` / `CTOC`) and artwork (`APIC`)
+  - [x] Open Library API and Google Books API metadata enrichment client (`src/drive/enrich.ts`)
+  - [x] Unit tests for binary parsing and external enrichment (`src/drive/metadata.test.ts`, `src/drive/enrich.test.ts`)
 
 ---
 
@@ -127,3 +128,4 @@
 | **2026-10-04 22:44** | **Step 1.3: D1 Database Core** | Created `packages/server`, `wrangler.jsonc`, 16-table Drizzle ORM schema, and generated SQL migrations. |
 | **2026-10-04 22:46** | **Step 1.4: Google Token Minter** | Implemented zero-dependency Web Crypto RSA-SHA256 JWT minter with KV caching; 4 Vitest unit tests passed. |
 | **2026-10-04 22:49** | **Step 1.5: 2 MB Chunk Range Proxy** | Built 4-tier hybrid streaming engine with Edge Cache API, R2 fast-path, and range alignment; 7 Vitest tests passed. |
+| **2026-10-04 22:52** | **Step 1.6: Metadata & TMDB Engine** | Built ISO-BMFF / ID3v2 binary streaming parsers and Open Library + Google Books enrichment engine; 15 Vitest tests passed. Phase 1 Complete! |
