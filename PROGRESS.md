@@ -113,15 +113,20 @@
 - [ ] **Step 4.1: Audiobookshelf (ABS) API Compatibility Layer**
   - [ ] Implement `/api/v1/login`, `/api/v1/libraries`, `/api/v1/items/:id`, `/api/v1/me/progress`
   - [ ] Verification with Plappa (iOS) and ShelfPlayer apps
-- [ ] **Step 4.2: Workers AI Whisper & Llama Narrative Recaps**
-  - [ ] Whisper Large v3 Turbo transcription for audio clips
-  - [ ] Llama 3.3 70B narrative recap generation for paused books
-- [ ] **Step 4.3: Two-Tier Search Engine**
-  - [ ] Client-side MiniSearch for sub-5ms title/author/narrator search
-  - [ ] Vectorize 768-dimension embeddings for natural language book discovery
-- [ ] **Step 4.4: Automated CI/CD & Production Wrangler Deploy**
+- [ ] **Step 4.2: Instant Client-Side Search Engine (MiniSearch)**
+  - [ ] Sub-5ms title, author, narrator, and series search with zero network latency
+  - [ ] Fuzzy keyword matching and prefix indexing
+- [ ] **Step 4.3: Automated CI/CD & Production Wrangler Deploy**
   - [ ] GitHub Actions workflow for linting, typechecking, and testing
   - [ ] Production deployment to custom domain on Cloudflare Anycast edge
+
+---
+
+### 🔮 Future Scope & Backlog (Deferred per User Request)
+- **Passkeys / WebAuthn**: Passwordless hardware/biometric authentication (FIDO2)
+- **Workers AI Whisper Transcription**: On-demand clip transcription and quote bookmarking
+- **Workers AI Narrative Recaps**: Llama 3.3 70B story recap generation when resuming after inactivity
+- **Vectorize Semantic Search**: 768-dimension embedding vector search for natural language queries
 
 ---
 
