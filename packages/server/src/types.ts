@@ -3,7 +3,6 @@ export interface Env {
   R2: R2Bucket;
   KV: KVNamespace;
   SYNC_ROOM: DurableObjectNamespace;
-  AI: Ai;
   ASSETS: Fetcher;
   BETTER_AUTH_SECRET: string;
   APP_URL: string;

@@ -17,7 +17,6 @@ describe("Invite HTTP API Routes", () => {
     R2: {} as R2Bucket,
     KV: {} as KVNamespace,
     SYNC_ROOM: {} as DurableObjectNamespace,
-    AI: {} as Ai,
     ASSETS: {} as Fetcher,
     BETTER_AUTH_SECRET: "test_secret_for_audioneko_better_auth_tests_32chars",
     APP_URL: "https://audioneko.app",
