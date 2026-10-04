@@ -1,4 +1,4 @@
-import { FastForward, Pause, Play, Rewind } from "lucide-react";
+import { FastForward, Pause, Play, Rewind, Zap } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useAudio } from "../../context/audio-context";
 
@@ -9,10 +9,14 @@ export function MiniPlayer() {
     currentTime,
     duration,
     playbackRate,
+    voiceBoost,
+    smartSpeed,
     togglePlay,
     seekTo,
     skipBy,
     setRate,
+    toggleVoiceBoost,
+    toggleSmartSpeed,
   } = useAudio();
 
   if (!currentBook) {
@@ -127,14 +131,44 @@ export function MiniPlayer() {
           </button>
         </div>
 
-        {/* Right: Time Display & Speed Toggle */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="text-[11px] font-mono text-muted hidden sm:block">
+        {/* Right: Time Display & DSP Toggles */}
+        <div className="flex items-center gap-2 md:gap-3 shrink-0">
+          <div className="text-[11px] font-mono text-muted hidden lg:block">
             <span>{formatTime(currentTime)}</span>
             <span className="text-subtle"> / </span>
             <span>{formatTime(duration)}</span>
           </div>
 
+          {/* Voice Boost toggle */}
+          <button
+            type="button"
+            onClick={toggleVoiceBoost}
+            className={`px-2 py-1 text-[10px] font-mono rounded surface-card transition-colors cursor-pointer flex items-center gap-1 ${
+              voiceBoost
+                ? "border-accent text-accent bg-accent-bg font-medium"
+                : "text-subtle hover:text-text"
+            }`}
+            title="Voice Boost EQ (85Hz cut, 2.2kHz lift, sibilance taming)"
+          >
+            <span>EQ</span>
+          </button>
+
+          {/* Smart Speed toggle */}
+          <button
+            type="button"
+            onClick={toggleSmartSpeed}
+            className={`px-2 py-1 text-[10px] font-mono rounded surface-card transition-colors cursor-pointer flex items-center gap-1 ${
+              smartSpeed
+                ? "border-accent text-accent bg-accent-bg font-medium"
+                : "text-subtle hover:text-text"
+            }`}
+            title="Smart Speed (Trim silent pauses dynamically)"
+          >
+            <Zap className="w-3 h-3" />
+            <span className="hidden sm:inline">SMART</span>
+          </button>
+
+          {/* Playback speed toggle */}
           <button
             type="button"
             onClick={cycleRate}

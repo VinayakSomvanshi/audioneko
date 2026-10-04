@@ -1,5 +1,6 @@
 import type { Book, Chapter } from "@audioneko/shared";
 import { type ReactNode, createContext, useContext, useEffect, useRef, useState } from "react";
+import { audioEngine } from "../lib/audio-engine";
 
 export interface AudioContextType {
   currentBook: Book | null;
@@ -9,6 +10,9 @@ export interface AudioContextType {
   duration: number;
   playbackRate: number;
   volume: number;
+  voiceBoost: boolean;
+  loudnessNormalization: boolean;
+  smartSpeed: boolean;
   playBook: (book: Book, initialPosition?: number) => void;
   pause: () => void;
   resume: () => void;
@@ -17,6 +21,9 @@ export interface AudioContextType {
   skipBy: (seconds: number) => void;
   setRate: (rate: number) => void;
   setVol: (vol: number) => void;
+  toggleVoiceBoost: () => void;
+  toggleLoudnessNormalization: () => void;
+  toggleSmartSpeed: () => void;
 }
 
 const AudioContext = createContext<AudioContextType | null>(null);
@@ -30,12 +37,21 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [volume, setVolume] = useState(1.0);
 
+  // DSP States
+  const [voiceBoost, setVoiceBoostState] = useState(false);
+  const [loudnessNormalization, setLoudnessNormState] = useState(true);
+  const [smartSpeed, setSmartSpeedState] = useState(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const audio = new Audio();
     audio.preload = "auto";
+    audio.crossOrigin = "anonymous";
     audioRef.current = audio;
+
+    // Attach Web Audio API DSP pipeline
+    audioEngine.init(audio).catch(console.warn);
 
     const onTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
@@ -76,23 +92,28 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       audioRef.current.src = `/api/stream/${book.id}`;
       audioRef.current.currentTime = initialPosition;
       audioRef.current.playbackRate = playbackRate;
-      audioRef.current
-        .play()
+      audioEngine.setBasePlaybackRate(playbackRate, audioRef.current);
+      audioEngine
+        .playWithRamp(audioRef.current)
         .then(() => setIsPlaying(true))
         .catch((err) => console.warn("Auto-playback deferred:", err));
     }
   };
 
   const pause = () => {
-    audioRef.current?.pause();
+    if (audioRef.current) {
+      audioEngine.pauseWithRamp(audioRef.current);
+    }
     setIsPlaying(false);
   };
 
   const resume = () => {
-    audioRef.current
-      ?.play()
-      .then(() => setIsPlaying(true))
-      .catch(console.warn);
+    if (audioRef.current) {
+      audioEngine
+        .playWithRamp(audioRef.current)
+        .then(() => setIsPlaying(true))
+        .catch(console.warn);
+    }
   };
 
   const togglePlay = () => {
@@ -119,17 +140,31 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   const setRate = (rate: number) => {
     setPlaybackRate(rate);
-    if (audioRef.current) {
-      audioRef.current.playbackRate = rate;
-    }
+    audioEngine.setBasePlaybackRate(rate, audioRef.current || undefined);
   };
 
   const setVol = (vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));
     setVolume(clamped);
-    if (audioRef.current) {
-      audioRef.current.volume = clamped;
-    }
+    audioEngine.setVolume(clamped);
+  };
+
+  const toggleVoiceBoost = () => {
+    const nextVal = !voiceBoost;
+    setVoiceBoostState(nextVal);
+    audioEngine.setVoiceBoost(nextVal);
+  };
+
+  const toggleLoudnessNormalization = () => {
+    const nextVal = !loudnessNormalization;
+    setLoudnessNormState(nextVal);
+    audioEngine.setLoudnessNormalization(nextVal);
+  };
+
+  const toggleSmartSpeed = () => {
+    const nextVal = !smartSpeed;
+    setSmartSpeedState(nextVal);
+    audioEngine.setSmartSpeed(nextVal, audioRef.current || undefined);
   };
 
   return (
@@ -142,6 +177,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         duration,
         playbackRate,
         volume,
+        voiceBoost,
+        loudnessNormalization,
+        smartSpeed,
         playBook,
         pause,
         resume,
@@ -150,6 +188,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         skipBy,
         setRate,
         setVol,
+        toggleVoiceBoost,
+        toggleLoudnessNormalization,
+        toggleSmartSpeed,
       }}
     >
       {children}

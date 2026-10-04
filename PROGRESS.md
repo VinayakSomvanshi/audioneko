@@ -74,11 +74,12 @@
   - [x] Built responsive layout: top header with logo dot & theme toggle, desktop sidebar with R2 quota meter, mobile bottom navigation, and docked mini-player
   - [x] Built routes: `/` (Library & Continue Listening), `/book/:id` (Details & Chapters), `/join` (Invite Onboarding), `/login` (Sign In), `/admin/invites` (Invite Manager)
   - [x] Configured PWA manifest (`public/manifest.json`), favicon, anti-flashbang theme script, and Vitest suite (34 total tests passing across monorepo)
-- [ ] **Step 2.4: Core Audio Player & Web Audio DSP Engine**
-  - [ ] HTMLMediaElement transport with smooth 40ms gain ramp cross-fade
-  - [ ] Web Audio API pipeline: 3-band parametric voice boost EQ
-  - [ ] AudioWorklet for dynamic RMS silence trimming (Smart Speed)
-  - [ ] Loudness normalization compressor targeting $-16\text{ LUFS}$
+- [x] **Step 2.4: Core Audio Player & Web Audio DSP Engine**
+  - [x] HTMLMediaElement transport with smooth 40ms gain ramp cross-fade
+  - [x] Web Audio API pipeline: 3-band parametric voice boost EQ (85 Hz highpass, 2.2 kHz presence peak, 7.5 kHz sibilance notch)
+  - [x] AudioWorklet for dynamic RMS silence trimming (Smart Speed)
+  - [x] Loudness normalization compressor targeting $-16\text{ LUFS}$
+  - [x] Integrated into AudioContext state, MiniPlayer toggles, and unit tested (39 total tests passing)
 - [ ] **Step 2.5: Media Session, Lock Screen & Waveform Scrubber**
   - [ ] `navigator.mediaSession` metadata and hardware media key handlers
   - [ ] Decelerated vertical-drag waveform scrubbing bar
