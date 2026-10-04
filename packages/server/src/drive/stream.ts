@@ -240,7 +240,8 @@ export async function handleAudioStreamRequest(
 
   // 6. Tier 3: Check Cloudflare Edge Cache API (2 MB chunk alignment)
   const { chunkIndex, chunkStart, chunkEnd } = getChunkBounds(start, totalSize);
-  const cacheKeyUrl = `https://cache.audioneko.internal/drive-chunks/${fileId}/${chunkIndex}`;
+  const requestUrl = new URL(request.url);
+  const cacheKeyUrl = `${requestUrl.origin}/api/stream/${fileId}?chunk=${chunkIndex}`;
   const cacheKey = new Request(cacheKeyUrl, { method: "GET" });
 
   const edgeCache = getEdgeCache();
