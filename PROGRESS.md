@@ -8,9 +8,9 @@
 
 | Metric | Status | Details |
 | :--- | :--- | :--- |
-| **Current Phase** | **Phase 2: Authentication, Security & UI Shell** | Step 2.1 complete; Step 2.2 Active (Invites Engine) |
-| **Active Step** | **Step 2.2: Cryptographic Invite Token Engine** | Admin generation & redemption of 256-bit hashed invites |
-| **Total Milestones** | **4 Phases / 18 Core Steps** | 7 steps completed (Phase 1 100%, Step 2.1 100%) |
+| **Current Phase** | **Phase 2: Authentication, Security & UI Shell** | Steps 2.1 & 2.2 complete; Step 2.3 Active (PWA Shell) |
+| **Active Step** | **Step 2.3: TanStack Start + Tailwind CSS v4 PWA Shell** | Scaffolding packages/app with React 19, Tailwind v4 & Obsidian design |
+| **Total Milestones** | **4 Phases / 18 Core Steps** | 8 steps completed (Phase 1 100%, Steps 2.1–2.2 100%) |
 | **Free-Tier Safety** | **Verified & Compliant (100%)** | All services within $0.00/mo envelope |
 | **Git Repository** | **Connected to GitHub** | `main` branch synced with `origin` |
 
@@ -62,10 +62,12 @@
   - [x] D1 session management and secure HttpOnly cookie handling
   - [x] Session & admin authorization middlewares (`requireAuth`, `optionalAuth`, `requireAdmin`)
   - [x] Note: Passkeys moved to future scope / stretch backlog per user request
-- [ ] **Step 2.2: Cryptographic Invite Token Engine**
-  - [ ] Single-use 256-bit entropy invite link generator
-  - [ ] Token redemption endpoint with Cloudflare Turnstile verification
-  - [ ] First-run user onboarding flow
+- [x] **Step 2.2: Cryptographic Invite Token Engine**
+  - [x] Single-use 256-bit entropy invite link generator (`generateSecureToken`)
+  - [x] SHA-256 token hashing with zero plaintext persistence in D1 (`hashToken`)
+  - [x] Token verification and atomic usage counter redemption (`verifyInviteToken`, `redeemInviteToken`)
+  - [x] Admin invite management endpoints & token-gated registration endpoint (`/api/invites/*`)
+  - [x] 11 new Vitest unit and HTTP route integration tests passing (31 total passing)
 - [ ] **Step 2.3: TanStack Start + Tailwind CSS v4 PWA Shell**
   - [ ] Initialize `packages/app/` with TanStack Start, React 19, and Vite
   - [ ] Configure Tailwind CSS v4 with CSS-first `@theme` design tokens
@@ -132,3 +134,4 @@
 | **2026-10-04 22:49** | **Step 1.5: 2 MB Chunk Range Proxy** | Built 4-tier hybrid streaming engine with Edge Cache API, R2 fast-path, and range alignment; 7 Vitest tests passed. |
 | **2026-10-04 22:52** | **Step 1.6: Metadata & TMDB Engine** | Built ISO-BMFF / ID3v2 binary streaming parsers and Open Library + Google Books enrichment engine; 15 Vitest tests passed. Phase 1 Complete! |
 | **2026-10-04 22:58** | **Step 2.1: Better Auth & Sessions** | Configured Better Auth with Email/Password & D1; built `requireAuth`, `optionalAuth`, `requireAdmin` middlewares; passkeys deferred to future scope per user; 20 Vitest tests passed. |
+| **2026-10-04 23:01** | **Step 2.2: Cryptographic Invites** | Built 256-bit entropy invite engine with SHA-256 hashing, atomic usage counters, admin endpoints, and token-gated registration; 31 Vitest tests passing. |
