@@ -7,7 +7,16 @@ import {
 } from "@audioneko/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, Check, Clock, HardDriveDownload, Loader2, Pause, Play } from "lucide-react";
+import {
+  ArrowUpDown,
+  BookOpen,
+  Check,
+  Clock,
+  HardDriveDownload,
+  Loader2,
+  Pause,
+  Play,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
@@ -15,10 +24,34 @@ import { getDownloadedBooks } from "../lib/opfs";
 import { PROGRESS_CHANGE_EVENT, getAllProgress } from "../lib/progress-store";
 import { updateSearchIndex } from "../lib/search";
 
+export type LibrarySortOption =
+  | "series"
+  | "duration-desc"
+  | "duration-asc"
+  | "title-asc"
+  | "title-desc"
+  | "author"
+  | "recent"
+  | "year-desc"
+  | "year-asc";
+
 export function LibraryPage() {
   const { playBook, pause, resume, currentBook, isPlaying, currentTime, duration } = useAudio();
   const [activeFilter, setActiveFilter] = useState<"all" | "in-progress" | "downloaded">("all");
+  const [sortBy, setSortBy] = useState<LibrarySortOption>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("audioneko_sort_by") as LibrarySortOption) || "series";
+    }
+    return "series";
+  });
   const [, setProgressTick] = useState(0);
+
+  const handleSortChange = (newSort: LibrarySortOption) => {
+    setSortBy(newSort);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("audioneko_sort_by", newSort);
+    }
+  };
 
   // Re-render when local progress changes
   useEffect(() => {
@@ -162,6 +195,88 @@ export function LibraryPage() {
     return true;
   });
 
+  // Sorted books according to user selection
+  const sortedBooks = useMemo(() => {
+    const list = [...filteredBooks];
+
+    switch (sortBy) {
+      case "series":
+        return list.sort((a, b) => {
+          const seriesA = (a.seriesName || a.series || "").trim();
+          const seriesB = (b.seriesName || b.series || "").trim();
+
+          // Both belong to a series
+          if (seriesA && seriesB) {
+            // Same series: sort chronologically by series index, then release year, then title
+            if (seriesA.toLowerCase() === seriesB.toLowerCase()) {
+              const idxA = a.seriesIndex ?? 9999;
+              const idxB = b.seriesIndex ?? 9999;
+              if (idxA !== idxB) return idxA - idxB;
+              const yrA = a.publishedYear ?? 9999;
+              const yrB = b.publishedYear ?? 9999;
+              if (yrA !== yrB) return yrA - yrB;
+              return a.title.localeCompare(b.title);
+            }
+            // Different series: group alphabetically by series name
+            return seriesA.localeCompare(seriesB);
+          }
+
+          // Series books clubbed first, standalones after
+          if (seriesA && !seriesB) return -1;
+          if (!seriesA && seriesB) return 1;
+
+          // Standalone books: sort by author, then title
+          const authorComp = a.author.localeCompare(b.author);
+          if (authorComp !== 0) return authorComp;
+          return a.title.localeCompare(b.title);
+        });
+
+      case "duration-desc":
+        return list.sort((a, b) => (b.durationSeconds || 0) - (a.durationSeconds || 0));
+
+      case "duration-asc":
+        return list.sort((a, b) => (a.durationSeconds || 0) - (b.durationSeconds || 0));
+
+      case "title-asc":
+        return list.sort((a, b) => a.title.localeCompare(b.title));
+
+      case "title-desc":
+        return list.sort((a, b) => b.title.localeCompare(a.title));
+
+      case "author":
+        return list.sort(
+          (a, b) => a.author.localeCompare(b.author) || a.title.localeCompare(b.title),
+        );
+
+      case "recent":
+        return list.sort((a, b) => {
+          const timeA = bookProgressMap.get(a.id)?.updatedAt || 0;
+          const timeB = bookProgressMap.get(b.id)?.updatedAt || 0;
+          if (timeA !== timeB) return timeB - timeA;
+          return (b.createdAt || 0) - (a.createdAt || 0);
+        });
+
+      case "year-desc":
+        return list.sort((a, b) => {
+          const yrA = a.publishedYear ?? -1;
+          const yrB = b.publishedYear ?? -1;
+          if (yrA !== yrB) return yrB - yrA;
+          return a.title.localeCompare(b.title);
+        });
+
+      case "year-asc":
+        return list.sort((a, b) => {
+          const yrA = a.publishedYear ?? 9999;
+          const yrB = b.publishedYear ?? 9999;
+          if (yrA !== yrB) return yrA - yrB;
+          return a.title.localeCompare(b.title);
+        });
+
+      default:
+        return list;
+    }
+  }, [filteredBooks, sortBy, bookProgressMap]);
+
   // Loading skeleton
   if (isLoading) {
     return (
@@ -263,15 +378,15 @@ export function LibraryPage() {
         </section>
       )}
 
-      {/* Filter Tabs & Count */}
-      <div className="flex items-center justify-between border-b border-border pb-3">
-        <div className="flex items-center gap-1">
+      {/* Filter Tabs & Sort Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
           {(["all", "in-progress", "downloaded"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveFilter(tab)}
-              className={`px-3 py-1.5 text-xs font-mono rounded capitalize transition-colors cursor-pointer ${
+              className={`px-3 py-1.5 text-xs font-mono rounded capitalize transition-colors cursor-pointer shrink-0 ${
                 activeFilter === tab
                   ? "bg-accent-bg text-accent font-medium border border-accent/20"
                   : "text-muted hover:text-text"
@@ -282,13 +397,39 @@ export function LibraryPage() {
           ))}
         </div>
 
-        <div className="text-xs font-mono text-subtle">
-          <span>{filteredBooks.length} titles</span>
+        <div className="flex items-center gap-3 self-end sm:self-auto">
+          {/* Sort Selector */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-mono text-muted flex items-center gap-1">
+              <ArrowUpDown className="w-3.5 h-3.5 text-accent" />
+              <span className="hidden md:inline">Sort:</span>
+            </span>
+            <select
+              value={sortBy}
+              onChange={(e) => handleSortChange(e.target.value as LibrarySortOption)}
+              className="bg-surface border border-border text-text text-xs font-mono rounded px-2.5 py-1 focus:outline-none focus:border-accent cursor-pointer hover:border-text-subtle transition-colors"
+              aria-label="Sort library audiobooks"
+            >
+              <option value="series">Series (Chronological)</option>
+              <option value="duration-desc">Length (Longest First)</option>
+              <option value="duration-asc">Length (Shortest First)</option>
+              <option value="title-asc">Alphabetical (A → Z)</option>
+              <option value="title-desc">Alphabetical (Z → A)</option>
+              <option value="author">Author (A → Z)</option>
+              <option value="recent">Recently Played</option>
+              <option value="year-desc">Release Year (Newest)</option>
+              <option value="year-asc">Release Year (Oldest)</option>
+            </select>
+          </div>
+
+          <div className="text-xs font-mono text-subtle shrink-0">
+            <span>{sortedBooks.length} titles</span>
+          </div>
         </div>
       </div>
 
       {/* Book Grid or Empty State */}
-      {filteredBooks.length === 0 ? (
+      {sortedBooks.length === 0 ? (
         activeFilter === "in-progress" ? (
           <div className="surface-card p-12 border border-border flex flex-col items-center justify-center gap-4 text-center">
             <Clock className="w-12 h-12 text-muted" />
@@ -328,7 +469,7 @@ export function LibraryPage() {
         )
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {filteredBooks.map((book) => {
+          {sortedBooks.map((book) => {
             const progress = bookProgressMap.get(book.id);
             const pos = progress?.currentTime ?? 0;
             const dur = progress?.duration || book.durationSeconds || 0;
@@ -434,6 +575,12 @@ export function LibraryPage() {
                     <p className="text-[11px] font-mono text-muted line-clamp-1 mt-0.5">
                       {book.author}
                     </p>
+                    {(book.seriesName || book.series) && (
+                      <p className="text-[10px] font-mono text-accent/80 line-clamp-1 mt-0.5">
+                        {book.seriesName || book.series}
+                        {book.seriesIndex != null ? ` #${book.seriesIndex}` : ""}
+                      </p>
+                    )}
                   </div>
 
                   <div className="pt-3 flex items-center justify-between text-[10px] font-mono text-subtle border-t border-border mt-3">

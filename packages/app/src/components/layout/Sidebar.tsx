@@ -5,17 +5,12 @@ import {
   Flame,
   HardDriveDownload,
   Library,
-  Search,
   ShieldCheck,
   Users,
 } from "lucide-react";
 import { useCurrentUser } from "../../lib/auth-client";
 
-interface SidebarProps {
-  onSearchClick?: () => void;
-}
-
-export function Sidebar({ onSearchClick }: SidebarProps) {
+export function Sidebar() {
   const location = useLocation();
   const { isAdmin } = useCurrentUser();
 
@@ -34,22 +29,6 @@ export function Sidebar({ onSearchClick }: SidebarProps) {
 
   return (
     <aside className="w-56 hidden md:flex flex-col border-r border-border bg-bg p-3 shrink-0 select-none h-full overflow-y-auto">
-      <div className="mb-2">
-        <button
-          type="button"
-          onClick={onSearchClick}
-          className="w-full flex items-center justify-between px-3 py-1.5 rounded text-xs font-mono text-muted surface-card hover:border-accent hover:text-text transition-colors cursor-pointer"
-        >
-          <span className="flex items-center gap-2">
-            <Search className="w-3.5 h-3.5 text-accent" />
-            <span>Search</span>
-          </span>
-          <kbd className="px-1.5 py-0.5 text-[10px] font-mono border border-border rounded bg-elevated text-subtle">
-            ⌘K
-          </kbd>
-        </button>
-      </div>
-
       <div className="text-[11px] font-mono uppercase tracking-wider text-subtle px-3 py-2">
         Collection
       </div>

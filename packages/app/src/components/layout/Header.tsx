@@ -62,15 +62,21 @@ export function Header({ onSearchClick }: HeaderProps) {
         <button
           type="button"
           onClick={onSearchClick}
-          className="w-full flex items-center justify-between px-3 py-1.5 text-xs text-muted surface-card hover:border-text-subtle transition-colors cursor-pointer"
+          className="w-full flex items-center justify-between px-3.5 py-1.5 text-xs text-muted surface-card hover:border-text-subtle transition-colors cursor-pointer"
         >
           <span className="flex items-center gap-2">
-            <Search className="w-3.5 h-3.5 text-subtle" />
+            <Search className="w-3.5 h-3.5 text-accent" />
             <span>Search books, authors, series...</span>
           </span>
-          <kbd className="px-1.5 py-0.5 text-[10px] font-mono border border-border rounded bg-elevated text-subtle">
-            /
-          </kbd>
+          <div className="flex items-center gap-1.5">
+            <kbd className="px-1.5 py-0.5 text-[10px] font-mono border border-border rounded bg-elevated text-subtle">
+              ⌘K
+            </kbd>
+            <span className="text-[10px] text-muted/60 font-mono">or</span>
+            <kbd className="px-1.5 py-0.5 text-[10px] font-mono border border-border rounded bg-elevated text-subtle">
+              /
+            </kbd>
+          </div>
         </button>
       </div>
 

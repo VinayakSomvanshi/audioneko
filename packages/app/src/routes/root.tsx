@@ -36,7 +36,7 @@ export function RootLayout() {
       <Header onSearchClick={() => setIsSearchOpen(true)} />
 
       <div className="flex-1 flex overflow-hidden min-h-0">
-        <Sidebar onSearchClick={() => setIsSearchOpen(true)} />
+        <Sidebar />
 
         <main className="flex-1 overflow-y-auto min-h-0 p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
