@@ -1,6 +1,7 @@
 import type { Book, Chapter } from "@audioneko/shared";
 import { Link, useParams } from "@tanstack/react-router";
-import { ArrowLeft, Download, ListMusic, Play } from "lucide-react";
+import { ArrowLeft, ListMusic, Play } from "lucide-react";
+import { DownloadButton } from "../components/storage/DownloadButton";
 import { useAudio } from "../context/audio-context";
 
 const MOCK_CHAPTERS: Chapter[] = [
@@ -130,13 +131,18 @@ export function BookDetailPage() {
               </span>
             </button>
 
-            <button
-              type="button"
-              className="px-4 py-2.5 rounded surface-card text-muted hover:text-text hover:border-text-subtle text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              <span>SAVE TO OPFS</span>
-            </button>
+            <DownloadButton
+              meta={{
+                bookId: mockBook.id,
+                title: mockBook.title,
+                author: mockBook.author,
+                durationSeconds: mockBook.durationSeconds || 0,
+                fileSizeBytes: mockBook.fileSizeBytes || 0,
+                downloadedAt: 0,
+                coverR2Key: mockBook.coverR2Key,
+                chapters: MOCK_CHAPTERS,
+              }}
+            />
           </div>
 
           <p className="text-xs text-muted leading-relaxed pt-2">{mockBook.description}</p>

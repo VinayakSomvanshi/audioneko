@@ -28,3 +28,17 @@ if (rootElement && !rootElement.innerHTML) {
     </React.StrictMode>,
   );
 }
+
+// Register offline streaming service worker
+if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((reg) => {
+        reg.update().catch(() => {});
+      })
+      .catch((err) => {
+        console.warn("Service worker registration deferred:", err);
+      });
+  });
+}

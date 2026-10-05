@@ -4,6 +4,7 @@ import { BookDetailPage } from "./routes/book-detail";
 import { JoinPage } from "./routes/join";
 import { LibraryPage } from "./routes/library";
 import { LoginPage } from "./routes/login";
+import { OfflinePage } from "./routes/offline";
 import { RootLayout } from "./routes/root";
 
 const rootRoute = createRootRoute({
@@ -40,12 +41,19 @@ const adminInvitesRoute = createRoute({
   component: AdminInvitesPage,
 });
 
+const offlineRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/offline",
+  component: OfflinePage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   bookDetailRoute,
   joinRoute,
   loginRoute,
   adminInvitesRoute,
+  offlineRoute,
 ]);
 
 export const router = createRouter({
