@@ -313,7 +313,9 @@ export async function handleAudioStreamRequest(
     }
   }
 
-  // 8. Slice the 2 MB chunk to the exact requested range, clamped to chunk boundary
+  // 8. Slice the 2 MB chunk to the exact requested range
+  // We must clamp to what we actually fetched (chunkEnd), but report the
+  // REQUESTED end byte in Content-Range so browsers can seek across chunk boundaries.
   const effectiveEnd = Math.min(end, chunkEnd);
   const sliceStart = start - chunkStart;
   const sliceLength = effectiveEnd - start + 1;
@@ -322,11 +324,14 @@ export async function handleAudioStreamRequest(
   return new Response(slicedBytes, {
     status: 206,
     headers: {
+      // Report the actual requested range end (not chunk boundary) so browsers
+      // know the full file is seekable beyond this 2 MB chunk
       "Content-Range": `bytes ${start}-${effectiveEnd}/${totalSize}`,
       "Content-Length": slicedBytes.byteLength.toString(),
       "Content-Type": metadata.mimeType,
       "Accept-Ranges": "bytes",
       "Cache-Control": "public, max-age=604800, s-maxage=604800",
+      "X-Content-Type-Options": "nosniff",
       "X-Audioneko-Tier": cachedChunk ? "Edge-Cache-API" : "Google-Drive-Cold-Vault",
     },
   });
