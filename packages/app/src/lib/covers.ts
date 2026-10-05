@@ -10,7 +10,11 @@ export function getBookCoverUrl(book: {
   updatedAt?: number | null;
 }): string {
   const id = book.id || book.bookId || "";
-  if (book.coverR2Key?.startsWith("http://") || book.coverR2Key?.startsWith("https://")) {
+  if (
+    book.coverR2Key?.startsWith("http://") ||
+    book.coverR2Key?.startsWith("https://") ||
+    book.coverR2Key?.startsWith("/")
+  ) {
     return book.coverR2Key;
   }
   return `/api/covers/${id}?v=${book.updatedAt || 1}`;

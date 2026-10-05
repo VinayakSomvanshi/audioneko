@@ -357,6 +357,21 @@ app.get("/api/covers/:bookId", async (c) => {
     return c.redirect(coverKey, 302);
   }
 
+  if (coverKey.startsWith("/")) {
+    if (c.env.ASSETS) {
+      const assetUrl = new URL(coverKey, c.req.url);
+      const res = await c.env.ASSETS.fetch(new Request(assetUrl.toString()));
+      if (res.status === 200) {
+        const headers = new Headers(res.headers);
+        headers.set("Cache-Control", "public, max-age=604800, s-maxage=604800");
+        return new Response(res.body, {
+          status: 200,
+          headers,
+        });
+      }
+    }
+  }
+
   if (coverKey.startsWith("gdrive:")) {
     const driveFileId = coverKey.replace("gdrive:", "");
     const cache =
