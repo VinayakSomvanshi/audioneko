@@ -4,7 +4,6 @@ import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Bookmark,
-  Check,
   FolderPlus,
   HardDrive,
   Info,
@@ -15,8 +14,6 @@ import {
   Zap,
 } from "lucide-react";
 import { useState } from "react";
-import { useAudio } from "../context/audio-context";
-import { useSession } from "../lib/auth-client";
 import { getBookCoverUrl } from "../lib/covers";
 
 interface CustomShelf {
@@ -53,12 +50,9 @@ interface ActiveShelfStatus {
 
 export function ShelvesPage() {
   const queryClient = useQueryClient();
-  const { playBook } = useAudio();
-  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState<"custom" | "active-shelf">("active-shelf");
   const [newShelfName, setNewShelfName] = useState("");
   const [isCreatingShelf, setIsCreatingShelf] = useState(false);
-  const [selectedShelfId, setSelectedShelfId] = useState<string | null>(null);
 
   // 1. Fetch Active Shelf (R2 Cache) status
   const { data: shelfStatus } = useQuery<ActiveShelfStatus>({
@@ -92,7 +86,7 @@ export function ShelvesPage() {
   });
 
   // 3. Fetch user custom shelves
-  const { data: shelvesData, isLoading: isShelvesLoading } = useQuery<{ shelves: CustomShelf[] }>({
+  const { data: shelvesData } = useQuery<{ shelves: CustomShelf[] }>({
     queryKey: ["customShelves"],
     queryFn: async () => {
       try {
@@ -242,10 +236,14 @@ export function ShelvesPage() {
             <span>Understanding Shelves in audioneko</span>
           </div>
           <p className="leading-relaxed">
-            <strong className="text-accent">1. Active Shelf:</strong> A high-speed, zero-egress Cloudflare R2 cache (10 GB free tier). Books on the Active Shelf start playing in &lt;50ms directly from Cloudflare's global edge without waiting on Google Drive.
+            <strong className="text-accent">1. Active Shelf:</strong> A high-speed, zero-egress
+            Cloudflare R2 cache (10 GB free tier). Books on the Active Shelf start playing in
+            &lt;50ms directly from Cloudflare's global edge without waiting on Google Drive.
           </p>
           <p className="leading-relaxed">
-            <strong className="text-text">2. Custom Collections:</strong> Personalized bookshelves created by you (e.g. "Favorites", "Up Next", "Classics") to categorize your personal library.
+            <strong className="text-text">2. Custom Collections:</strong> Personalized bookshelves
+            created by you (e.g. "Favorites", "Up Next", "Classics") to categorize your personal
+            library.
           </p>
         </div>
       </div>
@@ -302,7 +300,8 @@ export function ShelvesPage() {
                 <Zap className="w-8 h-8 text-muted mx-auto" />
                 <h4 className="text-sm font-semibold text-text">Active Shelf is currently empty</h4>
                 <p className="text-xs font-mono text-muted max-w-md mx-auto">
-                  When you listen to an audiobook or click "Stage to R2" below, the file is pre-cached on Cloudflare R2 for instant playback.
+                  When you listen to an audiobook or click "Stage to R2" below, the file is
+                  pre-cached on Cloudflare R2 for instant playback.
                 </p>
               </div>
             ) : (
@@ -334,9 +333,7 @@ export function ShelvesPage() {
                           >
                             {book.title}
                           </Link>
-                          <p className="text-[11px] font-mono text-muted truncate">
-                            {book.author}
-                          </p>
+                          <p className="text-[11px] font-mono text-muted truncate">{book.author}</p>
                         </div>
                       </div>
 
@@ -436,7 +433,6 @@ export function ShelvesPage() {
                     }
                   }}
                   className="bg-elevated border border-border rounded px-3 py-1 text-xs font-mono text-text focus:outline-none focus:border-accent"
-                  autoFocus
                 />
                 <button
                   type="button"

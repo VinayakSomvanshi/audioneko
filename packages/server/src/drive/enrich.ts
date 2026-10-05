@@ -85,21 +85,23 @@ export async function enrichBookMetadata(
   author?: string,
   customFetch: typeof fetch = fetch,
 ): Promise<EnrichedBookMetadata> {
-  const normalizedAuthor =
-    author && author !== "Unknown Author" ? normalizeAuthor(author) : "";
+  const normalizedAuthor = author && author !== "Unknown Author" ? normalizeAuthor(author) : "";
   const result: EnrichedBookMetadata = {
     title,
     author: normalizedAuthor || "Unknown Author",
     genres: [],
   };
 
-  const cleanTitle = title.replace(/\[.*?\]/g, "").replace(/\(.*?\)/g, "").trim() || title.trim();
+  const cleanTitle =
+    title
+      .replace(/\[.*?\]/g, "")
+      .replace(/\(.*?\)/g, "")
+      .trim() || title.trim();
   const hasKnownAuthor = Boolean(normalizedAuthor);
   // Extract primary author if multiple joined by & or and
-  const primaryAuthor =
-    hasKnownAuthor
-      ? normalizedAuthor.split(/\s*(?:&|and)\s*/i)[0]?.trim() || ""
-      : "";
+  const primaryAuthor = hasKnownAuthor
+    ? normalizedAuthor.split(/\s*(?:&|and)\s*/i)[0]?.trim() || ""
+    : "";
 
   // 1. Query Apple Books / iTunes Audiobook API for authentic 1:1 square artwork & metadata
   try {
@@ -109,12 +111,12 @@ export async function enrichBookMetadata(
       term: itunesTerm,
       limit: "5",
     });
-    let itunesRes = await customFetch(
+    const itunesRes = await customFetch(
       `https://itunes.apple.com/search?${itunesParams.toString()}`,
       {
         headers: {
           "User-Agent": "audioneko-audiobooks/1.0 (https://github.com/VinayakSomvanshi/audioneko)",
-          "Accept": "application/json",
+          Accept: "application/json",
         },
       },
     );
@@ -139,8 +141,9 @@ export async function enrichBookMetadata(
         `https://itunes.apple.com/search?${fallbackParams.toString()}`,
         {
           headers: {
-            "User-Agent": "audioneko-audiobooks/1.0 (https://github.com/VinayakSomvanshi/audioneko)",
-            "Accept": "application/json",
+            "User-Agent":
+              "audioneko-audiobooks/1.0 (https://github.com/VinayakSomvanshi/audioneko)",
+            Accept: "application/json",
           },
         },
       );
@@ -159,10 +162,16 @@ export async function enrichBookMetadata(
     if (matched) {
       if (matched.artworkUrl100) {
         // Upgrade to high-resolution 600x600 square artwork
-        result.coverUrl = matched.artworkUrl100.replace(/100x100bb\.(jpg|png|webp)/i, "600x600bb.$1");
+        result.coverUrl = matched.artworkUrl100.replace(
+          /100x100bb\.(jpg|png|webp)/i,
+          "600x600bb.$1",
+        );
       }
       if (matched.description) {
-        result.description = matched.description.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        result.description = matched.description
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
       }
       if ((!result.author || result.author === "Unknown Author") && matched.artistName) {
         result.author = matched.artistName;
@@ -196,7 +205,8 @@ export async function enrichBookMetadata(
 
         const res = await customFetch(`https://openlibrary.org/search.json?${olQuery.toString()}`, {
           headers: {
-            "User-Agent": "audioneko-audiobooks/1.0 (https://github.com/VinayakSomvanshi/audioneko)",
+            "User-Agent":
+              "audioneko-audiobooks/1.0 (https://github.com/VinayakSomvanshi/audioneko)",
           },
         });
 
@@ -235,9 +245,12 @@ export async function enrichBookMetadata(
       try {
         const q = [cleanTitle, primaryAuthor].filter(Boolean).join(" ");
         const qParams = new URLSearchParams({ q, limit: "5" });
-        const qRes = await customFetch(`https://openlibrary.org/search.json?${qParams.toString()}`, {
-          headers: { "User-Agent": "audioneko-audiobooks/1.0" },
-        });
+        const qRes = await customFetch(
+          `https://openlibrary.org/search.json?${qParams.toString()}`,
+          {
+            headers: { "User-Agent": "audioneko-audiobooks/1.0" },
+          },
+        );
         if (qRes.ok) {
           const qData = (await qRes.json()) as OpenLibraryResponse;
           if (qData.docs && qData.docs.length > 0) {
@@ -253,7 +266,10 @@ export async function enrichBookMetadata(
     let matchedDoc: OpenLibraryDoc | undefined;
     if (docs.length > 0) {
       matchedDoc =
-        docs.find((d) => (d.cover_i || d.author_name) && d.title?.toLowerCase() === cleanTitle.toLowerCase()) ||
+        docs.find(
+          (d) =>
+            (d.cover_i || d.author_name) && d.title?.toLowerCase() === cleanTitle.toLowerCase(),
+        ) ||
         docs.find((d) => d.cover_i && d.author_name) ||
         docs.find((d) => d.cover_i || d.author_name) ||
         docs[0];

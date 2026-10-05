@@ -112,9 +112,7 @@ export function MiniPlayer() {
               <h4 className="text-xs font-medium text-text truncate group-hover:text-accent transition-colors">
                 {currentBook.title}
               </h4>
-              <p className="text-[11px] font-mono text-muted truncate">
-                {currentBook.author}
-              </p>
+              <p className="text-[11px] font-mono text-muted truncate">{currentBook.author}</p>
             </div>
 
             <ChevronUp className="w-4 h-4 text-muted group-hover:text-text shrink-0 hidden sm:block opacity-60 group-hover:opacity-100 transition-opacity" />

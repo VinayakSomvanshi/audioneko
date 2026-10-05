@@ -86,7 +86,9 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
 
   // Extract bracketed series info before pattern matching:
   // e.g. [Windy City Series, Book 2] or [Windy City, Book 2] or [Windy City Series #2]
-  const bracketSeriesMatch = cleanName.match(/\[\s*(.+?)(?:\s+Series)?(?:,\s*(?:Book|#)?\s*(\d+(?:\.\d+)?))?\s*\]/i);
+  const bracketSeriesMatch = cleanName.match(
+    /\[\s*(.+?)(?:\s+Series)?(?:,\s*(?:Book|#)?\s*(\d+(?:\.\d+)?))?\s*\]/i,
+  );
   if (bracketSeriesMatch) {
     const candidateSeries = bracketSeriesMatch[1].trim();
     if (!/^(unabridged|abridged|mp3|m4b|audiobook|retail|re-up|cd\s*\d+)$/i.test(candidateSeries)) {
@@ -334,19 +336,28 @@ export async function scanDriveLibrary(
         }
 
         // Title words (length > 3 to skip noise words)
-        for (const word of parsed.title.toLowerCase().split(/\s+/).filter((w) => w.length > 3)) {
+        for (const word of parsed.title
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((w) => w.length > 3)) {
           if (lower.includes(word)) score += 2;
         }
 
         // Series name words
         if (parsed.series) {
-          for (const word of parsed.series.toLowerCase().split(/\s+/).filter((w) => w.length > 3)) {
+          for (const word of parsed.series
+            .toLowerCase()
+            .split(/\s+/)
+            .filter((w) => w.length > 3)) {
             if (lower.includes(word)) score += 2;
           }
         }
 
         // Author name parts
-        for (const part of parsed.author.toLowerCase().split(/\s+/).filter((w) => w.length > 3)) {
+        for (const part of parsed.author
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((w) => w.length > 3)) {
           if (lower.includes(part)) score += 1;
         }
 
@@ -363,7 +374,8 @@ export async function scanDriveLibrary(
             4: "acofas",
             5: "acosf",
           };
-          const sh = parsed.seriesIndex !== undefined ? acoMap[Math.round(parsed.seriesIndex)] : undefined;
+          const sh =
+            parsed.seriesIndex !== undefined ? acoMap[Math.round(parsed.seriesIndex)] : undefined;
           if (sh && lower.includes(sh)) score += 5;
         }
 
@@ -419,15 +431,14 @@ export async function scanDriveLibrary(
     // Only consider covers square if from Drive folder image or Apple Books mzstatic
     const hasSquareCover =
       Boolean(coverKey?.startsWith("gdrive:")) ||
-      Boolean(prevBook?.coverR2Key && prevBook.coverR2Key.includes("mzstatic.com"));
+      Boolean(prevBook?.coverR2Key?.includes("mzstatic.com"));
 
     let enrichedDescription = prevBook?.description ?? `${parsed.title} by ${enrichedAuthor}.`;
     let enrichedPublishedYear: number | null = prevBook?.publishedYear ?? null;
     let enrichedCoverUrl: string | null =
       hasSquareCover && prevBook?.coverR2Key?.startsWith("http") ? prevBook.coverR2Key : null;
 
-    const needsEnrichment =
-      !coverKey && (enrichedAuthor === "Unknown Author" || !hasSquareCover);
+    const needsEnrichment = !coverKey && (enrichedAuthor === "Unknown Author" || !hasSquareCover);
 
     if (needsEnrichment) {
       try {
@@ -437,7 +448,11 @@ export async function scanDriveLibrary(
           customFetch,
         );
 
-        if (enrichedAuthor === "Unknown Author" && enriched.author && enriched.author !== "Unknown Author") {
+        if (
+          enrichedAuthor === "Unknown Author" &&
+          enriched.author &&
+          enriched.author !== "Unknown Author"
+        ) {
           enrichedAuthor = enriched.author;
         }
         if (enriched.description) {

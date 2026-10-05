@@ -1,15 +1,7 @@
 import type { Book } from "@audioneko/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  BookOpen,
-  ChevronRight,
-  Clock,
-  Layers,
-  Play,
-  Search,
-} from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, Clock, Layers, Play, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
@@ -132,8 +124,7 @@ export function SeriesPage() {
   const activeSeries = selectedSeriesName
     ? allSeries.find(
         (s) =>
-          s.name.toLowerCase() === selectedSeriesName.toLowerCase() ||
-          s.id === selectedSeriesName,
+          s.name.toLowerCase() === selectedSeriesName.toLowerCase() || s.id === selectedSeriesName,
       )
     : null;
 
@@ -201,12 +192,17 @@ export function SeriesPage() {
                   {activeSeries.name}
                 </h1>
                 <p className="text-xs font-mono text-muted">
-                  Written by <span className="text-text font-medium">{activeSeries.primaryAuthor}</span>
+                  Written by{" "}
+                  <span className="text-text font-medium">{activeSeries.primaryAuthor}</span>
                 </p>
                 <div className="flex items-center gap-3 pt-1 text-xs font-mono text-subtle">
-                  <span className="text-accent font-medium">{activeSeries.books.length} Audiobooks</span>
+                  <span className="text-accent font-medium">
+                    {activeSeries.books.length} Audiobooks
+                  </span>
                   <span>•</span>
-                  <span>{formatDuration(activeSeries.totalDurationSeconds)} Total Listening Time</span>
+                  <span>
+                    {formatDuration(activeSeries.totalDurationSeconds)} Total Listening Time
+                  </span>
                 </div>
               </div>
             </div>
@@ -293,9 +289,7 @@ export function SeriesPage() {
                     <h3 className="text-sm font-semibold text-text group-hover:text-accent transition-colors line-clamp-1">
                       {book.title}
                     </h3>
-                    <p className="text-xs font-mono text-muted line-clamp-1">
-                      {book.author}
-                    </p>
+                    <p className="text-xs font-mono text-muted line-clamp-1">{book.author}</p>
                   </div>
                 </Link>
 
@@ -391,10 +385,11 @@ export function SeriesPage() {
             const firstBook = series.books[0];
 
             return (
-              <div
+              <button
+                type="button"
                 key={series.id}
                 onClick={() => selectSeries(series.name)}
-                className="group surface-card border border-border hover:border-accent/60 transition-all rounded-lg p-5 cursor-pointer flex flex-col justify-between space-y-4 hover:shadow-md"
+                className="group surface-card border border-border hover:border-accent/60 transition-all rounded-lg p-5 cursor-pointer flex flex-col justify-between space-y-4 hover:shadow-md text-left w-full"
               >
                 <div className="flex items-start gap-4">
                   {/* Layered / Stacked Cover Art for Series */}
@@ -457,7 +452,7 @@ export function SeriesPage() {
                   <span>View chronological order</span>
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

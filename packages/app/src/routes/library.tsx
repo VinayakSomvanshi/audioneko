@@ -79,7 +79,7 @@ export function LibraryPage() {
       : inProgressRecords.sort((a, b) => b.updatedAt - a.updatedAt)[0]?.bookId;
 
   const continueBook = latestProgressBookId
-    ? booksList.find((b) => b.id === latestProgressBookId) ?? null
+    ? (booksList.find((b) => b.id === latestProgressBookId) ?? null)
     : null;
 
   // Filtered books based on active tab
@@ -155,9 +155,7 @@ export function LibraryPage() {
                 <h2 className="text-xl md:text-2xl font-semibold text-text tracking-tight">
                   {continueBook.title}
                 </h2>
-                <p className="text-xs font-mono text-muted">
-                  {continueBook.author}
-                </p>
+                <p className="text-xs font-mono text-muted">{continueBook.author}</p>
                 <div className="flex items-center gap-3 pt-1 text-[11px] font-mono text-subtle">
                   <span>{formatDuration(continueBook.durationSeconds)}</span>
                   <span>•</span>
@@ -212,7 +210,8 @@ export function LibraryPage() {
             <div className="space-y-2">
               <h2 className="text-base font-semibold text-text">No audiobooks in progress</h2>
               <p className="text-xs font-mono text-muted max-w-sm">
-                Select and play any audiobook from your library. Your listening progress will automatically appear here.
+                Select and play any audiobook from your library. Your listening progress will
+                automatically appear here.
               </p>
             </div>
           </div>
@@ -222,7 +221,8 @@ export function LibraryPage() {
             <div className="space-y-2">
               <h2 className="text-base font-semibold text-text">No downloaded audiobooks</h2>
               <p className="text-xs font-mono text-muted max-w-sm">
-                You can download audiobooks to your browser's private offline storage to listen on the go without an internet connection.
+                You can download audiobooks to your browser's private offline storage to listen on
+                the go without an internet connection.
               </p>
             </div>
           </div>
@@ -304,7 +304,9 @@ export function LibraryPage() {
                 </div>
 
                 <div className="pt-3 flex items-center justify-between text-[10px] font-mono text-subtle border-t border-border mt-3">
-                  <span>{book.publishedYear || (book.format ? book.format.toUpperCase() : "—")}</span>
+                  <span>
+                    {book.publishedYear || (book.format ? book.format.toUpperCase() : "—")}
+                  </span>
                   {book.isActiveShelf && (
                     <span className="text-accent text-[9px] font-medium">SHELF</span>
                   )}

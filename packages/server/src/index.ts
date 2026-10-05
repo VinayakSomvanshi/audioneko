@@ -3,7 +3,12 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { absRoutes } from "./abs/routes";
 import { createAuth } from "./auth";
-import { type AuthContextVariables, optionalAuth, requireAdmin, requireAuth } from "./auth/middleware";
+import {
+  type AuthContextVariables,
+  optionalAuth,
+  requireAdmin,
+  requireAuth,
+} from "./auth/middleware";
 import { inviteRoutes } from "./auth/routes";
 import { createDb } from "./db";
 import * as schema from "./db/schema";
@@ -319,7 +324,9 @@ app.get("/api/covers/:bookId", async (c) => {
   if (coverKey.startsWith("gdrive:")) {
     const driveFileId = coverKey.replace("gdrive:", "");
     const cache =
-      typeof caches !== "undefined" && "default" in caches ? (caches as any).default : null;
+      typeof caches !== "undefined" && "default" in caches
+        ? (caches as unknown as { default: Cache }).default
+        : null;
     const cacheKey = new Request(c.req.url, { method: "GET" });
 
     if (cache) {
@@ -341,7 +348,7 @@ app.get("/api/covers/:bookId", async (c) => {
     );
 
     if (!driveRes.ok) {
-      return c.text("Failed to fetch cover from Drive", driveRes.status as any);
+      return new Response("Failed to fetch cover from Drive", { status: driveRes.status });
     }
 
     const contentType = driveRes.headers.get("content-type") || "image/png";
@@ -378,7 +385,9 @@ app.get("/api/covers/:bookId", async (c) => {
 app.post("/api/library/scan", async (c) => {
   try {
     let folderId = c.env.GOOGLE_DRIVE_FOLDER_ID || "1Eb41o9yGeJoojEYniUZvRCjaxBziLN-Z";
-    const bodyRaw = await c.req.json<{ folderId?: string }>().catch(() => ({} as { folderId?: string }));
+    const bodyRaw = await c.req
+      .json<{ folderId?: string }>()
+      .catch(() => ({}) as { folderId?: string });
     if (bodyRaw.folderId) {
       folderId = bodyRaw.folderId;
     }

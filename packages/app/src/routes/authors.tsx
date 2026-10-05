@@ -1,16 +1,7 @@
 import type { Book } from "@audioneko/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  BookOpen,
-  ChevronRight,
-  Clock,
-  Play,
-  Search,
-  User,
-  Users,
-} from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, Clock, Play, Search, User, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
@@ -189,7 +180,9 @@ export function AuthorsPage() {
                 {activeAuthor.name}
               </h1>
               <div className="flex items-center gap-3 pt-1 text-xs font-mono text-subtle">
-                <span className="text-accent font-medium">{activeAuthor.books.length} Audiobooks</span>
+                <span className="text-accent font-medium">
+                  {activeAuthor.books.length} Audiobooks
+                </span>
                 {activeAuthor.seriesCount > 0 && (
                   <>
                     <span>•</span>
@@ -224,7 +217,7 @@ export function AuthorsPage() {
                   className="text-xs font-mono text-accent hover:underline flex items-center gap-1"
                   onClick={() => {
                     if (typeof window !== "undefined") {
-                      const url = new URL(window.location.origin + "/series");
+                      const url = new URL(`${window.location.origin}/series`);
                       url.searchParams.set("series", seriesName);
                       window.history.pushState({}, "", url.toString());
                     }
@@ -335,10 +328,11 @@ export function AuthorsPage() {
             const sampleCovers = author.books.filter((b) => b.coverR2Key).slice(0, 3);
 
             return (
-              <div
+              <button
+                type="button"
                 key={author.name}
                 onClick={() => selectAuthor(author.name)}
-                className="group surface-card border border-border hover:border-accent/60 transition-all rounded-lg p-5 cursor-pointer flex flex-col justify-between space-y-4 hover:shadow-md"
+                className="group surface-card border border-border hover:border-accent/60 transition-all rounded-lg p-5 cursor-pointer flex flex-col justify-between space-y-4 hover:shadow-md text-left w-full"
               >
                 <div className="flex items-start gap-4">
                   {/* Avatar / Covers stack */}
@@ -351,7 +345,9 @@ export function AuthorsPage() {
                       {author.name}
                     </h2>
                     <div className="flex items-center gap-2 text-xs font-mono text-subtle">
-                      <span className="text-accent font-medium">{author.books.length} Audiobooks</span>
+                      <span className="text-accent font-medium">
+                        {author.books.length} Audiobooks
+                      </span>
                       {author.seriesCount > 0 && (
                         <>
                           <span>•</span>
@@ -392,7 +388,7 @@ export function AuthorsPage() {
                   <span>View author catalog</span>
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -479,9 +475,7 @@ function AuthorBookCard({
 
         <div className="pt-2 flex items-center justify-between text-[10px] font-mono text-subtle border-t border-border mt-2">
           <span>{book.publishedYear || book.format.toUpperCase()}</span>
-          {isCurrent && isPlaying && (
-            <span className="text-accent font-medium">PLAYING</span>
-          )}
+          {isCurrent && isPlaying && <span className="text-accent font-medium">PLAYING</span>}
         </div>
       </div>
     </Link>
