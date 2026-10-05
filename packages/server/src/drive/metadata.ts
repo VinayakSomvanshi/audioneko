@@ -388,3 +388,302 @@ function parseId3ApicFrame(data: Uint8Array): { mimeType: string; bytes: Uint8Ar
 
   return { mimeType, bytes };
 }
+
+// ==========================================
+// 3. QuickTime / M4B Chapter Track Parser
+// ==========================================
+
+function findAsciiSubarray(buffer: Uint8Array, needle: string, start = 0): number {
+  const needleBytes = new TextEncoder().encode(needle);
+  for (let i = start; i <= buffer.byteLength - needleBytes.byteLength; i++) {
+    let match = true;
+    for (let j = 0; j < needleBytes.byteLength; j++) {
+      if (buffer[i + j] !== needleBytes[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return i;
+  }
+  return -1;
+}
+
+function findLastAsciiSubarray(buffer: Uint8Array, needle: string, maxIdx: number): number {
+  const needleBytes = new TextEncoder().encode(needle);
+  const start = Math.min(buffer.byteLength - needleBytes.byteLength, maxIdx);
+  for (let i = start; i >= 0; i--) {
+    let match = true;
+    for (let j = 0; j < needleBytes.byteLength; j++) {
+      if (buffer[i + j] !== needleBytes[j]) {
+        match = false;
+        break;
+      }
+    }
+    if (match) return i;
+  }
+  return -1;
+}
+
+/**
+ * Parses QuickTime / ISO-BMFF text chapter track
+ */
+export async function parseQuickTimeTextTrak(
+  token: string,
+  fileId: string,
+  trakBuf: Uint8Array,
+  customFetch: typeof fetch = fetch,
+): Promise<ParsedChapter[]> {
+  const view = new DataView(trakBuf.buffer, trakBuf.byteOffset, trakBuf.byteLength);
+
+  // 1. mdhd timescale
+  let timescale = 1000;
+  const mdhdIdx = findAsciiSubarray(trakBuf, "mdhd");
+  if (mdhdIdx !== -1 && mdhdIdx + 24 <= trakBuf.byteLength) {
+    const version = trakBuf[mdhdIdx + 4] ?? 0;
+    const off = version === 0 ? mdhdIdx + 4 + 4 + 8 : mdhdIdx + 4 + 4 + 16;
+    if (off + 4 <= trakBuf.byteLength) {
+      timescale = view.getUint32(off) || 1000;
+    }
+  }
+
+  // 2. stts: sample durations
+  const sttsIdx = findAsciiSubarray(trakBuf, "stts");
+  const durations: number[] = [];
+  if (sttsIdx !== -1 && sttsIdx + 12 <= trakBuf.byteLength) {
+    const entryCount = view.getUint32(sttsIdx + 8);
+    let p = sttsIdx + 12;
+    for (let i = 0; i < entryCount && p + 8 <= trakBuf.byteLength; i++) {
+      const count = view.getUint32(p);
+      const delta = view.getUint32(p + 4);
+      p += 8;
+      for (let j = 0; j < count; j++) {
+        durations.push(delta / timescale);
+      }
+    }
+  }
+
+  // 3. stco (32-bit) or co64 (64-bit) chunk offsets
+  const offsets: number[] = [];
+  const stcoIdx = findAsciiSubarray(trakBuf, "stco");
+  if (stcoIdx !== -1 && stcoIdx + 12 <= trakBuf.byteLength) {
+    const entryCount = view.getUint32(stcoIdx + 8);
+    let p = stcoIdx + 12;
+    for (let i = 0; i < entryCount && p + 4 <= trakBuf.byteLength; i++) {
+      offsets.push(view.getUint32(p));
+      p += 4;
+    }
+  } else {
+    const co64Idx = findAsciiSubarray(trakBuf, "co64");
+    if (co64Idx !== -1 && co64Idx + 12 <= trakBuf.byteLength) {
+      const entryCount = view.getUint32(co64Idx + 8);
+      let p = co64Idx + 12;
+      for (let i = 0; i < entryCount && p + 8 <= trakBuf.byteLength; i++) {
+        const high = view.getUint32(p);
+        const low = view.getUint32(p + 4);
+        offsets.push(high * 4294967296 + low);
+        p += 8;
+      }
+    }
+  }
+
+  if (offsets.length === 0) return [];
+
+  const minOffset = Math.min(...offsets);
+  const maxOffset = Math.max(...offsets);
+  const textRangeSize = maxOffset - minOffset + 512;
+
+  // Fetch the chapter title text chunk from Google Drive in 1 single byte-range request
+  const textRes = await customFetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Range: `bytes=${minOffset}-${minOffset + textRangeSize}`,
+      },
+    },
+  );
+
+  if (!textRes.ok) return [];
+
+  const textBuf = new Uint8Array(await textRes.arrayBuffer());
+  const textView = new DataView(textBuf.buffer, textBuf.byteOffset, textBuf.byteLength);
+
+  let currentTime = 0;
+  const chapters: ParsedChapter[] = [];
+  for (let i = 0; i < offsets.length; i++) {
+    const fileOffset = offsets[i]!;
+    const relOffset = fileOffset - minOffset;
+    const dur = durations[i] || 0;
+
+    let title = "";
+    if (relOffset >= 0 && relOffset + 2 <= textBuf.byteLength) {
+      const textLen = textView.getUint16(relOffset);
+      if (textLen > 0 && relOffset + 2 + textLen <= textBuf.byteLength) {
+        title = new TextDecoder("utf-8")
+          .decode(textBuf.slice(relOffset + 2, relOffset + 2 + textLen))
+          .trim();
+      }
+    }
+    const startTime = currentTime;
+    const endTime = currentTime + dur;
+    currentTime = endTime;
+
+    chapters.push({
+      index: i + 1,
+      title: title || `Chapter ${i + 1}`,
+      startTimeSeconds: startTime,
+      endTimeSeconds: endTime,
+      durationSeconds: dur,
+    });
+  }
+
+  return chapters;
+}
+
+/**
+ * Extracts embedded chapters from an M4B file on Google Drive using partial byte ranges
+ */
+export async function extractChaptersFromM4b(
+  token: string,
+  fileId: string,
+  sizeBytes: number,
+  customFetch: typeof fetch = fetch,
+): Promise<ParsedChapter[]> {
+  if (sizeBytes <= 0) return [];
+
+  // Step 1: Check file tail (covers standard M4B files with moov at end)
+  const tailSize = Math.min(sizeBytes, 1024 * 1024); // 1 MB tail
+  try {
+    const tailRes = await customFetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Range: `bytes=${sizeBytes - tailSize}-${sizeBytes - 1}`,
+        },
+      },
+    );
+
+    if (tailRes.ok) {
+      const tailBuf = new Uint8Array(await tailRes.arrayBuffer());
+      const tailView = new DataView(tailBuf.buffer, tailBuf.byteOffset, tailBuf.byteLength);
+
+      // Check for QuickTime text track in tail
+      const textIdx = findAsciiSubarray(tailBuf, "text");
+      if (textIdx !== -1) {
+        const trakIdx = findLastAsciiSubarray(tailBuf, "trak", textIdx);
+        if (trakIdx >= 4 && trakIdx + 4 <= tailBuf.byteLength) {
+          const trakSize = tailView.getUint32(trakIdx - 4);
+          if (trakSize > 0 && trakIdx - 4 + trakSize <= tailBuf.byteLength) {
+            const trakSlice = tailBuf.slice(trakIdx - 4, trakIdx - 4 + trakSize);
+            const chapters = await parseQuickTimeTextTrak(token, fileId, trakSlice, customFetch);
+            if (chapters.length > 0) return chapters;
+          }
+        }
+      }
+
+      // Check for Nero chpl atom in tail
+      const chplIdx = findAsciiSubarray(tailBuf, "chpl");
+      if (chplIdx !== -1 && chplIdx >= 4) {
+        const atomSize = tailView.getUint32(chplIdx - 4);
+        const atomData = tailBuf.slice(chplIdx + 4, chplIdx - 4 + atomSize);
+        const chapters = parseChplAtom(atomData, 0, atomData.byteLength);
+        if (chapters.length > 0) return chapters;
+      }
+    }
+  } catch (err) {
+    console.warn(`[extractChaptersFromM4b] Tail scan failed for ${fileId}:`, err);
+  }
+
+  // Step 2: Check head (covers fast-start M4B files with moov at beginning)
+  try {
+    const headRes = await customFetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Range: "bytes=0-1023",
+        },
+      },
+    );
+
+    if (headRes.ok) {
+      const headBuf = new Uint8Array(await headRes.arrayBuffer());
+      const headView = new DataView(headBuf.buffer, headBuf.byteOffset, headBuf.byteLength);
+
+      // Scan atoms at head
+      let off = 0;
+      let moovStart = -1;
+      let moovSize = 0;
+
+      while (off + 8 <= headBuf.byteLength) {
+        const size = headView.getUint32(off);
+        const type = String.fromCharCode(
+          headBuf[off + 4] ?? 0,
+          headBuf[off + 5] ?? 0,
+          headBuf[off + 6] ?? 0,
+          headBuf[off + 7] ?? 0,
+        );
+
+        if (type === "moov") {
+          moovStart = off;
+          moovSize = size;
+          break;
+        }
+
+        if (size <= 0) break;
+        off += size;
+      }
+
+      // If moov is at head, chapters are near the end of moov
+      if (moovStart >= 0 && moovSize > 0) {
+        const moovEnd = moovStart + moovSize;
+        const scanSpan = Math.min(moovSize, 512 * 1024);
+        const moovTailRes = await customFetch(
+          `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Range: `bytes=${moovEnd - scanSpan}-${moovEnd - 1}`,
+            },
+          },
+        );
+
+        if (moovTailRes.ok) {
+          const mBuf = new Uint8Array(await moovTailRes.arrayBuffer());
+          const mView = new DataView(mBuf.buffer, mBuf.byteOffset, mBuf.byteLength);
+
+          const chplIdx = findAsciiSubarray(mBuf, "chpl");
+          if (chplIdx !== -1 && chplIdx >= 4) {
+            const atomSize = mView.getUint32(chplIdx - 4);
+            const atomData = mBuf.slice(chplIdx + 4, chplIdx - 4 + atomSize);
+            const chapters = parseChplAtom(atomData, 0, atomData.byteLength);
+            if (chapters.length > 0) return chapters;
+          }
+
+          const textIdx = findAsciiSubarray(mBuf, "text");
+          if (textIdx !== -1) {
+            const trakIdx = findLastAsciiSubarray(mBuf, "trak", textIdx);
+            if (trakIdx >= 4 && trakIdx + 4 <= mBuf.byteLength) {
+              const trakSize = mView.getUint32(trakIdx - 4);
+              if (trakSize > 0 && trakIdx - 4 + trakSize <= mBuf.byteLength) {
+                const trakSlice = mBuf.slice(trakIdx - 4, trakIdx - 4 + trakSize);
+                const chapters = await parseQuickTimeTextTrak(
+                  token,
+                  fileId,
+                  trakSlice,
+                  customFetch,
+                );
+                if (chapters.length > 0) return chapters;
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[extractChaptersFromM4b] Head/moov scan failed for ${fileId}:`, err);
+  }
+
+  return [];
+}

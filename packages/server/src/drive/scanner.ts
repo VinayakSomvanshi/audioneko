@@ -9,7 +9,7 @@ import { createDb } from "../db";
 import * as schema from "../db/schema";
 import type { Env } from "../types";
 import { enrichBookMetadata } from "./enrich";
-import { parseId3Metadata, parseMp4Metadata } from "./metadata";
+import { extractChaptersFromM4b, parseId3Metadata, parseMp4Metadata } from "./metadata";
 import { getGoogleAccessToken } from "./token";
 
 export interface DriveItem {
@@ -534,15 +534,46 @@ export async function scanDriveLibrary(
       });
     }
 
-    // 6. Ensure default chapter exists
+    // 6. Extract and ingest real embedded chapters (M4B QuickTime/Nero)
     const targetBookId = existingBook[0]?.id || bookId;
-    const existingChapter = await db
-      .select()
+    const existingChapters = await db
+      .select({ id: schema.chapters.id })
       .from(schema.chapters)
-      .where(eq(schema.chapters.bookId, targetBookId))
-      .limit(1);
+      .where(eq(schema.chapters.bookId, targetBookId));
 
-    if (!existingChapter[0]) {
+    if (existingChapters.length <= 1 && parsed.format === "m4b") {
+      const extractedChapters = await extractChaptersFromM4b(
+        token,
+        item.id,
+        sizeBytes,
+        customFetch,
+      );
+      if (extractedChapters.length > 0) {
+        await db.delete(schema.chapters).where(eq(schema.chapters.bookId, targetBookId));
+        const chapterRows = extractedChapters.map((ch) => ({
+          id: `ch_${targetBookId}_${ch.index}`,
+          bookId: targetBookId,
+          chapterIndex: ch.index,
+          title: ch.title,
+          startTime: ch.startTimeSeconds,
+          endTime: ch.endTimeSeconds,
+          duration: ch.durationSeconds,
+        }));
+        for (let i = 0; i < chapterRows.length; i += 50) {
+          await db.insert(schema.chapters).values(chapterRows.slice(i, i + 50));
+        }
+      } else if (existingChapters.length === 0) {
+        await db.insert(schema.chapters).values({
+          id: `ch_${targetBookId}_1`,
+          bookId: targetBookId,
+          chapterIndex: 1,
+          title: parsed.title,
+          startTime: 0,
+          endTime: durationSeconds,
+          duration: durationSeconds,
+        });
+      }
+    } else if (existingChapters.length === 0) {
       await db.insert(schema.chapters).values({
         id: `ch_${targetBookId}_1`,
         bookId: targetBookId,

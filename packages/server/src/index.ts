@@ -1,4 +1,4 @@
-import { and, eq, or } from "drizzle-orm";
+import { and, asc, eq, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { absRoutes } from "./abs/routes";
@@ -12,6 +12,7 @@ import {
 import { inviteRoutes } from "./auth/routes";
 import { createDb } from "./db";
 import * as schema from "./db/schema";
+import { extractChaptersFromM4b } from "./drive/metadata";
 import { scanDriveLibrary } from "./drive/scanner";
 import { handleAudioStreamRequest } from "./drive/stream";
 import { getGoogleAccessToken } from "./drive/token";
@@ -143,10 +144,45 @@ app.get("/api/books/:id", async (c) => {
 
   const bookFiles = await db.select().from(schema.files).where(eq(schema.files.bookId, id));
 
-  const bookChapters = await db
+  let bookChapters = await db
     .select()
     .from(schema.chapters)
-    .where(eq(schema.chapters.bookId, id));
+    .where(eq(schema.chapters.bookId, id))
+    .orderBy(asc(schema.chapters.chapterIndex));
+
+  // If this book only has 1 placeholder chapter and it's an M4B file, try on-demand extraction
+  if (bookChapters.length <= 1 && bookList[0].format === "m4b" && c.env.GOOGLE_SA_KEY) {
+    try {
+      const primaryDriveId = bookFiles[0]?.driveFileId || bookList[0].driveFolderId;
+      const sizeBytes = bookFiles[0]?.sizeBytes || bookList[0].fileSizeBytes || 0;
+      if (primaryDriveId && sizeBytes > 0) {
+        const token = await getGoogleAccessToken(c.env.GOOGLE_SA_KEY, c.env.KV);
+        const extracted = await extractChaptersFromM4b(token, primaryDriveId, sizeBytes);
+        if (extracted.length > 0) {
+          await db.delete(schema.chapters).where(eq(schema.chapters.bookId, id));
+          const chapterRows = extracted.map((ch) => ({
+            id: `ch_${id}_${ch.index}`,
+            bookId: id,
+            chapterIndex: ch.index,
+            title: ch.title,
+            startTime: ch.startTimeSeconds,
+            endTime: ch.endTimeSeconds,
+            duration: ch.durationSeconds,
+          }));
+          for (let i = 0; i < chapterRows.length; i += 50) {
+            await db.insert(schema.chapters).values(chapterRows.slice(i, i + 50));
+          }
+          bookChapters = await db
+            .select()
+            .from(schema.chapters)
+            .where(eq(schema.chapters.bookId, id))
+            .orderBy(asc(schema.chapters.chapterIndex));
+        }
+      }
+    } catch (err) {
+      console.warn(`[api/books/:id] On-demand chapter extraction failed for ${id}:`, err);
+    }
+  }
 
   return c.json({
     book: bookList[0],
