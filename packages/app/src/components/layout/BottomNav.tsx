@@ -30,7 +30,7 @@ export function BottomNav({ onSearchClick }: BottomNavProps) {
   }
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 h-14 bg-bg border-t border-border flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
+    <nav className="md:hidden shrink-0 z-30 h-14 bg-bg border-t border-border flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
       {navItems.map((item) => {
         const isActive = location.pathname === item.href;
         const Icon = item.icon;

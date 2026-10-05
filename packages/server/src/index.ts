@@ -173,8 +173,8 @@ app.get("/api/books/:id", async (c) => {
             endTime: ch.endTimeSeconds,
             duration: ch.durationSeconds,
           }));
-          for (let i = 0; i < chapterRows.length; i += 50) {
-            await db.insert(schema.chapters).values(chapterRows.slice(i, i + 50));
+          for (let i = 0; i < chapterRows.length; i += 10) {
+            await db.insert(schema.chapters).values(chapterRows.slice(i, i + 10));
           }
           bookChapters = await db
             .select()
