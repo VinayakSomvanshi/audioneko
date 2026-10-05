@@ -1,6 +1,13 @@
+export interface ShelfQueueMessage {
+  type: "precache" | "evict";
+  bookId?: string;
+  requiredBytes?: number;
+  timestamp: number;
+}
+
 export interface Env {
   DB: D1Database;
-  R2: R2Bucket;
+  R2?: R2Bucket;
   KV: KVNamespace;
   SYNC_ROOM: DurableObjectNamespace;
   ASSETS: Fetcher;
@@ -9,4 +16,5 @@ export interface Env {
   GOOGLE_SA_KEY?: string;
   GOOGLE_DRIVE_FOLDER_ID?: string;
   STREAM_SIGNING_SECRET?: string;
+  SHELF_QUEUE?: Queue<ShelfQueueMessage>;
 }

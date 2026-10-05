@@ -104,9 +104,11 @@
   - [x] Service Worker range request interception (`/api/stream/:fileId`) for offline byte-range playback (`206 Partial Content`)
   - [x] Client storage quota management dashboard (`StorageManagerModal.tsx`, `/offline` route) with per-book cache eviction
   - [x] Zero server cost guarantee verified: audio cached directly to user's local disk; 83 Vitest tests passing across monorepo
-- [ ] **Step 3.3: Cloudflare R2 Active Shelf LRU Cache Queue**
-  - [ ] Cloudflare Queue worker pre-caching active books from Drive to R2
-  - [ ] 8.5 GB high-water mark automatic LRU eviction policy
+- [x] **Step 3.3: Cloudflare R2 Active Shelf LRU Cache Queue**
+  - [x] Cloudflare Queue & `ctx.waitUntil` background worker pre-caching active books from Google Drive to R2 (`precacheBookToR2`)
+  - [x] 8.5 GB high-water mark automatic LRU eviction policy (`evictLruBooks`) preserving free tier headroom
+  - [x] REST endpoints `/api/shelf/status`, `/api/shelf/precache/:bookId`, `/api/shelf/evict`, `/api/shelf/:bookId` and 6-hour cron maintenance
+  - [x] Zero-cost invariant strictly enforced: `if (env.R2)` safeguards allow 100% free operation with no payment methods; 93 Vitest tests passing across monorepo
 - [ ] **Step 3.4: Listening Analytics, Streaks & Social Presence**
   - [ ] Daily listening streak counter & GitHub-style activity heatmap
   - [ ] Edge presence tracking for friends listening activity
@@ -154,3 +156,4 @@
 | **2026-10-05 00:15** | **Step 2.5: Media Session & Scrubber** | Built lock-screen controls, decelerated vertical-drag scrubber, smart sleep timer with fade & accelerometer shake-to-extend, PiP visualizer, and FullPlayerModal; 55 Vitest tests passing. Phase 2 Complete! |
 | **2026-10-05 11:12** | **Step 3.1: Durable Objects Real-Time Sync** | Implemented `SyncRoom` Durable Object with SQLite backend and hibernatable WebSockets, HLC + Monotonic Progress Vector conflict resolution, client `SyncClient` with exponential backoff, and tactile obsidian `ResumeBanner`; 78 Vitest tests passing. |
 | **2026-10-05 11:22** | **Step 3.2: OPFS Download Manager** | Implemented Origin Private File System (OPFS) background streaming chunk downloader, Service Worker range-interception (`/api/stream/:fileId`) with 206 streaming, storage quota estimator and manager, and offline UI; 83 Vitest tests passing. |
+| **2026-10-05 11:30** | **Step 3.3: R2 Active Shelf LRU** | Built optional Cloudflare R2 Active Shelf pre-caching engine, 8.5 GB high-water mark LRU eviction algorithm, queue consumer, scheduled cron maintenance, and management endpoints with zero-cost fallback; 93 Vitest tests passing. |
