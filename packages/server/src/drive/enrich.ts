@@ -74,7 +74,7 @@ function normalizeAuthor(authorStr: string): string {
   const trimmed = authorStr.trim();
   if (!trimmed || trimmed === "Unknown Author") return "Unknown Author";
   const inverted = trimmed.match(/^([^,]+),\s*([^,]+)$/);
-  if (inverted && !/^(inc|llc|ltd|co|corp)$/i.test(inverted[2])) {
+  if (inverted?.[1] && inverted[2] && !/^(inc|llc|ltd|co|corp)$/i.test(inverted[2])) {
     return `${inverted[2].trim()} ${inverted[1].trim()}`;
   }
   return trimmed;

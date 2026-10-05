@@ -43,6 +43,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
           durationSeconds: book.durationSeconds,
           format: book.format,
           fileSizeBytes: book.fileSizeBytes,
+          downloadedAt: Date.now(),
         }
       : null;
 

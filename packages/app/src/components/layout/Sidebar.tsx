@@ -4,7 +4,6 @@ import {
   Bookmark,
   Flame,
   HardDriveDownload,
-  KeyRound,
   Library,
   Search,
   ShieldCheck,

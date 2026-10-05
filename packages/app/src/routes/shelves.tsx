@@ -153,7 +153,6 @@ export function ShelvesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["customShelves"] });
-      setSelectedShelfId(null);
     },
   });
 

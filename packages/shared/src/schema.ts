@@ -13,6 +13,8 @@ export interface Book {
   title: string;
   author: string;
   seriesId?: string | null;
+  series?: string | null;
+  seriesName?: string | null;
   seriesIndex?: number | null;
   narrator?: string | null;
   description?: string | null;

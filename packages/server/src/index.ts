@@ -599,7 +599,7 @@ app.post("/api/shelves", requireAuth, async (c) => {
     userId: user.id,
     name,
     isPublic: false,
-    createdAt: new Date(),
+    createdAt: Math.floor(Date.now() / 1000),
   };
   await db.insert(schema.shelves).values(newShelf);
   return c.json({ success: true, shelf: { ...newShelf, items: [] } });
@@ -640,7 +640,7 @@ app.post("/api/shelves/:id/books", requireAuth, async (c) => {
       shelfId,
       bookId: body.bookId,
       orderIndex: 0,
-      addedAt: new Date(),
+      addedAt: Math.floor(Date.now() / 1000),
     })
     .onConflictDoNothing();
   return c.json({ success: true });

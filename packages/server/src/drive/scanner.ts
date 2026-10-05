@@ -37,7 +37,7 @@ export function normalizeAuthor(authorStr: string): string {
   const trimmed = authorStr.trim();
   if (!trimmed || trimmed === "Unknown Author") return "Unknown Author";
   const inverted = trimmed.match(/^([^,]+),\s*([^,]+)$/);
-  if (inverted && !/^(inc|llc|ltd|co|corp)$/i.test(inverted[2])) {
+  if (inverted?.[1] && inverted[2] && !/^(inc|llc|ltd|co|corp)$/i.test(inverted[2])) {
     return `${inverted[2].trim()} ${inverted[1].trim()}`;
   }
   return trimmed;
@@ -89,7 +89,7 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
   const bracketSeriesMatch = cleanName.match(
     /\[\s*(.+?)(?:\s+Series)?(?:,\s*(?:Book|#)?\s*(\d+(?:\.\d+)?))?\s*\]/i,
   );
-  if (bracketSeriesMatch) {
+  if (bracketSeriesMatch?.[1]) {
     const candidateSeries = bracketSeriesMatch[1].trim();
     if (!/^(unabridged|abridged|mp3|m4b|audiobook|retail|re-up|cd\s*\d+)$/i.test(candidateSeries)) {
       if (!series) {

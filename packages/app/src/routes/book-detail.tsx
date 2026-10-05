@@ -179,11 +179,11 @@ export function BookDetailPage() {
             <p className="text-sm font-mono text-muted">
               By <span className="text-text font-medium">{book.author}</span>
             </p>
-            {"series" in book && book.series && (
+            {Boolean(book.series) && (
               <p className="text-xs font-mono text-accent/80">
-                {String(book.series)}
-                {"seriesIndex" in book && book.seriesIndex != null && (
-                  <span className="text-subtle"> #{String(book.seriesIndex)}</span>
+                {book.series}
+                {book.seriesIndex != null && (
+                  <span className="text-subtle"> #{book.seriesIndex}</span>
                 )}
               </p>
             )}

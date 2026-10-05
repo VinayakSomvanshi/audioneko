@@ -1,7 +1,7 @@
 import type { Book } from "@audioneko/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, BookOpen, ChevronRight, Clock, Play, Search, User, Users } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronRight, Play, Search, User, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";

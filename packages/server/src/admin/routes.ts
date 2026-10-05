@@ -1,4 +1,4 @@
-import { count, desc, eq } from "drizzle-orm";
+import { count, countDistinct, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { deleteInvite, listInvites } from "../auth/invites";
 import {
@@ -47,7 +47,7 @@ adminRoutes.get("/stats", requireAuth, requireAdmin, async (c) => {
   const [booksCountRes, authorsCountRes, seriesCountRes, usersCountRes, invitesCountRes] =
     await Promise.all([
       db.select({ count: count() }).from(schema.books),
-      db.select({ count: count(schema.authors.id) }).from(schema.authors),
+      db.select({ count: countDistinct(schema.books.author) }).from(schema.books),
       db.select({ count: count() }).from(schema.series),
       db.select({ count: count() }).from(schema.user),
       db.select({ count: count() }).from(schema.invites),

@@ -1,6 +1,5 @@
 import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { AdminDashboardPage } from "./routes/admin";
-import { AdminInvitesPage } from "./routes/admin-invites";
 import { AnalyticsPage } from "./routes/analytics";
 import { AuthorsPage } from "./routes/authors";
 import { BookDetailPage } from "./routes/book-detail";

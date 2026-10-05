@@ -6,8 +6,10 @@ export interface OfflineBookMeta {
   author: string;
   durationSeconds: number;
   coverR2Key?: string | null;
+  coverUrl?: string | null;
   fileSizeBytes: number;
   downloadedAt: number;
+  format?: "m4b" | "mp3" | "m4a" | "flac" | "opus";
   mimeType?: string;
   chapters?: Chapter[];
 }
