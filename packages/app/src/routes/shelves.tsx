@@ -5,11 +5,13 @@ import {
   AlertCircle,
   ArrowLeft,
   Bookmark,
+  CheckCircle2,
   FolderPlus,
   HardDrive,
   Info,
   Layers,
   Loader2,
+  Play,
   Plus,
   Search,
   Sparkles,
@@ -241,7 +243,9 @@ export function ShelvesPage() {
               }`}
             >
               <Zap className="w-3.5 h-3.5" />
-              <span>Active Shelf (R2 Cache)</span>
+              <span>
+                {shelfStatus?.isR2Enabled ? "Active Shelf (R2 Cache)" : "Storage & Drive Tiers"}
+              </span>
             </button>
             <button
               type="button"
@@ -265,13 +269,13 @@ export function ShelvesPage() {
             <span>Understanding Shelves in audioneko</span>
           </div>
           <p className="leading-relaxed">
-            <strong className="text-accent">1. Active Shelf:</strong> A high-speed, zero-egress
-            Cloudflare R2 cache (10 GB free tier). Books on the Active Shelf start playing in
-            &lt;50ms directly from Cloudflare's global edge without waiting on Google Drive.
+            <strong className="text-accent">1. Direct Drive & Storage Tiers:</strong> Audioneko
+            streams directly from your Google Drive without requiring credit card or billing
+            details.
           </p>
           <p className="leading-relaxed">
             <strong className="text-text">2. Custom Collections:</strong> Personalized bookshelves
-            created by you (e.g. "Favorites", "Up Next", "Classics") to categorize your personal
+            created by you (e.g. "Favorites", "Up Next", "Classics") to organize and categorize your
             library.
           </p>
         </div>
@@ -284,23 +288,22 @@ export function ShelvesPage() {
         <div className="space-y-6">
           {/* Status Alert if R2 is not active */}
           {!shelfStatus?.isR2Enabled && (
-            <div className="p-4 rounded surface-card border border-warning/30 space-y-2 text-xs font-mono">
-              <div className="flex items-center gap-2 text-warning font-semibold">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>Zero-Cost Direct Google Drive Mode Active (R2 Inactive)</span>
+            <div className="p-4 rounded surface-card border border-accent/30 bg-accent-bg/10 space-y-2 text-xs font-mono">
+              <div className="flex items-center gap-2 text-accent font-semibold">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-accent" />
+                <span>100% Free Direct Google Drive Streaming Active</span>
               </div>
               <p className="text-muted leading-relaxed">
-                Your audiobooks are currently streamed{" "}
-                <strong className="text-text">directly from Google Drive (Tier 1 Cold)</strong> with
-                zero cloud server storage or egress fees.
+                You do <strong className="text-text font-semibold">not</strong> need to enter any
+                payment or credit card details into Cloudflare. Audioneko streams all your
+                audiobooks directly from your Google Drive with zero server storage costs and zero
+                billing info needed.
               </p>
               <p className="text-subtle text-[11px] leading-relaxed">
-                To activate fast &lt;50ms edge staging to Cloudflare R2 (10 GB free tier), enable R2
-                in your Cloudflare dashboard and configure the R2 bucket binding in{" "}
-                <code className="text-accent bg-elevated px-1 py-0.5 rounded">
-                  packages/server/wrangler.jsonc
-                </code>
-                .
+                Cloudflare R2 is completely optional. All {allBooks.length} audiobooks in your
+                library are ready to listen to right now! You can also use the{" "}
+                <strong className="text-text">Custom Collections</strong> tab above to create
+                personalized bookshelves (Favorites, Up Next, etc.).
               </p>
             </div>
           )}
@@ -438,12 +441,14 @@ export function ShelvesPage() {
             )}
           </div>
 
-          {/* Quick Staging Section: Books not yet on Active Shelf */}
+          {/* Quick Staging / Library Books Section */}
           <div className="space-y-4 pt-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
               <div className="flex items-center gap-2.5">
                 <h3 className="text-xs font-mono uppercase tracking-wider text-text font-bold">
-                  Available to Stage (From Tier 1 Drive Cold)
+                  {shelfStatus?.isR2Enabled
+                    ? "Available to Stage (From Tier 1 Drive Cold)"
+                    : "Audiobooks Available to Stream (Direct Drive)"}
                 </h3>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface border border-border text-muted">
                   {filteredUnstagedBooks.length}
@@ -454,7 +459,7 @@ export function ShelvesPage() {
                 </span>
               </div>
 
-              {/* Search filter for books to stage */}
+              {/* Search filter for books */}
               <div className="relative w-full sm:w-64">
                 <Search className="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
@@ -518,29 +523,36 @@ export function ShelvesPage() {
                         </div>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => precacheMutation.mutate(book.id)}
-                        disabled={precacheMutation.isPending || !canStage}
-                        title={
-                          !canStage
-                            ? "Audiobooks stream directly from Google Drive. Enable R2 in your Cloudflare dashboard to stage books to edge cache."
-                            : "Stage to Cloudflare R2 edge cache"
-                        }
-                        className="px-2.5 py-1.5 rounded bg-elevated border border-border hover:border-accent text-xs font-mono text-text hover:text-accent disabled:opacity-40 disabled:hover:border-border disabled:hover:text-text disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center gap-1.5"
-                      >
-                        {isThisBookStaging ? (
-                          <>
-                            <Loader2 className="w-3 h-3 text-accent animate-spin" />
-                            <span>Staging...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Zap className="w-3 h-3 text-accent" />
-                            <span>Stage</span>
-                          </>
-                        )}
-                      </button>
+                      {canStage ? (
+                        <button
+                          type="button"
+                          onClick={() => precacheMutation.mutate(book.id)}
+                          disabled={precacheMutation.isPending}
+                          title="Stage to Cloudflare R2 edge cache"
+                          className="px-2.5 py-1.5 rounded bg-elevated border border-border hover:border-accent text-xs font-mono text-text hover:text-accent disabled:opacity-40 disabled:hover:border-border disabled:hover:text-text disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center gap-1.5"
+                        >
+                          {isThisBookStaging ? (
+                            <>
+                              <Loader2 className="w-3 h-3 text-accent animate-spin" />
+                              <span>Staging...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="w-3 h-3 text-accent" />
+                              <span>Stage</span>
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <Link
+                          to="/book/$id"
+                          params={{ id: book.id }}
+                          className="px-2.5 py-1.5 rounded bg-elevated border border-border hover:border-accent text-xs font-mono text-text hover:text-accent transition-colors shrink-0 flex items-center gap-1.5"
+                        >
+                          <Play className="w-3 h-3 text-accent" />
+                          <span>Listen</span>
+                        </Link>
+                      )}
                     </div>
                   );
                 })}
