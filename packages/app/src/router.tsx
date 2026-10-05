@@ -1,12 +1,15 @@
 import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
 import { AdminInvitesPage } from "./routes/admin-invites";
 import { AnalyticsPage } from "./routes/analytics";
+import { AuthorsPage } from "./routes/authors";
 import { BookDetailPage } from "./routes/book-detail";
 import { JoinPage } from "./routes/join";
 import { LibraryPage } from "./routes/library";
 import { LoginPage } from "./routes/login";
 import { OfflinePage } from "./routes/offline";
 import { RootLayout } from "./routes/root";
+import { SeriesPage } from "./routes/series";
+import { ShelvesPage } from "./routes/shelves";
 
 const rootRoute = createRootRoute({
   component: RootLayout,
@@ -54,6 +57,24 @@ const analyticsRoute = createRoute({
   component: AnalyticsPage,
 });
 
+const seriesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/series",
+  component: SeriesPage,
+});
+
+const authorsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/authors",
+  component: AuthorsPage,
+});
+
+const shelvesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/shelves",
+  component: ShelvesPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   bookDetailRoute,
@@ -62,6 +83,9 @@ const routeTree = rootRoute.addChildren([
   adminInvitesRoute,
   offlineRoute,
   analyticsRoute,
+  seriesRoute,
+  authorsRoute,
+  shelvesRoute,
 ]);
 
 export const router = createRouter({

@@ -1,9 +1,9 @@
-import { eq, or } from "drizzle-orm";
+import { and, eq, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { absRoutes } from "./abs/routes";
 import { createAuth } from "./auth";
-import { type AuthContextVariables, requireAdmin, requireAuth } from "./auth/middleware";
+import { type AuthContextVariables, optionalAuth, requireAdmin, requireAuth } from "./auth/middleware";
 import { inviteRoutes } from "./auth/routes";
 import { createDb } from "./db";
 import * as schema from "./db/schema";
@@ -148,6 +148,152 @@ app.get("/api/books/:id", async (c) => {
     files: bookFiles,
     chapters: bookChapters,
   });
+});
+
+// Series API: Returns all series with their books in chronological order
+app.get("/api/series", async (c) => {
+  const db = createDb(c.env.DB);
+  const allSeries = await db.select().from(schema.series);
+  const allBooks = await db
+    .select({
+      id: schema.books.id,
+      title: schema.books.title,
+      author: schema.books.author,
+      seriesId: schema.books.seriesId,
+      seriesIndex: schema.books.seriesIndex,
+      durationSeconds: schema.books.durationSeconds,
+      coverR2Key: schema.books.coverR2Key,
+      narrator: schema.books.narrator,
+      publishedYear: schema.books.publishedYear,
+      format: schema.books.format,
+      isActiveShelf: schema.books.isActiveShelf,
+      seriesName: schema.series.name,
+    })
+    .from(schema.books)
+    .leftJoin(schema.series, eq(schema.books.seriesId, schema.series.id));
+
+  const seriesMap = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      description: string | null;
+      primaryAuthor: string;
+      bookCount: number;
+      totalDurationSeconds: number;
+      books: Array<(typeof allBooks)[number] & { series?: string }>;
+    }
+  >();
+
+  for (const s of allSeries) {
+    seriesMap.set(s.id, {
+      id: s.id,
+      name: s.name,
+      description: s.description,
+      primaryAuthor: "",
+      bookCount: 0,
+      totalDurationSeconds: 0,
+      books: [],
+    });
+  }
+
+  for (const b of allBooks) {
+    const mappedBook = { ...b, series: b.seriesName || undefined };
+    if (b.seriesId && seriesMap.has(b.seriesId)) {
+      const entry = seriesMap.get(b.seriesId)!;
+      entry.books.push(mappedBook);
+      entry.bookCount++;
+      entry.totalDurationSeconds += b.durationSeconds || 0;
+      if (!entry.primaryAuthor && b.author) {
+        entry.primaryAuthor = b.author;
+      }
+    }
+  }
+
+  const seriesList = Array.from(seriesMap.values())
+    .filter((s) => s.books.length > 0)
+    .map((s) => {
+      // Sort in strict chronological order by series index
+      s.books.sort((a, b) => (a.seriesIndex ?? 0) - (b.seriesIndex ?? 0));
+      return s;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return c.json({ series: seriesList });
+});
+
+// Authors API: Returns all authors with their books and series information
+app.get("/api/authors", async (c) => {
+  const db = createDb(c.env.DB);
+  const allBooks = await db
+    .select({
+      id: schema.books.id,
+      title: schema.books.title,
+      author: schema.books.author,
+      seriesId: schema.books.seriesId,
+      seriesIndex: schema.books.seriesIndex,
+      durationSeconds: schema.books.durationSeconds,
+      coverR2Key: schema.books.coverR2Key,
+      narrator: schema.books.narrator,
+      publishedYear: schema.books.publishedYear,
+      format: schema.books.format,
+      isActiveShelf: schema.books.isActiveShelf,
+      seriesName: schema.series.name,
+    })
+    .from(schema.books)
+    .leftJoin(schema.series, eq(schema.books.seriesId, schema.series.id));
+
+  const authorMap = new Map<
+    string,
+    {
+      name: string;
+      bookCount: number;
+      seriesCount: number;
+      seriesNames: string[];
+      totalDurationSeconds: number;
+      books: Array<(typeof allBooks)[number] & { series?: string }>;
+    }
+  >();
+
+  for (const b of allBooks) {
+    const authorName = b.author?.trim() || "Unknown Author";
+    const mappedBook = { ...b, series: b.seriesName || undefined };
+    if (!authorMap.has(authorName)) {
+      authorMap.set(authorName, {
+        name: authorName,
+        bookCount: 0,
+        seriesCount: 0,
+        seriesNames: [],
+        totalDurationSeconds: 0,
+        books: [],
+      });
+    }
+    const entry = authorMap.get(authorName)!;
+    entry.books.push(mappedBook);
+    entry.bookCount++;
+    entry.totalDurationSeconds += b.durationSeconds || 0;
+    if (b.seriesName && !entry.seriesNames.includes(b.seriesName)) {
+      entry.seriesNames.push(b.seriesName);
+    }
+  }
+
+  const authorsList = Array.from(authorMap.values())
+    .map((a) => {
+      a.seriesCount = a.seriesNames.length;
+      // Sort books: first by series name, then by seriesIndex, then title
+      a.books.sort((x, y) => {
+        if (x.seriesName && y.seriesName && x.seriesName === y.seriesName) {
+          return (x.seriesIndex ?? 0) - (y.seriesIndex ?? 0);
+        }
+        if (x.seriesName && !y.seriesName) return -1;
+        if (!x.seriesName && y.seriesName) return 1;
+        return x.title.localeCompare(y.title);
+      });
+      return a;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  return c.json({ authors: authorsList });
 });
 
 // Book Cover Proxy endpoint
@@ -333,6 +479,127 @@ app.delete("/api/shelf/:bookId", requireAuth, requireAdmin, async (c) => {
     .where(eq(schema.books.id, bookId));
 
   return c.json({ success: true, bookId });
+});
+
+// ==========================================
+// Custom User Shelves / Collections Routes
+// ==========================================
+
+// Get user's custom shelves with their contained books
+app.get("/api/shelves", optionalAuth, async (c) => {
+  const user = c.get("user");
+  if (!user?.id) {
+    return c.json({ shelves: [] });
+  }
+  const db = createDb(c.env.DB);
+  const userShelves = await db
+    .select()
+    .from(schema.shelves)
+    .where(eq(schema.shelves.userId, user.id));
+
+  const allItems = await db
+    .select({
+      id: schema.shelfItems.id,
+      shelfId: schema.shelfItems.shelfId,
+      bookId: schema.shelfItems.bookId,
+      orderIndex: schema.shelfItems.orderIndex,
+      addedAt: schema.shelfItems.addedAt,
+      bookTitle: schema.books.title,
+      bookAuthor: schema.books.author,
+      coverR2Key: schema.books.coverR2Key,
+      durationSeconds: schema.books.durationSeconds,
+      format: schema.books.format,
+    })
+    .from(schema.shelfItems)
+    .leftJoin(schema.books, eq(schema.shelfItems.bookId, schema.books.id));
+
+  const shelvesWithItems = userShelves.map((s) => ({
+    ...s,
+    items: allItems.filter((i) => i.shelfId === s.id),
+  }));
+
+  return c.json({ shelves: shelvesWithItems });
+});
+
+// Create a new custom shelf
+app.post("/api/shelves", requireAuth, async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json<{ name: string }>().catch(() => ({ name: "" }));
+  const name = body.name?.trim();
+  if (!name) {
+    return c.json({ error: "Shelf name is required" }, 400);
+  }
+  const db = createDb(c.env.DB);
+  const newShelf = {
+    id: `sh_${crypto.randomUUID()}`,
+    userId: user.id,
+    name,
+    isPublic: false,
+    createdAt: new Date(),
+  };
+  await db.insert(schema.shelves).values(newShelf);
+  return c.json({ success: true, shelf: { ...newShelf, items: [] } });
+});
+
+// Delete a custom shelf
+app.delete("/api/shelves/:id", requireAuth, async (c) => {
+  const user = c.get("user");
+  const shelfId = c.req.param("id");
+  const db = createDb(c.env.DB);
+  await db
+    .delete(schema.shelves)
+    .where(and(eq(schema.shelves.id, shelfId), eq(schema.shelves.userId, user.id)));
+  return c.json({ success: true });
+});
+
+// Add a book to a custom shelf
+app.post("/api/shelves/:id/books", requireAuth, async (c) => {
+  const user = c.get("user");
+  const shelfId = c.req.param("id");
+  const body = await c.req.json<{ bookId: string }>().catch(() => ({ bookId: "" }));
+  if (!body.bookId) {
+    return c.json({ error: "Book ID required" }, 400);
+  }
+  const db = createDb(c.env.DB);
+  const shelf = await db
+    .select()
+    .from(schema.shelves)
+    .where(and(eq(schema.shelves.id, shelfId), eq(schema.shelves.userId, user.id)))
+    .limit(1);
+  if (!shelf[0]) {
+    return c.json({ error: "Shelf not found" }, 404);
+  }
+  await db
+    .insert(schema.shelfItems)
+    .values({
+      id: `shi_${crypto.randomUUID()}`,
+      shelfId,
+      bookId: body.bookId,
+      orderIndex: 0,
+      addedAt: new Date(),
+    })
+    .onConflictDoNothing();
+  return c.json({ success: true });
+});
+
+// Remove a book from a custom shelf
+app.delete("/api/shelves/:id/books/:bookId", requireAuth, async (c) => {
+  const user = c.get("user");
+  const shelfId = c.req.param("id");
+  const bookId = c.req.param("bookId");
+  const db = createDb(c.env.DB);
+  const shelf = await db
+    .select()
+    .from(schema.shelves)
+    .where(and(eq(schema.shelves.id, shelfId), eq(schema.shelves.userId, user.id)))
+    .limit(1);
+  if (!shelf[0]) {
+    return c.json({ error: "Shelf not found" }, 404);
+  }
+  await db
+    .delete(schema.shelfItems)
+    .where(and(eq(schema.shelfItems.shelfId, shelfId), eq(schema.shelfItems.bookId, bookId)));
+  return c.json({ success: true });
 });
 
 // ==========================================
