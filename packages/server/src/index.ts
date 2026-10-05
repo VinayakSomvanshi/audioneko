@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { createAuth } from "./auth";
+import { requireAuth } from "./auth/middleware";
 import { inviteRoutes } from "./auth/routes";
 import { handleAudioStreamRequest } from "./drive/stream";
+import { SyncRoom } from "./sync/room";
 import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -34,7 +36,41 @@ app.on("HEAD", "/api/stream/:fileId", (c) => {
   return handleAudioStreamRequest(c.req.raw, fileId, c.env);
 });
 
+// Real-time WebSocket sync route (/api/sync/ws)
+app.get("/api/sync/ws", requireAuth, async (c) => {
+  const upgradeHeader = c.req.header("Upgrade");
+  if (upgradeHeader !== "websocket") {
+    return c.text("Expected Upgrade: websocket", 426);
+  }
+
+  const user = c.get("user");
+  if (!user?.id) {
+    return c.text("Unauthorized", 401);
+  }
+
+  // Derive Durable Object ID deterministically from user ID
+  const doId = c.env.SYNC_ROOM.idFromName(user.id);
+  const stub = c.env.SYNC_ROOM.get(doId);
+
+  return stub.fetch(c.req.raw);
+});
+
+// REST sync progress state endpoint (/api/sync/state)
+app.get("/api/sync/state", requireAuth, async (c) => {
+  const user = c.get("user");
+  if (!user?.id) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const doId = c.env.SYNC_ROOM.idFromName(user.id);
+  const stub = c.env.SYNC_ROOM.get(doId);
+
+  const res = await stub.fetch(new Request("https://sync/state"));
+  return c.newResponse(res.body, res.status as 200, Object.fromEntries(res.headers.entries()));
+});
+
 export default app;
+export { SyncRoom };
 export * from "./types";
 export * from "./db";
 export * from "./auth";
@@ -45,3 +81,4 @@ export * from "./drive/token";
 export * from "./drive/stream";
 export * from "./drive/metadata";
 export * from "./drive/enrich";
+export * from "./sync/room";

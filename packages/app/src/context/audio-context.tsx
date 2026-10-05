@@ -1,4 +1,4 @@
-import type { Book, Chapter } from "@audioneko/shared";
+import type { Book, BookProgressRecord, Chapter } from "@audioneko/shared";
 import {
   type ReactNode,
   createContext,
@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ResumeBanner } from "../components/player/ResumeBanner";
 import { audioEngine } from "../lib/audio-engine";
 import {
   registerMediaSessionHandlers,
@@ -18,6 +19,7 @@ import {
 } from "../lib/media-session";
 import { pipManager } from "../lib/pip-visualizer";
 import { SleepTimer, type SleepTimerPreset, type SleepTimerState } from "../lib/sleep-timer";
+import { SyncClient } from "../lib/sync-client";
 
 export interface AudioContextType {
   currentBook: Book | null;
@@ -34,6 +36,10 @@ export interface AudioContextType {
   isFullPlayerOpen: boolean;
   isPiPActive: boolean;
   sleepTimerState: SleepTimerState;
+  remoteResumePrompt: BookProgressRecord | null;
+  isSyncConnected: boolean;
+  dismissResumePrompt: () => void;
+  jumpToRemotePosition: () => void;
   setIsFullPlayerOpen: (open: boolean) => void;
   playBook: (book: Book, initialPosition?: number, bookChapters?: Chapter[]) => void;
   pause: () => void;
@@ -68,6 +74,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [isFullPlayerOpen, setIsFullPlayerOpen] = useState(false);
   const [isPiPActive, setIsPiPActive] = useState(false);
 
+  // Cross-device sync state
+  const [remoteResumePrompt, setRemoteResumePrompt] = useState<BookProgressRecord | null>(null);
+  const [isSyncConnected, setIsSyncConnected] = useState(false);
+  const syncClientRef = useRef<SyncClient | null>(null);
+
   // DSP States
   const [voiceBoost, setVoiceBoostState] = useState(false);
   const [loudnessNormalization, setLoudnessNormState] = useState(true);
@@ -87,6 +98,48 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Initialize SyncClient connection
+  useEffect(() => {
+    const client = new SyncClient();
+    syncClientRef.current = client;
+
+    const unsubConn = client.onConnectionChange(setIsSyncConnected);
+    const unsubRemote = client.onRemoteProgress((record) => {
+      if (currentBook?.id === record.bookId) {
+        const timeDiff = Math.abs(record.currentTime - currentTime);
+        if (timeDiff > 5) {
+          setRemoteResumePrompt(record);
+        }
+      }
+    });
+
+    client.connect();
+
+    return () => {
+      unsubConn();
+      unsubRemote();
+      client.disconnect();
+      syncClientRef.current = null;
+    };
+  }, [currentBook?.id, currentTime]);
+
+  // Periodic progress sync while playing (every 10s)
+  useEffect(() => {
+    if (!isPlaying || !currentBook) return;
+
+    const interval = setInterval(() => {
+      syncClientRef.current?.sendUpdate({
+        bookId: currentBook.id,
+        currentTime,
+        duration,
+        playbackRate,
+        isPlaying: true,
+      });
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [isPlaying, currentBook, currentTime, duration, playbackRate]);
+
   // Determine current chapter from currentTime
   const currentChapter = useMemo(() => {
     if (!chapters || chapters.length === 0) return null;
@@ -105,7 +158,16 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
     setIsPlaying(false);
     setMediaSessionPlaybackState("paused");
-  }, []);
+    if (currentBook) {
+      syncClientRef.current?.sendUpdate({
+        bookId: currentBook.id,
+        currentTime,
+        duration,
+        playbackRate,
+        isPlaying: false,
+      });
+    }
+  }, [currentBook, currentTime, duration, playbackRate]);
 
   const resume = useCallback(() => {
     if (audioRef.current) {
@@ -114,10 +176,19 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         .then(() => {
           setIsPlaying(true);
           setMediaSessionPlaybackState("playing");
+          if (currentBook) {
+            syncClientRef.current?.sendUpdate({
+              bookId: currentBook.id,
+              currentTime,
+              duration,
+              playbackRate,
+              isPlaying: true,
+            });
+          }
         })
         .catch(console.warn);
     }
-  }, []);
+  }, [currentBook, currentTime, duration, playbackRate]);
 
   const togglePlay = useCallback(() => {
     if (isPlaying) {
@@ -138,9 +209,19 @@ export function AudioProvider({ children }: { children: ReactNode }) {
           playbackRate,
           position: clamped,
         });
+        if (currentBook) {
+          syncClientRef.current?.sendUpdate({
+            bookId: currentBook.id,
+            currentTime: clamped,
+            duration,
+            playbackRate,
+            isPlaying,
+            isExplicitSeek: true,
+          });
+        }
       }
     },
-    [duration, playbackRate],
+    [currentBook, duration, playbackRate, isPlaying],
   );
 
   const skipBy = useCallback(
@@ -301,6 +382,13 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         .then(() => {
           setIsPlaying(true);
           setMediaSessionPlaybackState("playing");
+          syncClientRef.current?.sendUpdate({
+            bookId: book.id,
+            currentTime: initialPosition,
+            duration: book.durationSeconds || 0,
+            playbackRate,
+            isPlaying: true,
+          });
         })
         .catch((err) => console.warn("Auto-playback deferred:", err));
     }
@@ -314,6 +402,15 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       playbackRate: rate,
       position: currentTime,
     });
+    if (currentBook) {
+      syncClientRef.current?.sendUpdate({
+        bookId: currentBook.id,
+        currentTime,
+        duration,
+        playbackRate: rate,
+        isPlaying,
+      });
+    }
   };
 
   const setVol = (vol: number) => {
@@ -376,6 +473,20 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     return active;
   };
 
+  const dismissResumePrompt = useCallback(() => {
+    setRemoteResumePrompt(null);
+  }, []);
+
+  const jumpToRemotePosition = useCallback(() => {
+    if (remoteResumePrompt) {
+      seekTo(remoteResumePrompt.currentTime);
+      if (remoteResumePrompt.isPlaying && !isPlaying) {
+        resume();
+      }
+      setRemoteResumePrompt(null);
+    }
+  }, [remoteResumePrompt, seekTo, isPlaying, resume]);
+
   return (
     <AudioContext.Provider
       value={{
@@ -393,6 +504,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         isFullPlayerOpen,
         isPiPActive,
         sleepTimerState,
+        remoteResumePrompt,
+        isSyncConnected,
+        dismissResumePrompt,
+        jumpToRemotePosition,
         setIsFullPlayerOpen,
         playBook,
         pause,
@@ -415,6 +530,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <ResumeBanner
+        remoteRecord={remoteResumePrompt}
+        bookTitle={currentBook?.title}
+        onJump={jumpToRemotePosition}
+        onDismiss={dismissResumePrompt}
+      />
     </AudioContext.Provider>
   );
 }

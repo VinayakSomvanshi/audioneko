@@ -8,10 +8,12 @@
 
 | Metric | Status | Details |
 | :--- | :--- | :--- |
-| **Current Phase** | **Phase 2: Authentication, Security & UI Shell** | Steps 2.1–2.3 complete; Step 2.4 Active (Audio DSP Engine) |
-| **Active Step** | **Step 2.4: Core Audio Player & Web Audio DSP Engine** | 3-band parametric voice boost, dynamic silence trimming & cross-fade |
-| **Total Milestones** | **4 Phases / 18 Core Steps** | 9 steps completed (Phase 1 100%, Steps 2.1–2.3 100%) |
-| **Free-Tier Safety** | **Verified & Compliant (100%)** | All services within $0.00/mo envelope |
+| Metric | Status | Details |
+| :--- | :--- | :--- |
+| **Current Phase** | **Phase 3: Real-Time Sync, Offline Storage & Active Shelf** | Step 3.1 complete; Step 3.2 next (OPFS Offline Storage) |
+| **Active Step** | **Step 3.2: Origin Private File System (OPFS) Download Manager** | Background stream writer, Service Worker range interceptor & cache quota |
+| **Total Milestones** | **4 Phases / 18 Core Steps** | 12 steps completed (Phase 1 100%, Phase 2 100%, Step 3.1 100%) |
+| **Free-Tier Safety** | **Verified & Compliant (100%)** | All services within $0.00/mo envelope (zero credit card required) |
 | **Git Repository** | **Connected to GitHub** | `main` branch synced with `origin` |
 
 ---
@@ -55,7 +57,7 @@
 
 ---
 
-### Phase 2: Authentication, Security & Player UI Shell
+### Phase 2: Authentication, Security & Player UI Shell (100% Complete)
 - [x] **Step 2.1: Better Auth with Email/Password & D1 Database**
   - [x] Mount Better Auth router on Hono (`/api/auth/*`)
   - [x] Configure `emailAndPassword` authentication with secure password hashing
@@ -89,12 +91,14 @@
 
 ---
 
-### Phase 3: Real-Time Sync, Offline Storage & Active Shelf
-- [ ] **Step 3.1: Durable Objects Real-Time Progress Sync**
-  - [ ] Implement `SyncRoom` Durable Object class with SQLite backend
-  - [ ] Stateful hibernatable WebSocket listener connections
-  - [ ] Hybrid Logical Clock (HLC) + Monotonic Progress Vector conflict resolution
-  - [ ] Multi-device "Resume from other device" notification banner
+### Phase 3: Real-Time Sync, Offline Storage & Active Shelf (In Progress)
+- [x] **Step 3.1: Durable Objects Real-Time Progress Sync**
+  - [x] Implement `SyncRoom` Durable Object class with SQLite backend (`packages/server/src/sync/room.ts`)
+  - [x] Stateful hibernatable WebSocket listener connections (`/api/sync/ws`)
+  - [x] Hybrid Logical Clock (HLC) + Monotonic Progress Vector conflict resolution (`packages/shared/src/hlc.ts`)
+  - [x] Multi-device "Resume from other device" notification banner (`ResumeBanner.tsx`)
+  - [x] Auto-reconnecting client WebSocket manager with exponential backoff (`SyncClient`)
+  - [x] 23 new unit tests across shared, server, and app (78 total tests passing across monorepo)
 - [ ] **Step 3.2: Origin Private File System (OPFS) Download Manager**
   - [ ] Background stream writer to OPFS via `FileSystemWritableFileStream`
   - [ ] Service Worker range request interception for offline playback
@@ -145,3 +149,6 @@
 | **2026-10-04 22:58** | **Step 2.1: Better Auth & Sessions** | Configured Better Auth with Email/Password & D1; built `requireAuth`, `optionalAuth`, `requireAdmin` middlewares; passkeys deferred to future scope per user; 20 Vitest tests passed. |
 | **2026-10-04 23:01** | **Step 2.2: Cryptographic Invites** | Built 256-bit entropy invite engine with SHA-256 hashing, atomic usage counters, admin endpoints, and token-gated registration; 31 Vitest tests passing. |
 | **2026-10-04 23:14** | **Step 2.3: PWA Shell (Sober Thoughts Style)** | Built React 19 + Tailwind v4 PWA shell inspired by sober-thoughts (obsidian, high-contrast, tactile 1px borders, zero cloudy glass); 34 Vitest tests passing across monorepo. |
+| **2026-10-04 23:35** | **Step 2.4: Web Audio DSP Engine** | Built HTMLMediaElement transport, 40ms gain ramp, 3-band parametric Voice Boost EQ, RMS silence trimming, and -16 LUFS compressor; 39 Vitest tests passing. |
+| **2026-10-05 00:15** | **Step 2.5: Media Session & Scrubber** | Built lock-screen controls, decelerated vertical-drag scrubber, smart sleep timer with fade & accelerometer shake-to-extend, PiP visualizer, and FullPlayerModal; 55 Vitest tests passing. Phase 2 Complete! |
+| **2026-10-05 11:12** | **Step 3.1: Durable Objects Real-Time Sync** | Implemented `SyncRoom` Durable Object with SQLite backend and hibernatable WebSockets, HLC + Monotonic Progress Vector conflict resolution, client `SyncClient` with exponential backoff, and tactile obsidian `ResumeBanner`; 78 Vitest tests passing. |
