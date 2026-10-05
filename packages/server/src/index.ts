@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { absRoutes } from "./abs/routes";
@@ -6,7 +6,8 @@ import { createAuth } from "./auth";
 import { type AuthContextVariables, requireAdmin, requireAuth } from "./auth/middleware";
 import { inviteRoutes } from "./auth/routes";
 import { createDb } from "./db";
-import { books } from "./db/schema";
+import * as schema from "./db/schema";
+import { scanDriveLibrary } from "./drive/scanner";
 import { handleAudioStreamRequest } from "./drive/stream";
 import {
   ACTIVE_SHELF_PREFIX,
@@ -67,15 +68,141 @@ app.all("/api/auth/*", (c) => {
 // Cryptographic invite routes (/api/invites/*)
 app.route("/api/invites", inviteRoutes);
 
+// Resolve fileId: if it's a book ID, map to Google Drive file ID from files table
+async function resolveDriveFileId(db: ReturnType<typeof createDb>, param: string): Promise<string> {
+  const fileRecord = await db
+    .select({ driveFileId: schema.files.driveFileId })
+    .from(schema.files)
+    .where(or(eq(schema.files.bookId, param), eq(schema.files.id, param)))
+    .limit(1);
+  return fileRecord[0]?.driveFileId || param;
+}
+
 // Audio streaming range proxy endpoint (GET and HEAD)
-app.get("/api/stream/:fileId", (c) => {
+app.get("/api/stream/:fileId", async (c) => {
   const fileId = c.req.param("fileId");
-  return handleAudioStreamRequest(c.req.raw, fileId, c.env);
+  const db = createDb(c.env.DB);
+  const resolved = await resolveDriveFileId(db, fileId);
+  return handleAudioStreamRequest(c.req.raw, resolved, c.env);
 });
 
-app.on("HEAD", "/api/stream/:fileId", (c) => {
+app.on("HEAD", "/api/stream/:fileId", async (c) => {
   const fileId = c.req.param("fileId");
-  return handleAudioStreamRequest(c.req.raw, fileId, c.env);
+  const db = createDb(c.env.DB);
+  const resolved = await resolveDriveFileId(db, fileId);
+  return handleAudioStreamRequest(c.req.raw, resolved, c.env);
+});
+
+// Library Books API
+app.get("/api/books", async (c) => {
+  const db = createDb(c.env.DB);
+  const allBooks = await db
+    .select({
+      id: schema.books.id,
+      driveFolderId: schema.books.driveFolderId,
+      title: schema.books.title,
+      author: schema.books.author,
+      seriesId: schema.books.seriesId,
+      seriesIndex: schema.books.seriesIndex,
+      narrator: schema.books.narrator,
+      description: schema.books.description,
+      coverR2Key: schema.books.coverR2Key,
+      durationSeconds: schema.books.durationSeconds,
+      publishedYear: schema.books.publishedYear,
+      format: schema.books.format,
+      fileSizeBytes: schema.books.fileSizeBytes,
+      isActiveShelf: schema.books.isActiveShelf,
+      createdAt: schema.books.createdAt,
+      updatedAt: schema.books.updatedAt,
+      seriesName: schema.series.name,
+    })
+    .from(schema.books)
+    .leftJoin(schema.series, eq(schema.books.seriesId, schema.series.id));
+
+  const mapped = allBooks.map((b) => ({
+    ...b,
+    series: b.seriesName || undefined,
+  }));
+  return c.json({ books: mapped });
+});
+
+app.get("/api/books/:id", async (c) => {
+  const id = c.req.param("id");
+  const db = createDb(c.env.DB);
+  const bookList = await db.select().from(schema.books).where(eq(schema.books.id, id)).limit(1);
+
+  if (!bookList[0]) {
+    return c.json({ error: "Book not found" }, 404);
+  }
+
+  const bookFiles = await db.select().from(schema.files).where(eq(schema.files.bookId, id));
+
+  const bookChapters = await db
+    .select()
+    .from(schema.chapters)
+    .where(eq(schema.chapters.bookId, id));
+
+  return c.json({
+    book: bookList[0],
+    files: bookFiles,
+    chapters: bookChapters,
+  });
+});
+
+// Book Cover Proxy endpoint
+app.get("/api/covers/:bookId", async (c) => {
+  const bookId = c.req.param("bookId");
+  const db = createDb(c.env.DB);
+  const bookRecord = await db
+    .select({ coverR2Key: schema.books.coverR2Key })
+    .from(schema.books)
+    .where(eq(schema.books.id, bookId))
+    .limit(1);
+
+  const coverKey = bookRecord[0]?.coverR2Key;
+  if (!coverKey) {
+    return c.text("Cover not found", 404);
+  }
+
+  if (coverKey.startsWith("http://") || coverKey.startsWith("https://")) {
+    return c.redirect(coverKey);
+  }
+
+  if (coverKey.startsWith("gdrive:")) {
+    const driveFileId = coverKey.replace("gdrive:", "");
+    return handleAudioStreamRequest(c.req.raw, driveFileId, c.env);
+  }
+
+  if (c.env.R2) {
+    const r2Obj = await c.env.R2.get(coverKey);
+    if (r2Obj && "body" in r2Obj && r2Obj.body) {
+      return new Response(r2Obj.body as ReadableStream, {
+        headers: {
+          "Content-Type": r2Obj.httpMetadata?.contentType || "image/jpeg",
+          "Cache-Control": "public, max-age=604800, s-maxage=604800",
+        },
+      });
+    }
+  }
+
+  return c.text("Cover not found", 404);
+});
+
+// Google Drive Library Scanner endpoint
+app.post("/api/library/scan", async (c) => {
+  try {
+    let folderId = c.env.GOOGLE_DRIVE_FOLDER_ID || "1E0mdkz7_wUBEHZ-GVGoeK9CZvM_lqwMw";
+    const body = await c.req.json<{ folderId?: string }>().catch(() => ({}));
+    if (body?.folderId) {
+      folderId = body.folderId;
+    }
+
+    const result = await scanDriveLibrary(c.env, folderId);
+    return c.json(result);
+  } catch (err) {
+    console.error("Library scan failed:", err);
+    return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+  }
 });
 
 // Real-time WebSocket sync route (/api/sync/ws)
@@ -244,6 +371,38 @@ app.get("/api/social/rooms/:roomId/state", requireAuth, async (c) => {
 app.route("/api/v1", absRoutes);
 app.route("/api", absRoutes);
 app.route("/", absRoutes);
+
+// Fallback: Serve client PWA static assets or SPA shell (/index.html)
+app.get("*", async (c) => {
+  if (c.env.ASSETS) {
+    const url = new URL(c.req.url);
+    const pathname = url.pathname;
+
+    // Do not intercept API requests
+    if (pathname.startsWith("/api/")) {
+      return c.text("Not Found", 404);
+    }
+
+    const lastSegment = pathname.split("/").pop() || "";
+    const hasExtension = lastSegment.includes(".");
+
+    // If it's an SPA route without a file extension, serve root SPA shell
+    if (!hasExtension) {
+      url.pathname = "/";
+      url.search = "";
+      return c.env.ASSETS.fetch(new Request(url.toString()));
+    }
+
+    const res = await c.env.ASSETS.fetch(c.req.raw);
+    if (res.status === 404 || (res.status >= 300 && res.status < 400)) {
+      url.pathname = "/";
+      url.search = "";
+      return c.env.ASSETS.fetch(new Request(url.toString()));
+    }
+    return res;
+  }
+  return c.text("audioneko API Active", 200);
+});
 
 export default {
   fetch: app.fetch,

@@ -1,5 +1,7 @@
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { createDb } from "../db";
+import { user } from "../db/schema";
 import type { Env } from "../types";
 import { createAuth } from "./index";
 import { createInvite, listInvites, redeemInviteToken, verifyInviteToken } from "./invites";
@@ -150,6 +152,14 @@ inviteRoutes.post("/register", async (c) => {
 
     // Atomically increment invite usage
     await redeemInviteToken(db, body.token);
+
+    // If invite assigned a specific role (e.g. admin), ensure it is persisted in the database
+    if (verification.invite.role && verification.invite.role !== "listener") {
+      await db
+        .update(user)
+        .set({ role: verification.invite.role })
+        .where(eq(user.email, body.email.toLowerCase().trim()));
+    }
 
     // Forward the session cookie and response headers to the client
     const responseHeaders = new Headers(authResponse.headers);

@@ -20,6 +20,9 @@ build/
 *.pem
 *.key
 google-service-account.json
+audioneko-vault-*.json
+*service-account*.json
+*credentials*.json
 
 # Cache & Diagnostics
 .turbo/

@@ -1,4 +1,5 @@
 import type { Book, Chapter } from "@audioneko/shared";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { ArrowLeft, ListMusic, Play } from "lucide-react";
 import { DownloadButton } from "../components/storage/DownloadButton";
@@ -56,6 +57,17 @@ export function BookDetailPage() {
   const { id } = useParams({ strict: false });
   const { playBook, currentBook, isPlaying, seekTo } = useAudio();
 
+  const { data: bookData } = useQuery({
+    queryKey: ["book", id],
+    queryFn: async () => {
+      if (!id) return null;
+      const res = await fetch(`/api/books/${id}`);
+      if (!res.ok) return null;
+      return (await res.json()) as { book: Book; chapters: Chapter[] };
+    },
+    enabled: !!id,
+  });
+
   const mockBook: Book = {
     id: id || "sample_m4b_1",
     driveFolderId: "fld_1",
@@ -68,10 +80,14 @@ export function BookDetailPage() {
     isActiveShelf: true,
     publishedYear: 2021,
     description:
-      "Ryland Grace is the sole survivor on a desperate, last-chance mission—and if he fails, humanity and the earth itself will perish. Except that right now, he doesn't know that. He can't even remember his own name, let alone the nature of his assignment or how to complete it.",
+      "Ryland Grace is the sole survivor on a desperate, last-chance mission—and if he fails, humanity and the earth itself will perish.",
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+
+  const book = bookData?.book || mockBook;
+  const chapters =
+    bookData?.chapters && bookData.chapters.length > 0 ? bookData.chapters : MOCK_CHAPTERS;
 
   const formatSeconds = (secs: number) => {
     const h = Math.floor(secs / 3600);
@@ -96,100 +112,127 @@ export function BookDetailPage() {
       {/* Main Book Card */}
       <div className="surface-card p-6 md:p-8 flex flex-col md:flex-row gap-8 items-start border border-border">
         {/* Cover presentation */}
-        <div className="w-48 h-48 md:w-56 md:h-56 rounded border border-border bg-elevated shrink-0 flex items-center justify-center font-mono text-muted text-xl font-bold shadow-sm">
-          {mockBook.format.toUpperCase()}
+        <div className="w-48 h-48 md:w-56 md:h-56 rounded border border-border bg-elevated shrink-0 flex items-center justify-center font-mono text-muted text-xl font-bold shadow-sm overflow-hidden">
+          {book.coverR2Key ? (
+            <img
+              src={`/api/covers/${book.id}`}
+              alt={book.title}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = "none";
+              }}
+            />
+          ) : (
+            book.format.toUpperCase()
+          )}
         </div>
 
-        {/* Metadata & Actions */}
+        {/* Metadata Details */}
         <div className="flex-1 space-y-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs font-mono text-accent">
-              <span>{mockBook.format.toUpperCase()} SINGLE FILE</span>
-              <span>•</span>
-              <span>{mockBook.publishedYear}</span>
+              <span className="logo-dot" />
+              <span>{book.format.toUpperCase()} AUDIOBOOK</span>
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-text">
-              {mockBook.title}
+              {book.title}
             </h1>
             <p className="text-sm font-mono text-muted">
-              By <span className="text-text">{mockBook.author}</span>
+              By <span className="text-text font-medium">{book.author}</span>
+              {book.narrator && (
+                <span>
+                  {" "}
+                  • Narrated by <span className="text-text">{book.narrator}</span>
+                </span>
+              )}
             </p>
-            {mockBook.narrator && (
-              <p className="text-xs font-mono text-subtle">Narrated by {mockBook.narrator}</p>
+          </div>
+
+          <p className="text-xs text-muted leading-relaxed line-clamp-4">
+            {book.description || `${book.title} by ${book.author}.`}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-4 text-xs font-mono text-subtle pt-2">
+            <div>
+              <span className="text-muted">Length: </span>
+              <span>{formatSeconds(book.durationSeconds)}</span>
+            </div>
+            <div>
+              <span className="text-muted">Size: </span>
+              <span>{(book.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB</span>
+            </div>
+            {book.isActiveShelf && (
+              <span className="text-accent border border-accent/30 px-2 py-0.5 rounded text-[10px]">
+                Active Shelf Cached
+              </span>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 pt-2">
+          {/* Action buttons */}
+          <div className="flex items-center gap-3 pt-4">
             <button
               type="button"
-              onClick={() => playBook(mockBook, 0, MOCK_CHAPTERS)}
-              className="px-6 py-2.5 rounded bg-accent text-bg text-xs font-mono font-semibold flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+              onClick={() => playBook(book, 0, chapters)}
+              className="px-6 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
             >
               <Play className="w-4 h-4 fill-current" />
               <span>
-                {isPlaying && currentBook?.id === mockBook.id ? "PAUSE" : "START LISTENING"}
+                {isPlaying && currentBook?.id === book.id ? "PAUSE PLAYBACK" : "LISTEN NOW"}
               </span>
             </button>
 
-            <DownloadButton
-              meta={{
-                bookId: mockBook.id,
-                title: mockBook.title,
-                author: mockBook.author,
-                durationSeconds: mockBook.durationSeconds || 0,
-                fileSizeBytes: mockBook.fileSizeBytes || 0,
-                downloadedAt: 0,
-                coverR2Key: mockBook.coverR2Key,
-                chapters: MOCK_CHAPTERS,
-              }}
-            />
+            {/* Offline OPFS Download Button */}
+            <DownloadButton book={book} />
           </div>
-
-          <p className="text-xs text-muted leading-relaxed pt-2">{mockBook.description}</p>
         </div>
       </div>
 
       {/* Chapters Section */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-border pb-2">
-          <div className="flex items-center gap-2 text-xs font-mono text-text font-semibold">
+          <div className="flex items-center gap-2 font-mono text-xs text-text font-medium">
             <ListMusic className="w-4 h-4 text-accent" />
-            <span>CHAPTERS ({MOCK_CHAPTERS.length})</span>
+            <span>CHAPTERS ({chapters.length})</span>
           </div>
-          <span className="text-[11px] font-mono text-subtle">Extracted from ISO-BMFF Atoms</span>
+          <span className="text-[11px] font-mono text-subtle">
+            Total: {formatSeconds(book.durationSeconds)}
+          </span>
         </div>
 
-        <div className="divide-y divide-border surface-card border border-border">
-          {MOCK_CHAPTERS.map((ch, idx) => (
-            <button
-              type="button"
-              key={ch.id}
-              className="w-full text-left p-3.5 flex items-center justify-between hover:bg-elevated/40 transition-colors group cursor-pointer"
-              onClick={() => {
-                if (currentBook?.id !== mockBook.id) {
-                  playBook(mockBook, ch.startTime, MOCK_CHAPTERS);
-                } else {
-                  seekTo(ch.startTime);
-                }
-              }}
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] font-mono text-subtle w-6">
-                  {(idx + 1).toString().padStart(2, "0")}
-                </span>
-                <span className="text-xs font-medium text-text group-hover:text-accent transition-colors">
-                  {ch.title}
-                </span>
-              </div>
+        <div className="surface-card divide-y divide-border border border-border">
+          {chapters.map((chapter) => {
+            const isCurrentPlaying = isPlaying && currentBook?.id === book.id;
 
-              <div className="flex items-center gap-3">
-                <span className="text-[11px] font-mono text-muted">
-                  {formatSeconds(ch.startTime)}
-                </span>
-                <Play className="w-3.5 h-3.5 text-subtle group-hover:text-accent fill-current opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </button>
-          ))}
+            return (
+              <button
+                key={chapter.id}
+                type="button"
+                onClick={() => {
+                  if (currentBook?.id !== book.id) {
+                    playBook(book, chapter.startTime, chapters);
+                  } else {
+                    seekTo(chapter.startTime);
+                  }
+                }}
+                className={`w-full p-3.5 flex items-center justify-between text-left hover:bg-elevated transition-colors cursor-pointer ${
+                  isCurrentPlaying ? "bg-accent-bg" : ""
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono text-subtle w-6">
+                    {chapter.chapterIndex.toString().padStart(2, "0")}
+                  </span>
+                  <span className="text-xs font-medium text-text">{chapter.title}</span>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-mono text-subtle">
+                  <span>{formatSeconds(chapter.startTime)}</span>
+                  <span className="text-[10px] text-muted">
+                    ({formatSeconds(chapter.duration)})
+                  </span>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

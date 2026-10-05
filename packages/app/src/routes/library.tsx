@@ -1,10 +1,12 @@
 import type { Book } from "@audioneko/shared";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Play } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAudio } from "../context/audio-context";
+import { updateSearchIndex } from "../lib/search";
 
-// Mock/Initial sample book while library scans Google Drive
+// Fallback sample books if library has not been scanned yet
 const SAMPLE_BOOKS: Book[] = [
   {
     id: "sample_m4b_1",
@@ -12,7 +14,7 @@ const SAMPLE_BOOKS: Book[] = [
     title: "Project Hail Mary",
     author: "Andy Weir",
     narrator: "Ray Porter",
-    durationSeconds: 57900, // 16h 05m
+    durationSeconds: 57900,
     format: "m4b",
     fileSizeBytes: 420 * 1024 * 1024,
     isActiveShelf: true,
@@ -28,7 +30,7 @@ const SAMPLE_BOOKS: Book[] = [
     title: "The Way of Kings",
     author: "Brandon Sanderson",
     narrator: "Michael Kramer & Kate Reading",
-    durationSeconds: 164160, // 45h 36m
+    durationSeconds: 164160,
     format: "m4b",
     fileSizeBytes: 1200 * 1024 * 1024,
     isActiveShelf: false,
@@ -44,13 +46,31 @@ export function LibraryPage() {
   const { playBook, currentBook, isPlaying } = useAudio();
   const [activeFilter, setActiveFilter] = useState<"all" | "in-progress" | "downloaded">("all");
 
+  const { data: booksData } = useQuery({
+    queryKey: ["books"],
+    queryFn: async () => {
+      const res = await fetch("/api/books");
+      if (!res.ok) return { books: [] };
+      return (await res.json()) as { books: Book[] };
+    },
+  });
+
+  const booksList = booksData?.books && booksData.books.length > 0 ? booksData.books : SAMPLE_BOOKS;
+
+  // Sync client-side search index
+  useEffect(() => {
+    if (booksList && booksList.length > 0) {
+      updateSearchIndex(booksList);
+    }
+  }, [booksList]);
+
   const formatDuration = (secs: number) => {
     const hours = Math.floor(secs / 3600);
     const mins = Math.floor((secs % 3600) / 60);
     return `${hours}h ${mins}m`;
   };
 
-  const continueBook = currentBook || SAMPLE_BOOKS[0];
+  const continueBook = currentBook || booksList[0];
 
   return (
     <div className="space-y-8 pb-24">
@@ -59,8 +79,19 @@ export function LibraryPage() {
         <section className="surface-card p-5 md:p-6 relative overflow-hidden border border-border">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-20 h-20 md:w-24 md:h-24 rounded border border-border bg-elevated shrink-0 flex items-center justify-center font-mono text-muted text-lg font-bold">
-                {continueBook.format.toUpperCase()}
+              <div className="w-20 h-20 md:w-24 md:h-24 rounded border border-border bg-elevated shrink-0 flex items-center justify-center font-mono text-muted text-lg font-bold overflow-hidden">
+                {continueBook.coverR2Key ? (
+                  <img
+                    src={`/api/covers/${continueBook.id}`}
+                    alt={continueBook.title}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none";
+                    }}
+                  />
+                ) : (
+                  continueBook.format.toUpperCase()
+                )}
               </div>
 
               <div className="space-y-1">
@@ -72,12 +103,12 @@ export function LibraryPage() {
                   {continueBook.title}
                 </h2>
                 <p className="text-xs font-mono text-muted">
-                  {continueBook.author} • Narrated by {continueBook.narrator}
+                  {continueBook.author} • Narrated by {continueBook.narrator || "Narrator"}
                 </p>
                 <div className="flex items-center gap-3 pt-1 text-[11px] font-mono text-subtle">
                   <span>{formatDuration(continueBook.durationSeconds)}</span>
                   <span>•</span>
-                  <span className="text-accent">M4B 64kbps AAC</span>
+                  <span className="text-accent">{continueBook.format.toUpperCase()} STREAM</span>
                 </div>
               </div>
             </div>
@@ -116,21 +147,32 @@ export function LibraryPage() {
         </div>
 
         <div className="text-xs font-mono text-subtle">
-          <span>{SAMPLE_BOOKS.length} titles</span>
+          <span>{booksList.length} titles</span>
         </div>
       </div>
 
       {/* Book Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {SAMPLE_BOOKS.map((book) => (
+        {booksList.map((book) => (
           <div
             key={book.id}
             className="group surface-card overflow-hidden flex flex-col transition-all hover:border-text-subtle"
           >
-            <div className="aspect-square bg-elevated relative flex items-center justify-center border-b border-border">
-              <span className="font-mono text-sm font-semibold text-subtle">
-                {book.format.toUpperCase()}
-              </span>
+            <div className="aspect-square bg-elevated relative flex items-center justify-center border-b border-border overflow-hidden">
+              {book.coverR2Key ? (
+                <img
+                  src={`/api/covers/${book.id}`}
+                  alt={book.title}
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                  onError={(e) => {
+                    (e.target as HTMLElement).style.display = "none";
+                  }}
+                />
+              ) : (
+                <span className="font-mono text-sm font-semibold text-subtle">
+                  {book.format.toUpperCase()}
+                </span>
+              )}
 
               {/* Hover quick play button */}
               <button
@@ -164,7 +206,7 @@ export function LibraryPage() {
               </div>
 
               <div className="pt-3 flex items-center justify-between text-[10px] font-mono text-subtle border-t border-border mt-3">
-                <span>{book.publishedYear || "—"}</span>
+                <span>{book.publishedYear || (book.format ? book.format.toUpperCase() : "—")}</span>
                 {book.isActiveShelf && (
                   <span className="text-accent text-[9px] font-medium">SHELF</span>
                 )}

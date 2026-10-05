@@ -13,20 +13,14 @@
     {
       "binding": "DB",
       "database_name": "audioneko-db",
-      "database_id": "audioneko-local-d1-id",
+      "database_id": "013edbba-b34e-4c02-96fa-c4de23ff136e",
       "migrations_dir": "drizzle"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "R2",
-      "bucket_name": "audioneko-r2"
     }
   ],
   "kv_namespaces": [
     {
       "binding": "KV",
-      "id": "audioneko-kv-id"
+      "id": "84d4fc2d371540f5b872ec7780ca81a9"
     }
   ],
   "durable_objects": {

@@ -52,6 +52,15 @@ export function RootLayout() {
     updateSearchIndex(INITIAL_SEARCHABLE_BOOKS);
   }, []);
 
+  // Safeguard: If landing with invite ?token= on any route outside /join, redirect to /join
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    if (token && window.location.pathname !== "/join") {
+      window.location.href = `/join?token=${encodeURIComponent(token)}`;
+    }
+  }, []);
+
   // Global shortcut listener: Cmd+K or Ctrl+K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
