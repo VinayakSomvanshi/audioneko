@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { absRoutes } from "./abs/routes";
 import { createAuth } from "./auth";
 import { type AuthContextVariables, requireAdmin, requireAuth } from "./auth/middleware";
 import { inviteRoutes } from "./auth/routes";
@@ -208,6 +209,14 @@ app.get("/api/social/rooms/:roomId/state", requireAuth, async (c) => {
   return c.newResponse(res.body, res.status as 200, Object.fromEntries(res.headers.entries()));
 });
 
+// ==========================================
+// Audiobookshelf (ABS) API Compatibility Layer
+// Supports Plappa (iOS), ShelfPlayer, and native ABS clients
+// ==========================================
+app.route("/api/v1", absRoutes);
+app.route("/api", absRoutes);
+app.route("/", absRoutes);
+
 export default {
   fetch: app.fetch,
   async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
@@ -235,3 +244,7 @@ export * from "./shelf/active-shelf";
 export * from "./social/analytics";
 export * from "./social/presence";
 export * from "./social/listen-along";
+export * from "./abs/types";
+export * from "./abs/auth";
+export * from "./abs/mapper";
+export * from "./abs/routes";
