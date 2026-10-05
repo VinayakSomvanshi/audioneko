@@ -75,21 +75,6 @@ export function Sidebar({ onSearchClick }: SidebarProps) {
           );
         })}
       </nav>
-
-      {/* Cloudflare Edge Quota Card */}
-      <div className="mt-auto surface-card p-3 space-y-2">
-        <div className="flex items-center justify-between text-[10px] font-mono text-subtle">
-          <span>ACTIVE SHELF (R2)</span>
-          <span className="text-accent font-medium">0 / 10 GB</span>
-        </div>
-        <div className="w-full bg-elevated h-1 rounded overflow-hidden">
-          <div className="bg-accent h-full w-[0%]" />
-        </div>
-        <div className="text-[10px] font-mono text-muted flex items-center justify-between">
-          <span>Tier 1 Drive Cold</span>
-          <span className="text-[9px] text-accent">READY</span>
-        </div>
-      </div>
     </aside>
   );
 }
