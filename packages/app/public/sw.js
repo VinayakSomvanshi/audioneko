@@ -1,5 +1,4 @@
 // audioneko Service Worker — Offline Range Streaming & PWA Shell Cache
-const CACHE_NAME = "audioneko-shell-v1";
 const OPFS_ROOT_DIR = "audioneko_books";
 const AUDIO_FILE_NAME = "audio.bin";
 
@@ -11,15 +10,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) =>
-        Promise.all(
-          keys.map((key) => {
-            if (key !== CACHE_NAME) {
-              return caches.delete(key);
-            }
-          }),
-        ),
-      )
+      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   );
 });

@@ -724,8 +724,24 @@ app.route("/api/v1", absRoutes);
 app.route("/api", absRoutes);
 app.route("/", absRoutes);
 
+// Helper to serve index.html with strict no-cache headers to prevent stale chunk errors
+async function serveSpaIndexHtml(env: Env, reqUrl: string): Promise<Response> {
+  const rootUrl = new URL("/", reqUrl);
+  const res = await env.ASSETS.fetch(new Request(rootUrl.toString()));
+  const headers = new Headers(res.headers);
+  headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+  headers.set("Pragma", "no-cache");
+  headers.set("Expires", "0");
+  headers.set("Content-Type", "text/html; charset=utf-8");
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
+}
+
 // Fallback: Serve client PWA static assets or SPA shell (/index.html)
-app.get("*", async (c) => {
+app.on(["GET", "HEAD"], "*", async (c) => {
   if (c.env.ASSETS) {
     const url = new URL(c.req.url);
     const pathname = url.pathname;
@@ -735,23 +751,59 @@ app.get("*", async (c) => {
       return c.text("Not Found", 404);
     }
 
+    // Explicit root or HTML requests: serve fresh index.html with no-cache
+    if (pathname === "/" || pathname === "/index.html") {
+      return serveSpaIndexHtml(c.env, c.req.url);
+    }
+
+    // Explicit hashed Vite assets: /assets/*
+    if (pathname.startsWith("/assets/")) {
+      const res = await c.env.ASSETS.fetch(c.req.raw);
+      if (res.status === 200) {
+        const headers = new Headers(res.headers);
+        headers.set("Cache-Control", "public, max-age=31536000, immutable");
+        return new Response(res.body, {
+          status: 200,
+          statusText: res.statusText,
+          headers,
+        });
+      }
+      // CRITICAL: Never return index.html for missing /assets/* — return clean 404
+      return new Response("Asset Not Found", {
+        status: 404,
+        headers: {
+          "Content-Type": "text/plain",
+          "Cache-Control": "no-cache, no-store",
+        },
+      });
+    }
+
+    // Service Worker: must never be cached by browser
+    if (pathname === "/sw.js") {
+      const res = await c.env.ASSETS.fetch(c.req.raw);
+      const headers = new Headers(res.headers);
+      headers.set("Cache-Control", "no-cache, no-store, must-revalidate");
+      return new Response(res.body, {
+        status: res.status,
+        statusText: res.statusText,
+        headers,
+      });
+    }
+
     const lastSegment = pathname.split("/").pop() || "";
     const hasExtension = lastSegment.includes(".");
 
-    // If it's an SPA route without a file extension, serve root SPA shell
-    if (!hasExtension) {
-      url.pathname = "/";
-      url.search = "";
-      return c.env.ASSETS.fetch(new Request(url.toString()));
+    // If it's a file with an extension (e.g. /favicon.svg, /manifest.json, etc.)
+    if (hasExtension) {
+      const res = await c.env.ASSETS.fetch(c.req.raw);
+      if (res.status === 200) {
+        return res;
+      }
+      return c.text("Not Found", 404);
     }
 
-    const res = await c.env.ASSETS.fetch(c.req.raw);
-    if (res.status === 404 || (res.status >= 300 && res.status < 400)) {
-      url.pathname = "/";
-      url.search = "";
-      return c.env.ASSETS.fetch(new Request(url.toString()));
-    }
-    return res;
+    // It's an SPA route without a file extension (e.g. /series, /authors, /shelves, /book/123)
+    return serveSpaIndexHtml(c.env, c.req.url);
   }
   return c.text("audioneko API Active", 200);
 });

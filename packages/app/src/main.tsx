@@ -42,3 +42,17 @@ if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       });
   });
 }
+
+// Auto-recover if dynamic imports fail due to new version deployment
+if (typeof window !== "undefined") {
+  window.addEventListener("vite:preloadError", (event) => {
+    event.preventDefault();
+    const key = "audioneko_preload_reload";
+    const last = sessionStorage.getItem(key);
+    const now = Date.now();
+    if (!last || now - Number.parseInt(last, 10) > 10000) {
+      sessionStorage.setItem(key, String(now));
+      window.location.reload();
+    }
+  });
+}

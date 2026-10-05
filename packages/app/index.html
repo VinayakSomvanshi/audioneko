@@ -18,6 +18,27 @@
       })();
     </script>
 
+    <!-- Auto-recovery for stale chunks or asset load failures after deployments -->
+    <script>
+      (function() {
+        window.addEventListener('error', function(e) {
+          var target = e.target;
+          if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
+            var url = target.src || target.href || '';
+            if (url.includes('/assets/')) {
+              var key = 'audioneko_asset_reload';
+              var last = sessionStorage.getItem(key);
+              var now = Date.now();
+              if (!last || (now - parseInt(last, 10)) > 10000) {
+                sessionStorage.setItem(key, String(now));
+                window.location.reload();
+              }
+            }
+          }
+        }, true);
+      })();
+    </script>
+
     <title>audioneko</title>
     <meta name="description" content="Private zero-recurring-cost audiobook streaming web app with 4-tier hybrid caching and offline OPFS support." />
     
