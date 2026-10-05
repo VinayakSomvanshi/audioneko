@@ -40,7 +40,6 @@ export function ShelvesPage() {
   const [isCreatingShelf, setIsCreatingShelf] = useState(false);
   const [addingBookShelfId, setAddingBookShelfId] = useState<string | null>(null);
   const [shelfBookSearch, setShelfBookSearch] = useState("");
-  const [librarySearch, setLibrarySearch] = useState("");
 
   // 1. Fetch user custom shelves
   const { data: shelvesData, isLoading: shelvesLoading } = useQuery<{ shelves: CustomShelf[] }>({
@@ -132,13 +131,6 @@ export function ShelvesPage() {
 
   const allBooks = booksData?.books ?? [];
   const customShelves = shelvesData?.shelves ?? [];
-
-  // Filtered books for the library explore section
-  const filteredLibraryBooks = allBooks.filter((b) => {
-    if (!librarySearch.trim()) return true;
-    const q = librarySearch.trim().toLowerCase();
-    return b.title.toLowerCase().includes(q) || Boolean(b.author?.toLowerCase().includes(q));
-  });
 
   return (
     <div className="space-y-8 pb-32">
@@ -488,85 +480,6 @@ export function ShelvesPage() {
                 </div>
               );
             })}
-          </div>
-        )}
-      </div>
-
-      {/* ========================================== */}
-      {/* Browse Library Section */}
-      {/* ========================================== */}
-      <div className="space-y-4 pt-6 border-t border-border">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-sm font-bold font-mono text-text uppercase">
-              All Library Audiobooks
-            </h2>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface border border-border text-muted">
-              {filteredLibraryBooks.length}
-              {filteredLibraryBooks.length !== allBooks.length ? ` / ${allBooks.length}` : ""}{" "}
-              available
-            </span>
-          </div>
-
-          <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search library..."
-              value={librarySearch}
-              onChange={(e) => setLibrarySearch(e.target.value)}
-              className="w-full bg-elevated border border-border focus:border-accent rounded pl-8 pr-3 py-1.5 text-xs font-mono text-text placeholder:text-muted focus:outline-none transition-colors"
-            />
-          </div>
-        </div>
-
-        {filteredLibraryBooks.length === 0 ? (
-          <div className="surface-card p-6 border border-border text-center text-xs font-mono text-muted">
-            No audiobooks match "{librarySearch}".
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {filteredLibraryBooks.map((book) => (
-              <div
-                key={book.id}
-                className="surface-card p-3 border border-border flex items-center justify-between gap-3 hover:border-border/80 transition-colors"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-10 h-10 rounded border border-border bg-surface overflow-hidden shrink-0">
-                    {book.coverR2Key ? (
-                      <img
-                        src={getBookCoverUrl(book)}
-                        alt={book.title}
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <Bookmark className="w-4 h-4 text-muted m-auto mt-3" />
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <Link
-                      to="/book/$id"
-                      params={{ id: book.id }}
-                      className="text-xs font-medium text-text hover:text-accent truncate block"
-                    >
-                      {book.title}
-                    </Link>
-                    <div className="text-[10px] font-mono text-muted truncate">{book.author}</div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Link
-                    to="/book/$id"
-                    params={{ id: book.id }}
-                    className="px-2.5 py-1 rounded bg-elevated border border-border hover:border-accent text-xs font-mono text-text hover:text-accent transition-colors flex items-center gap-1"
-                  >
-                    <Play className="w-3 h-3 text-accent" />
-                    <span>Listen</span>
-                  </Link>
-                </div>
-              </div>
-            ))}
           </div>
         )}
       </div>
