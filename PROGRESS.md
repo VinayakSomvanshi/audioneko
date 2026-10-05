@@ -91,7 +91,7 @@
 
 ---
 
-### Phase 3: Real-Time Sync, Offline Storage & Active Shelf (In Progress)
+### Phase 3: Real-Time Sync, Offline Storage & Active Shelf (Completed)
 - [x] **Step 3.1: Durable Objects Real-Time Progress Sync**
   - [x] Implement `SyncRoom` Durable Object class with SQLite backend (`packages/server/src/sync/room.ts`)
   - [x] Stateful hibernatable WebSocket listener connections (`/api/sync/ws`)
@@ -109,10 +109,11 @@
   - [x] 8.5 GB high-water mark automatic LRU eviction policy (`evictLruBooks`) preserving free tier headroom
   - [x] REST endpoints `/api/shelf/status`, `/api/shelf/precache/:bookId`, `/api/shelf/evict`, `/api/shelf/:bookId` and 6-hour cron maintenance
   - [x] Zero-cost invariant strictly enforced: `if (env.R2)` safeguards allow 100% free operation with no payment methods; 93 Vitest tests passing across monorepo
-- [ ] **Step 3.4: Listening Analytics, Streaks & Social Presence**
-  - [ ] Daily listening streak counter & GitHub-style activity heatmap
-  - [ ] Edge presence tracking for friends listening activity
-  - [ ] Synchronized listen-along room host/follower audio clock slewing
+- [x] **Step 3.4: Listening Analytics, Streaks & Social Presence**
+  - [x] Daily listening streak counter & GitHub-style 365-day activity contribution heatmap (`ActivityHeatmap.tsx`, `analytics.ts`)
+  - [x] Edge presence tracking for friends listening activity with live pulsing indicators (`FriendActivityBar.tsx`, `presence.ts`)
+  - [x] Synchronized listen-along room host/follower audio clock slewing without audio pops (`ListenAlongRoom`, `slewing.ts`, `listen-along-client.ts`)
+  - [x] Automatic playback event logger in audio context and `/analytics` route; 105 Vitest tests passing across monorepo
 
 ---
 
@@ -157,3 +158,4 @@
 | **2026-10-05 11:12** | **Step 3.1: Durable Objects Real-Time Sync** | Implemented `SyncRoom` Durable Object with SQLite backend and hibernatable WebSockets, HLC + Monotonic Progress Vector conflict resolution, client `SyncClient` with exponential backoff, and tactile obsidian `ResumeBanner`; 78 Vitest tests passing. |
 | **2026-10-05 11:22** | **Step 3.2: OPFS Download Manager** | Implemented Origin Private File System (OPFS) background streaming chunk downloader, Service Worker range-interception (`/api/stream/:fileId`) with 206 streaming, storage quota estimator and manager, and offline UI; 83 Vitest tests passing. |
 | **2026-10-05 11:30** | **Step 3.3: R2 Active Shelf LRU** | Built optional Cloudflare R2 Active Shelf pre-caching engine, 8.5 GB high-water mark LRU eviction algorithm, queue consumer, scheduled cron maintenance, and management endpoints with zero-cost fallback; 93 Vitest tests passing. |
+| **2026-10-05 11:39** | **Step 3.4: Analytics, Streaks & Social** | Built daily streak tracker, GitHub-style 365-day contribution heatmap, real-time edge friend presence with pulsing indicators, and ListenAlongRoom Durable Object with audio clock slewing; 105 Vitest tests passing. Phase 3 Complete! |

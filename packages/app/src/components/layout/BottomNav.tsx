@@ -1,12 +1,12 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { BookOpen, HardDriveDownload, Library, User as UserIcon } from "lucide-react";
+import { Flame, HardDriveDownload, Library, User as UserIcon } from "lucide-react";
 
 export function BottomNav() {
   const location = useLocation();
 
   const navItems = [
     { label: "Library", href: "/", icon: Library },
-    { label: "Shelves", href: "/shelves", icon: BookOpen },
+    { label: "Activity", href: "/analytics", icon: Flame },
     { label: "Offline", href: "/offline", icon: HardDriveDownload },
     { label: "Account", href: "/login", icon: UserIcon },
   ];

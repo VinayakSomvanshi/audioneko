@@ -111,3 +111,110 @@ export type SyncServerMessage =
   | {
       type: "PONG";
     };
+
+// ==========================================
+// Listening Analytics & Streak Types
+// ==========================================
+
+export interface DailyListeningData {
+  date: string; // "YYYY-MM-DD"
+  secondsListened: number;
+  eventsCount: number;
+  intensity: 0 | 1 | 2 | 3 | 4; // 0=0s, 1=<15m, 2=15-45m, 3=45m-2h, 4=>2h
+}
+
+export interface ListeningAnalyticsResponse {
+  currentStreakDays: number;
+  longestStreakDays: number;
+  totalListenedSeconds: number;
+  totalBooksCompleted: number;
+  todayListenedSeconds: number;
+  averageDailySeconds: number;
+  dailyHistory: DailyListeningData[]; // Recent 365 days
+}
+
+export interface RecordListeningEventRequest {
+  bookId: string;
+  startTimeSeconds: number;
+  endTimeSeconds: number;
+  durationListenedSeconds: number;
+  playbackRate: number;
+  timestamp?: number;
+}
+
+// ==========================================
+// Social Presence Types
+// ==========================================
+
+export interface FriendPresence {
+  userId: string;
+  userName: string;
+  userImage?: string | null;
+  isOnline: boolean;
+  lastActiveAt: number;
+  currentBook?: {
+    bookId: string;
+    title: string;
+    author: string;
+    coverR2Key?: string | null;
+    progressFraction: number;
+    currentTimeSeconds: number;
+    durationSeconds: number;
+    isPlaying: boolean;
+  } | null;
+}
+
+export interface SocialPresenceResponse {
+  friends: FriendPresence[];
+}
+
+// ==========================================
+// Listen-Along Synchronous Room Types
+// ==========================================
+
+export interface ListenAlongRoomState {
+  roomId: string;
+  hostUserId: string;
+  hostName: string;
+  bookId: string;
+  bookTitle?: string;
+  positionSeconds: number;
+  isPlaying: boolean;
+  playbackRate: number;
+  epochSnapshotTime: number; // Server timestamp in ms when state was broadcast
+  listenersCount: number;
+}
+
+export type ListenAlongClientMessage =
+  | {
+      type: "HOST_UPDATE";
+      bookId: string;
+      positionSeconds: number;
+      isPlaying: boolean;
+      playbackRate: number;
+    }
+  | {
+      type: "JOIN_ROOM";
+      roomId: string;
+    }
+  | {
+      type: "LEAVE_ROOM";
+    };
+
+export type ListenAlongServerMessage =
+  | {
+      type: "ROOM_STATE";
+      state: ListenAlongRoomState;
+    }
+  | {
+      type: "HOST_STATE_BROADCAST";
+      bookId: string;
+      positionSeconds: number;
+      isPlaying: boolean;
+      playbackRate: number;
+      epochSnapshotTime: number;
+    }
+  | {
+      type: "LISTENER_COUNT";
+      count: number;
+    };

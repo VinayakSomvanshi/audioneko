@@ -10,6 +10,7 @@ export interface Env {
   R2?: R2Bucket;
   KV: KVNamespace;
   SYNC_ROOM: DurableObjectNamespace;
+  LISTEN_ALONG_ROOM?: DurableObjectNamespace;
   ASSETS: Fetcher;
   BETTER_AUTH_SECRET: string;
   APP_URL: string;

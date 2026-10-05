@@ -14,6 +14,9 @@ import {
   getActiveShelfStatus,
   handleQueueBatch,
 } from "./shelf/active-shelf";
+import { getUserListeningAnalytics, recordListeningEvent } from "./social/analytics";
+import { ListenAlongRoom } from "./social/listen-along";
+import { getFriendsPresence } from "./social/presence";
 import { SyncRoom } from "./sync/room";
 import type { Env, ShelfQueueMessage } from "./types";
 
@@ -136,6 +139,75 @@ app.delete("/api/shelf/:bookId", requireAuth, requireAdmin, async (c) => {
   return c.json({ success: true, bookId });
 });
 
+// ==========================================
+// Listening Analytics & Streaks Routes
+// ==========================================
+
+// Record a listening playback event
+app.post("/api/analytics/listen", requireAuth, async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json();
+  const db = createDb(c.env.DB);
+  const result = await recordListeningEvent(user.id, body, db);
+  return c.json(result);
+});
+
+// Get user listening statistics, streaks, and 365-day activity heatmap
+app.get("/api/analytics/summary", requireAuth, async (c) => {
+  const user = c.get("user");
+  const db = createDb(c.env.DB);
+  const analytics = await getUserListeningAnalytics(user.id, db);
+  return c.json(analytics);
+});
+
+// ==========================================
+// Social Presence Routes
+// ==========================================
+
+// Get small-group friends presence and current listening status
+app.get("/api/social/presence", requireAuth, async (c) => {
+  const user = c.get("user");
+  const db = createDb(c.env.DB);
+  const presence = await getFriendsPresence(user.id, db);
+  return c.json(presence);
+});
+
+// ==========================================
+// Listen-Along Synchronous Room Routes
+// ==========================================
+
+// WebSocket connect to a synchronized listen-along room
+app.get("/api/social/rooms/:roomId/ws", requireAuth, async (c) => {
+  const upgradeHeader = c.req.header("Upgrade");
+  if (upgradeHeader !== "websocket") {
+    return c.text("Expected Upgrade: websocket", 426);
+  }
+
+  if (!c.env.LISTEN_ALONG_ROOM) {
+    return c.text("ListenAlongRoom Durable Object not bound", 501);
+  }
+
+  const roomId = c.req.param("roomId");
+  const doId = c.env.LISTEN_ALONG_ROOM.idFromName(roomId);
+  const stub = c.env.LISTEN_ALONG_ROOM.get(doId);
+
+  return stub.fetch(c.req.raw);
+});
+
+// Get current listen-along room state
+app.get("/api/social/rooms/:roomId/state", requireAuth, async (c) => {
+  if (!c.env.LISTEN_ALONG_ROOM) {
+    return c.json({ error: "ListenAlongRoom Durable Object not bound" }, 501);
+  }
+
+  const roomId = c.req.param("roomId");
+  const doId = c.env.LISTEN_ALONG_ROOM.idFromName(roomId);
+  const stub = c.env.LISTEN_ALONG_ROOM.get(doId);
+
+  const res = await stub.fetch(new Request("https://room/state"));
+  return c.newResponse(res.body, res.status as 200, Object.fromEntries(res.headers.entries()));
+});
+
 export default {
   fetch: app.fetch,
   async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
@@ -147,7 +219,7 @@ export default {
   },
 };
 
-export { SyncRoom, app };
+export { SyncRoom, ListenAlongRoom, app };
 export * from "./types";
 export * from "./db";
 export * from "./auth";
@@ -160,3 +232,6 @@ export * from "./drive/metadata";
 export * from "./drive/enrich";
 export * from "./sync/room";
 export * from "./shelf/active-shelf";
+export * from "./social/analytics";
+export * from "./social/presence";
+export * from "./social/listen-along";

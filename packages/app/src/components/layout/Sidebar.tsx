@@ -1,5 +1,13 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { BookOpen, Bookmark, HardDriveDownload, KeyRound, Library, Users } from "lucide-react";
+import {
+  BookOpen,
+  Bookmark,
+  Flame,
+  HardDriveDownload,
+  KeyRound,
+  Library,
+  Users,
+} from "lucide-react";
 import { useSession } from "../../lib/auth-client";
 
 export function Sidebar() {
@@ -9,6 +17,7 @@ export function Sidebar() {
 
   const navItems = [
     { label: "Library", href: "/", icon: Library },
+    { label: "Analytics & Streaks", href: "/analytics", icon: Flame },
     { label: "Series", href: "/series", icon: BookOpen },
     { label: "Authors", href: "/authors", icon: Users },
     { label: "Shelves", href: "/shelves", icon: Bookmark },

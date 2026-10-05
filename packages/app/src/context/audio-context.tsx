@@ -123,7 +123,31 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     };
   }, [currentBook?.id, currentTime]);
 
-  // Periodic progress sync while playing (every 10s)
+  const lastListenTickRef = useRef<{
+    time: number;
+    position: number;
+    bookId: string;
+  } | null>(null);
+
+  const flushListeningEvent = useCallback(
+    (bookId: string, startPos: number, endPos: number, elapsedWallSecs: number, rate: number) => {
+      if (elapsedWallSecs < 3) return;
+      fetch("/api/analytics/listen", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookId,
+          startTimeSeconds: Math.round(startPos),
+          endTimeSeconds: Math.round(endPos),
+          durationListenedSeconds: Math.round(elapsedWallSecs),
+          playbackRate: rate,
+        }),
+      }).catch(() => {});
+    },
+    [],
+  );
+
+  // Periodic progress sync while playing (every 10s) and analytics logging (every 60s)
   useEffect(() => {
     if (!isPlaying || !currentBook) return;
 
@@ -135,10 +159,29 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         playbackRate,
         isPlaying: true,
       });
+
+      // Flush analytics chunk periodically if playing for >= 60s
+      if (lastListenTickRef.current && lastListenTickRef.current.bookId === currentBook.id) {
+        const elapsed = (Date.now() - lastListenTickRef.current.time) / 1000;
+        if (elapsed >= 60) {
+          flushListeningEvent(
+            currentBook.id,
+            lastListenTickRef.current.position,
+            currentTime,
+            elapsed,
+            playbackRate,
+          );
+          lastListenTickRef.current = {
+            time: Date.now(),
+            position: currentTime,
+            bookId: currentBook.id,
+          };
+        }
+      }
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [isPlaying, currentBook, currentTime, duration, playbackRate]);
+  }, [isPlaying, currentBook, currentTime, duration, playbackRate, flushListeningEvent]);
 
   // Determine current chapter from currentTime
   const currentChapter = useMemo(() => {
@@ -166,8 +209,21 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         playbackRate,
         isPlaying: false,
       });
+
+      // Flush listening analytics on pause
+      if (lastListenTickRef.current && lastListenTickRef.current.bookId === currentBook.id) {
+        const elapsed = (Date.now() - lastListenTickRef.current.time) / 1000;
+        flushListeningEvent(
+          currentBook.id,
+          lastListenTickRef.current.position,
+          currentTime,
+          elapsed,
+          playbackRate,
+        );
+        lastListenTickRef.current = null;
+      }
     }
-  }, [currentBook, currentTime, duration, playbackRate]);
+  }, [currentBook, currentTime, duration, playbackRate, flushListeningEvent]);
 
   const resume = useCallback(() => {
     if (audioRef.current) {
@@ -177,6 +233,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
           setIsPlaying(true);
           setMediaSessionPlaybackState("playing");
           if (currentBook) {
+            lastListenTickRef.current = {
+              time: Date.now(),
+              position: currentTime,
+              bookId: currentBook.id,
+            };
             syncClientRef.current?.sendUpdate({
               bookId: currentBook.id,
               currentTime,
