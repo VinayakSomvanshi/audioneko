@@ -1,14 +1,14 @@
 import type { Book, Chapter } from "@audioneko/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
-import { ArrowLeft, BookOpen, ListMusic, Loader2, Play } from "lucide-react";
+import { ArrowLeft, BookOpen, ListMusic, Loader2, Play, RotateCcw } from "lucide-react";
 import { DownloadButton } from "../components/storage/DownloadButton";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
 
 export function BookDetailPage() {
   const { id } = useParams({ strict: false });
-  const { playBook, currentBook, isPlaying, seekTo } = useAudio();
+  const { playBook, currentBook, isPlaying, seekTo, getSavedProgress } = useAudio();
 
   const { data: bookData, isLoading } = useQuery({
     queryKey: ["book", id],
@@ -25,11 +25,45 @@ export function BookDetailPage() {
   const book = bookData?.book ?? null;
   const chapters = bookData?.chapters ?? [];
 
+  const savedProgress = id ? getSavedProgress(id) : null;
+  const savedPosition = savedProgress?.position ?? 0;
+  const totalDuration = savedProgress?.duration || book?.durationSeconds || 0;
+  const progressPercent =
+    totalDuration > 0 && savedPosition > 0 ? (savedPosition / totalDuration) * 100 : 0;
+
+  // Which chapter does the saved position fall in?
+  const resumeChapter =
+    savedPosition > 0 && chapters.length > 0
+      ? (chapters.find(
+          (c) =>
+            savedPosition >= (c.startTime ?? 0) && savedPosition < (c.endTime ?? totalDuration),
+        ) ?? chapters[0])
+      : null;
+
+  const hasProgress = savedPosition > 3 && progressPercent > 0.1;
+
   const formatSeconds = (secs: number) => {
     const h = Math.floor(secs / 3600);
     const m = Math.floor((secs % 3600) / 60);
     const s = Math.floor(secs % 60);
     return `${h > 0 ? `${h}:` : ""}${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const isCurrentlyPlaying = isPlaying && currentBook?.id === book?.id;
+
+  const handleResume = () => {
+    if (!book) return;
+    if (currentBook?.id === book.id) {
+      // Already loaded — just seek
+      seekTo(savedPosition);
+    } else {
+      playBook(book, savedPosition, chapters.length > 0 ? chapters : undefined);
+    }
+  };
+
+  const handlePlayFromStart = () => {
+    if (!book) return;
+    playBook(book, 0, chapters.length > 0 ? chapters : undefined);
   };
 
   // Loading skeleton
@@ -62,7 +96,6 @@ export function BookDetailPage() {
     );
   }
 
-  // Not found / error state
   if (!book) {
     return (
       <div className="max-w-4xl mx-auto space-y-8 pb-32">
@@ -109,7 +142,7 @@ export function BookDetailPage() {
 
       {/* Main Book Card */}
       <div className="surface-card p-6 md:p-8 flex flex-col md:flex-row gap-8 items-start border border-border">
-        {/* Cover presentation */}
+        {/* Cover */}
         <div className="w-48 h-48 md:w-56 md:h-56 rounded border border-border bg-surface shrink-0 flex items-center justify-center font-mono text-muted text-xl font-bold shadow-sm overflow-hidden relative">
           {book.coverR2Key ? (
             <>
@@ -133,7 +166,7 @@ export function BookDetailPage() {
           )}
         </div>
 
-        {/* Metadata Details */}
+        {/* Metadata */}
         <div className="flex-1 space-y-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs font-mono text-accent">
@@ -146,7 +179,6 @@ export function BookDetailPage() {
             <p className="text-sm font-mono text-muted">
               By <span className="text-text font-medium">{book.author}</span>
             </p>
-            {/* Series badge */}
             {"series" in book && book.series && (
               <p className="text-xs font-mono text-accent/80">
                 {String(book.series)}
@@ -185,20 +217,108 @@ export function BookDetailPage() {
             )}
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-3 pt-4">
-            <button
-              type="button"
-              onClick={() => playBook(book, 0, chapters.length > 0 ? chapters : undefined)}
-              className="px-6 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
-            >
-              <Play className="w-4 h-4 fill-current" />
-              <span>
-                {isPlaying && currentBook?.id === book.id ? "PAUSE PLAYBACK" : "LISTEN NOW"}
-              </span>
-            </button>
+          {/* ── Progress bar + Resume UI ── */}
+          {hasProgress && (
+            <div className="space-y-2 pt-1">
+              {/* Chapter & time info */}
+              <div className="flex items-center justify-between text-[11px] font-mono">
+                <span className="text-accent">
+                  {resumeChapter ? (
+                    <>
+                      <span className="text-muted">Chapter: </span>
+                      <span className="text-text">{resumeChapter.title}</span>
+                    </>
+                  ) : (
+                    <span className="text-muted">In Progress</span>
+                  )}
+                </span>
+                <span className="text-subtle">
+                  {formatSeconds(savedPosition)}
+                  <span className="text-muted/50"> / </span>
+                  {formatSeconds(totalDuration)}
+                </span>
+              </div>
 
-            {/* Offline OPFS Download Button */}
+              {/* Chapter-segmented progress bar */}
+              <div className="relative w-full h-2 bg-elevated rounded-full overflow-hidden">
+                {/* Filled portion */}
+                <div
+                  className="absolute inset-y-0 left-0 bg-accent rounded-full transition-all"
+                  style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                />
+                {/* Chapter tick marks */}
+                {chapters.length > 1 &&
+                  totalDuration > 0 &&
+                  chapters.slice(1).map((ch) => {
+                    const pct = ((ch.startTime ?? 0) / totalDuration) * 100;
+                    return (
+                      <div
+                        key={ch.id}
+                        className="absolute inset-y-0 w-px bg-bg/40"
+                        style={{ left: `${pct}%` }}
+                      />
+                    );
+                  })}
+              </div>
+
+              {/* Chapter dots row */}
+              {chapters.length > 1 && chapters.length <= 40 && (
+                <div className="flex items-center gap-0.5 overflow-hidden">
+                  {chapters.map((ch) => {
+                    const isListened = savedPosition >= (ch.endTime ?? ch.startTime + 1);
+                    const isCurrent = resumeChapter?.id === ch.id;
+                    return (
+                      <div
+                        key={ch.id}
+                        title={ch.title}
+                        className={`h-1 flex-1 rounded-full transition-colors ${
+                          isCurrent ? "bg-accent" : isListened ? "bg-accent/50" : "bg-elevated"
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-3 pt-2">
+            {hasProgress ? (
+              <>
+                {/* Primary: Resume */}
+                <button
+                  type="button"
+                  onClick={handleResume}
+                  className="px-6 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>{isCurrentlyPlaying ? "NOW PLAYING" : "RESUME"}</span>
+                </button>
+
+                {/* Secondary: Start from Beginning */}
+                <button
+                  type="button"
+                  onClick={handlePlayFromStart}
+                  className="px-4 py-2.5 rounded border border-border bg-surface text-muted font-mono text-xs flex items-center gap-2 hover:bg-elevated hover:text-text transition-colors cursor-pointer"
+                  title="Start from Beginning"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Start Over</span>
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePlayFromStart}
+                className="px-6 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+              >
+                <Play className="w-4 h-4 fill-current" />
+                <span>{isCurrentlyPlaying ? "NOW PLAYING" : "LISTEN NOW"}</span>
+              </button>
+            )}
+
+            {/* Offline Download Button */}
             <DownloadButton book={book} />
           </div>
         </div>
@@ -224,7 +344,7 @@ export function BookDetailPage() {
             </p>
             <button
               type="button"
-              onClick={() => playBook(book, 0)}
+              onClick={handlePlayFromStart}
               className="mt-2 px-4 py-2 rounded bg-accent text-bg text-xs font-mono font-semibold hover:opacity-90 transition-opacity cursor-pointer"
             >
               <Play className="w-3 h-3 inline fill-current mr-1.5" />
@@ -234,7 +354,11 @@ export function BookDetailPage() {
         ) : (
           <div className="surface-card divide-y divide-border border border-border">
             {chapters.map((chapter) => {
-              const isCurrentPlaying = isPlaying && currentBook?.id === book.id;
+              const isCurrentChapter =
+                isCurrentlyPlaying &&
+                savedPosition >= (chapter.startTime ?? 0) &&
+                savedPosition < (chapter.endTime ?? book.durationSeconds);
+              const isListened = savedPosition >= (chapter.endTime ?? chapter.startTime + 1);
 
               return (
                 <button
@@ -248,16 +372,25 @@ export function BookDetailPage() {
                     }
                   }}
                   className={`w-full p-3.5 flex items-center justify-between text-left hover:bg-elevated transition-colors cursor-pointer ${
-                    isCurrentPlaying ? "bg-accent-bg" : ""
+                    isCurrentChapter ? "bg-accent/10 border-l-2 border-l-accent" : ""
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono text-subtle w-6">
+                    <span
+                      className={`text-xs font-mono w-6 ${isListened ? "text-accent" : "text-subtle"}`}
+                    >
                       {chapter.chapterIndex.toString().padStart(2, "0")}
                     </span>
-                    <span className="text-xs font-medium text-text">{chapter.title}</span>
+                    <span
+                      className={`text-xs font-medium ${isCurrentChapter ? "text-accent" : isListened ? "text-text/70" : "text-text"}`}
+                    >
+                      {chapter.title}
+                    </span>
                   </div>
                   <div className="flex items-center gap-4 text-xs font-mono text-subtle">
+                    {isListened && !isCurrentChapter && (
+                      <span className="text-accent/60 text-[10px]">✓</span>
+                    )}
                     <span>{formatSeconds(chapter.startTime)}</span>
                     <span className="text-[10px] text-muted">
                       ({formatSeconds(chapter.duration)})

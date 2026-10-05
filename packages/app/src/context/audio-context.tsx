@@ -18,6 +18,7 @@ import {
   setMediaSessionPositionState,
 } from "../lib/media-session";
 import { pipManager } from "../lib/pip-visualizer";
+import { clearProgress, getProgress, progressTracker, setProgress } from "../lib/progress-store";
 import { SleepTimer, type SleepTimerPreset, type SleepTimerState } from "../lib/sleep-timer";
 import { SyncClient } from "../lib/sync-client";
 
@@ -59,6 +60,7 @@ export interface AudioContextType {
   cancelSleepTimer: () => void;
   setShakeToExtend: (enabled: boolean) => void;
   togglePiP: () => Promise<boolean>;
+  getSavedProgress: (bookId: string) => { position: number; duration: number } | null;
 }
 
 const AudioContext = createContext<AudioContextType | null>(null);
@@ -154,6 +156,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   );
 
   // Core controls - all use refs so they never go stale
+  // Flush to localStorage on explicit pause too
   const pause = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -161,6 +164,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     setMediaSessionPlaybackState("paused");
     const book = currentBookRef.current;
     const ct = audio.currentTime;
+    if (book && ct > 3) {
+      setProgress(book.id, ct, audio.duration || durationRef.current || 0);
+    }
     if (book) {
       syncClientRef.current?.sendUpdate({
         bookId: book.id,
@@ -313,6 +319,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         playbackRate: audio.playbackRate || 1.0,
         position: t,
       });
+      // Throttled localStorage save (every 5s)
+      const book = currentBookRef.current;
+      if (book && t > 3) {
+        progressTracker.tick(book.id, t, audio.duration || durationRef.current || 0);
+      }
     };
 
     const onDurationChange = () => {
@@ -343,6 +354,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       setIsPlaying(false);
       isPlayingRef.current = false;
       setMediaSessionPlaybackState("none");
+      // Clear saved progress — book finished
+      const book = currentBookRef.current;
+      if (book) clearProgress(book.id);
     };
 
     const onAudioError = () => {
@@ -352,6 +366,16 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       isPlayingRef.current = false;
     };
 
+    // Flush position to localStorage on tab close / navigation
+    const onBeforeUnload = () => {
+      const book = currentBookRef.current;
+      const a = audioRef.current;
+      if (book && a && a.currentTime > 3) {
+        progressTracker.flush(book.id, a.currentTime, a.duration || durationRef.current || 0);
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("durationchange", onDurationChange);
     audio.addEventListener("play", onPlay);
@@ -360,6 +384,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     audio.addEventListener("error", onAudioError);
 
     return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
       unsubTimer();
       timer.cancel();
       audio.pause();
@@ -669,6 +694,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         cancelSleepTimer,
         setShakeToExtend,
         togglePiP,
+        getSavedProgress: (bookId: string) => getProgress(bookId),
       }}
     >
       {children}
