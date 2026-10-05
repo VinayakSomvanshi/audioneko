@@ -428,17 +428,30 @@ export async function scanDriveLibrary(
           ? normalizeAuthor(prevBook.author)
           : "Unknown Author";
 
-    // Only consider covers square if from Drive folder image or Apple Books mzstatic
+    // Only consider covers square if from curated local cover, Love Hypothesis 1:1, Drive folder image or Apple Books mzstatic
+    const isCuratedLocalCover = Boolean(prevBook?.coverR2Key?.startsWith("/"));
+    const isLoveHypothesis = parsed.title.toLowerCase().includes("love hypothesis");
     const hasSquareCover =
+      isCuratedLocalCover ||
+      isLoveHypothesis ||
       Boolean(coverKey?.startsWith("gdrive:")) ||
       Boolean(prevBook?.coverR2Key?.includes("mzstatic.com"));
 
     let enrichedDescription = prevBook?.description ?? `${parsed.title} by ${enrichedAuthor}.`;
     let enrichedPublishedYear: number | null = prevBook?.publishedYear ?? null;
-    let enrichedCoverUrl: string | null =
-      hasSquareCover && prevBook?.coverR2Key?.startsWith("http") ? prevBook.coverR2Key : null;
+    let enrichedCoverUrl: string | null = isCuratedLocalCover
+      ? (prevBook?.coverR2Key ?? null)
+      : isLoveHypothesis
+        ? "/covers/love-hypothesis.jpg"
+        : hasSquareCover && prevBook?.coverR2Key?.startsWith("http")
+          ? prevBook.coverR2Key
+          : null;
 
-    const needsEnrichment = !coverKey && (enrichedAuthor === "Unknown Author" || !hasSquareCover);
+    const needsEnrichment =
+      !coverKey &&
+      !isLoveHypothesis &&
+      !isCuratedLocalCover &&
+      (enrichedAuthor === "Unknown Author" || !hasSquareCover);
 
     if (needsEnrichment) {
       try {
@@ -469,8 +482,9 @@ export async function scanDriveLibrary(
       }
     }
 
-    // Final cover: Drive gdrive: key takes priority, then API URL, then null
-    const finalCoverKey = coverKey ?? enrichedCoverUrl;
+    // Final cover: Drive gdrive: key takes priority, then curated local cover, then API URL, then null
+    const finalCoverKey =
+      coverKey ?? (isLoveHypothesis ? "/covers/love-hypothesis.jpg" : enrichedCoverUrl);
     const nowEpoch = Math.floor(Date.now() / 1000);
 
     if (existingBook[0]) {
