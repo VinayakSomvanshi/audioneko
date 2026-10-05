@@ -1,7 +1,11 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Flame, HardDriveDownload, Library, User as UserIcon } from "lucide-react";
+import { Flame, HardDriveDownload, Library, Search, User as UserIcon } from "lucide-react";
 
-export function BottomNav() {
+interface BottomNavProps {
+  onSearchClick?: () => void;
+}
+
+export function BottomNav({ onSearchClick }: BottomNavProps) {
   const location = useLocation();
 
   const navItems = [
@@ -21,7 +25,7 @@ export function BottomNav() {
           <Link
             key={item.href}
             to={item.href}
-            className={`flex flex-col items-center justify-center gap-1 w-16 py-1 text-[10px] font-mono transition-colors ${
+            className={`flex flex-col items-center justify-center gap-1 w-14 py-1 text-[10px] font-mono transition-colors ${
               isActive ? "text-accent" : "text-muted hover:text-text"
             }`}
           >
@@ -30,6 +34,15 @@ export function BottomNav() {
           </Link>
         );
       })}
+
+      <button
+        type="button"
+        onClick={onSearchClick}
+        className="flex flex-col items-center justify-center gap-1 w-14 py-1 text-[10px] font-mono text-muted hover:text-accent cursor-pointer transition-colors"
+      >
+        <Search className="w-4 h-4" />
+        <span>Search</span>
+      </button>
     </nav>
   );
 }
