@@ -145,8 +145,7 @@ export class ListenAlongRoom implements DurableObject {
     }
   }
 
-  async webSocketClose(ws: WebSocket): Promise<void> {
-    ws.close();
+  async webSocketClose(_ws: WebSocket): Promise<void> {
     const remainingCount = this.ctx.getWebSockets().length;
     this.broadcast({
       type: "LISTENER_COUNT",
@@ -154,8 +153,8 @@ export class ListenAlongRoom implements DurableObject {
     });
   }
 
-  async webSocketError(ws: WebSocket): Promise<void> {
-    ws.close();
+  async webSocketError(_ws: WebSocket, error?: unknown): Promise<void> {
+    console.error("WebSocket error in ListenAlongRoom:", error);
   }
 
   /**

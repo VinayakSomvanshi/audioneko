@@ -113,9 +113,9 @@ export async function enrichBookMetadata(
 
   // 2. Query Google Books API for rich plot synopsis and backup cover
   try {
-    let gbQuery = `intitle:${cleanTitle}`;
+    let gbQuery = `intitle:"${cleanTitle}"`;
     if (cleanAuthor) {
-      gbQuery += `+inauthor:${cleanAuthor}`;
+      gbQuery += ` inauthor:"${cleanAuthor}"`;
     }
 
     const gbUrl = `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(gbQuery)}&maxResults=1`;

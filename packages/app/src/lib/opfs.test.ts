@@ -211,6 +211,56 @@ describe("Origin Private File System (OPFS) Download Manager", () => {
     expect(books[0]?.fileSizeBytes).toBe(8);
   });
 
+  it("downloads large multi-megabyte audiobooks across sequential 2 MB chunk ranges", async () => {
+    const chunk1 = new Uint8Array(2 * 1024 * 1024);
+    const chunk2 = new Uint8Array(1024 * 1024);
+    const totalSize = 3 * 1024 * 1024; // 3 MB
+
+    const requestedRanges: string[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
+      const range = (init?.headers as Record<string, string>)?.Range || "";
+      requestedRanges.push(range);
+      const isFirst = range.includes("0-2097151");
+      const payload = isFirst ? chunk1 : chunk2;
+
+      const stream = new ReadableStream({
+        start(controller) {
+          controller.enqueue(payload);
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        status: 206,
+        headers: { "Content-Length": payload.byteLength.toString() },
+      });
+    });
+
+    const meta: OfflineBookMeta = {
+      bookId: "book_offline_large",
+      title: "The Way of Kings",
+      author: "Brandon Sanderson",
+      durationSeconds: 150000,
+      fileSizeBytes: totalSize,
+      downloadedAt: 0,
+    };
+
+    const progressUpdates: number[] = [];
+    await downloadBookToOpfs(meta, {
+      onProgress: (p) => {
+        progressUpdates.push(p.progressPercent);
+      },
+    });
+
+    expect(requestedRanges).toHaveLength(2);
+    expect(requestedRanges[0]).toBe("bytes=0-2097151");
+    expect(requestedRanges[1]).toBe("bytes=2097152-3145727");
+    expect(progressUpdates[progressUpdates.length - 1]).toBe(100);
+
+    const isDownloaded = await isBookDownloaded("book_offline_large");
+    expect(isDownloaded).toBe(true);
+  });
+
   it("deletes a downloaded book from OPFS cleanly", async () => {
     // Seed book in mock directory
     const booksDir = await mockRootDir.getDirectoryHandle("audioneko_books", {

@@ -18,7 +18,6 @@ interface SearchPaletteModalProps {
 export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPaletteModalProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [searchDurationMs, setSearchDurationMs] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
@@ -34,12 +33,14 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
   }, [isOpen]);
 
   // Execute instant client-side search with microsecond duration tracking
-  const results = useMemo(() => {
+  const { results, searchDurationMs } = useMemo(() => {
     const start = performance.now();
     const res = searchBooks(query, null, 25);
     const duration = performance.now() - start;
-    setSearchDurationMs(Math.round(duration * 100) / 100);
-    return res;
+    return {
+      results: res,
+      searchDurationMs: Math.round(duration * 100) / 100,
+    };
   }, [query]);
 
   // Sync books prop to search index if provided

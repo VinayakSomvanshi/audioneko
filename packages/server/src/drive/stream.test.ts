@@ -26,15 +26,20 @@ describe("Audio Stream Engine & Range Proxy", () => {
     expect(suffix).toEqual({ start: TOTAL_SIZE - 1000, end: TOTAL_SIZE - 1 });
   });
 
-  it("falls back to initial 2 MB chunk when Range header is missing or invalid", () => {
+  it("falls back to initial 2 MB chunk when Range header is missing or non-range", () => {
     const noHeader = parseRangeHeader(null, TOTAL_SIZE);
     expect(noHeader).toEqual({ start: 0, end: CHUNK_SIZE - 1 });
 
     const invalidHeader = parseRangeHeader("invalid-range", TOTAL_SIZE);
     expect(invalidHeader).toEqual({ start: 0, end: CHUNK_SIZE - 1 });
+  });
 
+  it("returns null for unsatisfiable or inverted ranges per RFC 7233", () => {
     const invertedRange = parseRangeHeader("bytes=5000-2000", TOTAL_SIZE);
-    expect(invertedRange).toEqual({ start: 0, end: CHUNK_SIZE - 1 });
+    expect(invertedRange).toBeNull();
+
+    const outOfBoundsRange = parseRangeHeader("bytes=15000000-", TOTAL_SIZE);
+    expect(outOfBoundsRange).toBeNull();
   });
 
   it("calculates uniform 2 MB chunk bounds correctly", () => {
@@ -134,5 +139,85 @@ describe("Audio Stream Engine & Range Proxy", () => {
 
     const bytes = new Uint8Array(await response.arrayBuffer());
     expect(bytes).toEqual(fakeAudioBytes);
+  });
+
+  it("returns HTTP 416 Range Not Satisfiable when range is past file boundary", async () => {
+    const mockEnv = {
+      GOOGLE_SA_KEY: JSON.stringify({ client_email: "test@sa.com", private_key: "dummy" }),
+      KV: {
+        get: vi.fn().mockImplementation((key: string) => {
+          if (key === "gdrive_access_token") return Promise.resolve("mock_bearer_token");
+          if (key.startsWith("gdrive_meta_")) {
+            return Promise.resolve({
+              size: 1000,
+              mimeType: "audio/mp4",
+              name: "book.m4b",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+      },
+    } as unknown as Env;
+
+    const request = new Request("https://audioneko.app/api/stream/file_123", {
+      method: "GET",
+      headers: { Range: "bytes=2000-3000" },
+    });
+
+    const response = await handleAudioStreamRequest(request, "file_123", mockEnv);
+
+    expect(response.status).toBe(416);
+    expect(response.headers.get("Content-Range")).toBe("bytes */1000");
+    expect(response.headers.get("Accept-Ranges")).toBe("bytes");
+  });
+
+  it("clamps open-ended stream requests to 2 MB chunk boundary with exact Content-Range and Content-Length", async () => {
+    const mockChunkBytes = new Uint8Array(2 * 1024 * 1024);
+    mockChunkBytes.fill(42);
+
+    const mockEnv = {
+      GOOGLE_SA_KEY: JSON.stringify({ client_email: "test@sa.com", private_key: "dummy" }),
+      KV: {
+        get: vi.fn().mockImplementation((key: string) => {
+          if (key === "gdrive_access_token") return Promise.resolve("mock_bearer_token");
+          if (key.startsWith("gdrive_meta_")) {
+            return Promise.resolve({
+              size: 50 * 1024 * 1024, // 50 MB
+              mimeType: "audio/mp4",
+              name: "large-book.m4b",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+      },
+    } as unknown as Env;
+
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(mockChunkBytes.buffer, {
+        status: 206,
+        headers: { "Content-Range": `bytes 0-${CHUNK_SIZE - 1}/${50 * 1024 * 1024}` },
+      }),
+    );
+
+    const request = new Request("https://audioneko.app/api/stream/file_123", {
+      method: "GET",
+      headers: { Range: "bytes=0-10000000" }, // Request 10 MB
+    });
+
+    const response = await handleAudioStreamRequest(
+      request,
+      "file_123",
+      mockEnv,
+      mockFetch as unknown as typeof fetch,
+    );
+
+    expect(response.status).toBe(206);
+    // Must be clamped to the 2 MB chunk boundary (2097151)
+    expect(response.headers.get("Content-Range")).toBe(
+      `bytes 0-${CHUNK_SIZE - 1}/${50 * 1024 * 1024}`,
+    );
+    expect(response.headers.get("Content-Length")).toBe(CHUNK_SIZE.toString());
+    const body = await response.arrayBuffer();
+    expect(body.byteLength).toBe(CHUNK_SIZE);
   });
 });

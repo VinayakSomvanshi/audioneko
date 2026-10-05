@@ -23,5 +23,15 @@ export default defineConfig({
     outDir: "dist",
     emptyOutDir: true,
     target: "esnext",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          router: ["@tanstack/react-router"],
+          search: ["minisearch"],
+          icons: ["lucide-react"],
+        },
+      },
+    },
   },
 });

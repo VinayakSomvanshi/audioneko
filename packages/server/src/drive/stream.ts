@@ -26,7 +26,7 @@ export interface DriveFileMetadata {
 export function parseRangeHeader(
   rangeHeader: string | null | undefined,
   totalSize: number,
-): ParsedRange {
+): ParsedRange | null {
   if (!rangeHeader || !rangeHeader.startsWith("bytes=")) {
     // Default to initial 2 MB chunk if no range specified
     return {
@@ -51,15 +51,17 @@ export function parseRangeHeader(
   const startStr = parts[0]?.trim();
   const endStr = parts[1]?.trim();
 
-  let start = startStr ? Number.parseInt(startStr, 10) : 0;
-  if (Number.isNaN(start) || start < 0) {
-    start = 0;
+  const start = startStr ? Number.parseInt(startStr, 10) : 0;
+  if (Number.isNaN(start) || start < 0 || start >= totalSize) {
+    return null;
   }
 
   let end: number;
   if (endStr && endStr.length > 0) {
     end = Number.parseInt(endStr, 10);
-    if (Number.isNaN(end) || end >= totalSize) {
+    if (Number.isNaN(end)) {
+      end = Math.min(start + CHUNK_SIZE - 1, totalSize - 1);
+    } else if (end >= totalSize) {
       end = totalSize - 1;
     }
   } else {
@@ -68,7 +70,7 @@ export function parseRangeHeader(
   }
 
   if (start > end) {
-    return { start: 0, end: Math.min(CHUNK_SIZE - 1, totalSize - 1) };
+    return null;
   }
 
   return { start, end };
@@ -198,7 +200,17 @@ export async function handleAudioStreamRequest(
 
   // 4. Parse Range Header
   const rangeHeader = request.headers.get("Range");
-  const { start, end } = parseRangeHeader(rangeHeader, totalSize);
+  const parsedRange = parseRangeHeader(rangeHeader, totalSize);
+  if (!parsedRange) {
+    return new Response(null, {
+      status: 416,
+      headers: {
+        "Content-Range": `bytes */${totalSize}`,
+        "Accept-Ranges": "bytes",
+      },
+    });
+  }
+  const { start, end } = parsedRange;
   const requestedLength = end - start + 1;
 
   // 5. Tier 2: Check Cloudflare R2 "Active Shelf" Cache
@@ -301,15 +313,16 @@ export async function handleAudioStreamRequest(
     }
   }
 
-  // 8. Slice the 2 MB chunk to the exact requested range
+  // 8. Slice the 2 MB chunk to the exact requested range, clamped to chunk boundary
+  const effectiveEnd = Math.min(end, chunkEnd);
   const sliceStart = start - chunkStart;
-  const sliceEnd = sliceStart + requestedLength;
-  const slicedBytes = chunkBuffer.slice(sliceStart, sliceEnd);
+  const sliceLength = effectiveEnd - start + 1;
+  const slicedBytes = chunkBuffer.slice(sliceStart, sliceStart + sliceLength);
 
   return new Response(slicedBytes, {
     status: 206,
     headers: {
-      "Content-Range": `bytes ${start}-${end}/${totalSize}`,
+      "Content-Range": `bytes ${start}-${effectiveEnd}/${totalSize}`,
       "Content-Length": slicedBytes.byteLength.toString(),
       "Content-Type": metadata.mimeType,
       "Accept-Ranges": "bytes",

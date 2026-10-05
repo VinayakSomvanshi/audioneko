@@ -424,7 +424,7 @@ absRoutes.get("/items/:id", optionalAbsAuth, async (c) => {
 });
 
 // Cover artwork streaming or SVG placeholder
-absRoutes.get("/items/:id/cover", async (c) => {
+absRoutes.on(["GET", "HEAD"], "/items/:id/cover", async (c) => {
   const id = c.req.param("id");
   const db = createDb(c.env.DB);
 
@@ -442,7 +442,7 @@ absRoutes.get("/items/:id/cover", async (c) => {
     try {
       const obj = await c.env.R2.get(book.coverR2Key);
       if (obj) {
-        return new Response(obj.body, {
+        return new Response(c.req.method === "HEAD" ? null : obj.body, {
           headers: {
             "Content-Type": obj.httpMetadata?.contentType || "image/jpeg",
             "Cache-Control": "public, max-age=86400",
@@ -470,7 +470,7 @@ absRoutes.get("/items/:id/cover", async (c) => {
     <text x="300" y="520" font-family="monospace" font-size="13" fill="#71717a" text-anchor="middle">audioneko</text>
   </svg>`;
 
-  return new Response(svg, {
+  return new Response(c.req.method === "HEAD" ? null : svg, {
     headers: {
       "Content-Type": "image/svg+xml",
       "Cache-Control": "public, max-age=86400",
@@ -478,8 +478,8 @@ absRoutes.get("/items/:id/cover", async (c) => {
   });
 });
 
-// Stream audio file
-absRoutes.get("/items/:id/file/:fileId", (c) => {
+// Stream audio file (supports both GET audio chunks and HEAD range probes)
+absRoutes.on(["GET", "HEAD"], "/items/:id/file/:fileId", (c) => {
   const fileId = c.req.param("fileId");
   return handleAudioStreamRequest(c.req.raw, fileId, c.env);
 });

@@ -69,30 +69,39 @@ async function handleAudioStreamFetch(request) {
       });
     }
 
-    // Parse bytes=start-end
-    const match = rangeHeader.match(/bytes=(\d+)-(\d+)?/);
-    if (!match) {
-      return new Response(file, {
-        status: 200,
-        headers: {
-          "Content-Type": mimeType,
-          "Content-Length": fileSize.toString(),
-          "Accept-Ranges": "bytes",
-          "X-Audioneko-Source": "OPFS-Offline",
-        },
-      });
+    // Parse Range header per RFC 7233: bytes=start-end, bytes=start-, bytes=-suffix
+    let start = 0;
+    let end = fileSize - 1;
+
+    const spec = rangeHeader.slice(6).trim();
+    if (spec.startsWith("-")) {
+      const suffix = Number.parseInt(spec.slice(1), 10);
+      if (!Number.isNaN(suffix) && suffix > 0) {
+        start = Math.max(0, fileSize - suffix);
+        end = fileSize - 1;
+      }
+    } else {
+      const parts = spec.split("-");
+      const parsedStart = Number.parseInt(parts[0], 10);
+      if (!Number.isNaN(parsedStart)) {
+        start = parsedStart;
+      }
+      if (parts[1] && parts[1].trim().length > 0) {
+        const parsedEnd = Number.parseInt(parts[1], 10);
+        if (!Number.isNaN(parsedEnd)) {
+          end = Math.min(parsedEnd, fileSize - 1);
+        }
+      }
     }
 
-    const start = Number.parseInt(match[1], 10);
-    const end = match[2] ? Number.parseInt(match[2], 10) : fileSize - 1;
-
-    // Bounds validation
-    if (start >= fileSize || end >= fileSize || start > end) {
+    // Bounds validation: return 416 only if start is beyond EOF or start > end
+    if (start >= fileSize || start > end) {
       return new Response(null, {
         status: 416,
         statusText: "Range Not Satisfiable",
         headers: {
           "Content-Range": `bytes */${fileSize}`,
+          "Accept-Ranges": "bytes",
         },
       });
     }

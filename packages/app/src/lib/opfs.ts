@@ -180,55 +180,123 @@ export async function downloadBookToOpfs(
 
   const writable = await audioHandle.createWritable();
 
+  const CHUNK_DOWNLOAD_SIZE = 2 * 1024 * 1024; // 2 MB aligned chunk stream
+  const streamUrl = `/api/stream/${meta.bookId}`;
+
   try {
-    const streamUrl = `/api/stream/${meta.bookId}`;
-    const response = await fetch(streamUrl, {
-      signal,
-      headers: {
-        Accept: "audio/mp4, audio/mpeg, audio/*;q=0.9, */*;q=0.8",
-      },
-    });
+    let totalBytes = meta.fileSizeBytes || 0;
 
-    if (!response.ok && response.status !== 206) {
-      throw new Error(
-        `Failed to download audio stream: HTTP ${response.status} ${response.statusText}`,
-      );
+    // Probe HEAD if size unknown
+    if (totalBytes <= 0) {
+      try {
+        const headRes = await fetch(streamUrl, { method: "HEAD", signal });
+        const lenHeader = headRes.headers.get("Content-Length");
+        if (lenHeader) totalBytes = Number.parseInt(lenHeader, 10);
+      } catch {
+        // Fallback
+      }
     }
 
-    const contentLengthHeader = response.headers.get("Content-Length");
-    const totalBytes = contentLengthHeader
-      ? Number.parseInt(contentLengthHeader, 10)
-      : meta.fileSizeBytes || 0;
-
-    if (!response.body) {
-      throw new Error("Response body is empty or not streamable");
-    }
-
-    const reader = response.body.getReader();
     let downloadedBytes = 0;
 
-    while (true) {
-      if (signal?.aborted) {
-        throw new Error("Download aborted by user");
+    if (totalBytes > CHUNK_DOWNLOAD_SIZE) {
+      // Multi-chunk sequential range streaming for large audiobooks
+      let offset = 0;
+      while (offset < totalBytes) {
+        if (signal?.aborted) {
+          throw new Error("Download aborted by user");
+        }
+
+        const chunkEnd = Math.min(offset + CHUNK_DOWNLOAD_SIZE - 1, totalBytes - 1);
+        const chunkRes = await fetch(streamUrl, {
+          signal,
+          headers: {
+            Range: `bytes=${offset}-${chunkEnd}`,
+            Accept: "audio/mp4, audio/mpeg, audio/*;q=0.9, */*;q=0.8",
+          },
+        });
+
+        if (!chunkRes.ok && chunkRes.status !== 206) {
+          throw new Error(
+            `Failed to download audio chunk [${chunkRes.status}]: ${chunkRes.statusText}`,
+          );
+        }
+
+        if (!chunkRes.body) {
+          throw new Error("Chunk response body is empty or not streamable");
+        }
+
+        const reader = chunkRes.body.getReader();
+        while (true) {
+          if (signal?.aborted) {
+            throw new Error("Download aborted by user");
+          }
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) {
+            await writable.write(value);
+            downloadedBytes += value.byteLength;
+            const percent = Math.min(100, Math.round((downloadedBytes / totalBytes) * 100));
+            onProgress?.({
+              bookId: meta.bookId,
+              status: "downloading",
+              downloadedBytes,
+              totalBytes,
+              progressPercent: percent,
+            });
+          }
+        }
+
+        offset = chunkEnd + 1;
+      }
+    } else {
+      // Single-shot streaming for smaller audiobooks or tests
+      const response = await fetch(streamUrl, {
+        signal,
+        headers: {
+          Accept: "audio/mp4, audio/mpeg, audio/*;q=0.9, */*;q=0.8",
+        },
+      });
+
+      if (!response.ok && response.status !== 206) {
+        throw new Error(
+          `Failed to download audio stream: HTTP ${response.status} ${response.statusText}`,
+        );
       }
 
-      const { done, value } = await reader.read();
-      if (done) break;
+      const contentLengthHeader = response.headers.get("Content-Length");
+      if (totalBytes <= 0 && contentLengthHeader) {
+        totalBytes = Number.parseInt(contentLengthHeader, 10);
+      }
 
-      if (value) {
-        await writable.write(value);
-        downloadedBytes += value.byteLength;
+      if (!response.body) {
+        throw new Error("Response body is empty or not streamable");
+      }
 
-        const percent =
-          totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+      const reader = response.body.getReader();
+      while (true) {
+        if (signal?.aborted) {
+          throw new Error("Download aborted by user");
+        }
 
-        onProgress?.({
-          bookId: meta.bookId,
-          status: "downloading",
-          downloadedBytes,
-          totalBytes,
-          progressPercent: percent,
-        });
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        if (value) {
+          await writable.write(value);
+          downloadedBytes += value.byteLength;
+
+          const percent =
+            totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+
+          onProgress?.({
+            bookId: meta.bookId,
+            status: "downloading",
+            downloadedBytes,
+            totalBytes,
+            progressPercent: percent,
+          });
+        }
       }
     }
 

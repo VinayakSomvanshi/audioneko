@@ -23,7 +23,35 @@ import type { Env, ShelfQueueMessage } from "./types";
 
 const app = new Hono<{ Bindings: Env; Variables: AuthContextVariables }>();
 
-app.use("*", cors());
+app.use(
+  "*",
+  cors({
+    origin: (origin) => origin || "*",
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+    allowHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-token",
+      "Range",
+      "Upgrade",
+      "Sec-WebSocket-Key",
+      "Sec-WebSocket-Version",
+      "Sec-WebSocket-Extensions",
+    ],
+    exposeHeaders: [
+      "Content-Range",
+      "Accept-Ranges",
+      "Content-Length",
+      "Content-Type",
+      "ETag",
+      "x-token",
+      "X-Audioneko-Tier",
+      "X-Audioneko-Source",
+    ],
+    credentials: true,
+    maxAge: 86400,
+  }),
+);
 
 // Health check endpoint
 app.get("/api/health", (c) => {
