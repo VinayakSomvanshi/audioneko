@@ -78,13 +78,21 @@ export function MiniPlayer() {
             className="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer group"
             title="Expand Full Player"
           >
-            <div className="w-10 h-10 rounded border border-border bg-elevated shrink-0 overflow-hidden flex items-center justify-center relative group-hover:border-accent transition-colors">
+            <div className="w-10 h-10 rounded border border-border bg-surface shrink-0 overflow-hidden flex items-center justify-center relative group-hover:border-accent transition-colors">
               {currentBook.coverR2Key ? (
-                <img
-                  src={`/api/covers/${currentBook.id}`}
-                  alt={currentBook.title}
-                  className="w-full h-full object-cover"
-                />
+                <>
+                  <img
+                    src={`/api/covers/${currentBook.id}`}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 w-full h-full object-cover blur-sm opacity-35 scale-110 pointer-events-none select-none"
+                  />
+                  <img
+                    src={`/api/covers/${currentBook.id}`}
+                    alt={currentBook.title}
+                    className="relative z-10 w-full h-full object-contain select-none"
+                  />
+                </>
               ) : (
                 <div className="w-full h-full bg-elevated flex items-center justify-center text-subtle text-xs font-mono">
                   {currentBook.format.toUpperCase()}

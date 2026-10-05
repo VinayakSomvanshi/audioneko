@@ -145,11 +145,19 @@ export function FullPlayerModal() {
         {/* Large Cover Art with Crisp Border & Obsidian Shadow */}
         <div className="relative aspect-square w-full max-w-[340px] mx-auto rounded-lg border border-border bg-surface overflow-hidden shadow-2xl flex items-center justify-center group">
           {currentBook.coverR2Key ? (
-            <img
-              src={`/api/covers/${currentBook.id}`}
-              alt={currentBook.title}
-              className="w-full h-full object-cover select-none"
-            />
+            <>
+              <img
+                src={`/api/covers/${currentBook.id}`}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover blur-md opacity-35 scale-110 pointer-events-none select-none"
+              />
+              <img
+                src={`/api/covers/${currentBook.id}`}
+                alt={currentBook.title}
+                className="relative z-10 w-full h-full object-contain select-none drop-shadow-lg"
+              />
+            </>
           ) : (
             <div className="w-full h-full bg-elevated flex flex-col items-center justify-center p-6 text-center">
               <span className="text-2xl font-bold font-mono text-muted mb-2">

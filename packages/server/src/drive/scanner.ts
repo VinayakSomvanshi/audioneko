@@ -158,7 +158,11 @@ export async function scanDriveLibrary(
   const imageFiles: ImageFileEntry[] = [];
 
   // Recursive directory explorer
-  async function exploreFolder(folderId: string, folderName: string): Promise<void> {
+  async function exploreFolder(
+    folderId: string,
+    folderName: string,
+    parentOfFolderId?: string,
+  ): Promise<void> {
     let pageToken: string | undefined;
 
     do {
@@ -187,7 +191,7 @@ export async function scanDriveLibrary(
 
       for (const item of items) {
         if (item.mimeType === "application/vnd.google-apps.folder") {
-          await exploreFolder(item.id, item.name);
+          await exploreFolder(item.id, item.name, folderId);
         } else if (
           item.name.endsWith(".m4b") ||
           item.name.endsWith(".mp3") ||
@@ -202,7 +206,14 @@ export async function scanDriveLibrary(
           item.name.endsWith(".png") ||
           item.name.endsWith(".webp")
         ) {
-          imageFiles.push({ item, parentFolderId: folderId, parentFolderName: folderName });
+          const isArtworkSubfolder = /^(artwork|covers?|images?)$/i.test(folderName);
+          const effectiveParentFolderId =
+            isArtworkSubfolder && parentOfFolderId ? parentOfFolderId : folderId;
+          imageFiles.push({
+            item,
+            parentFolderId: effectiveParentFolderId,
+            parentFolderName: folderName,
+          });
         }
       }
 
@@ -215,6 +226,8 @@ export async function scanDriveLibrary(
 
   const seriesCache = new Map<string, string>(); // seriesName -> seriesId
   const importedBooks: ScanResult["books"] = [];
+  // Per-folder tracking: prevent assigning the same image to multiple books in the same folder
+  const usedCoverIdsByFolder = new Map<string, Set<string>>();
 
   // Process each audio file
   for (const { item, parentFolderId, parentFolderName } of audioFiles) {
@@ -250,80 +263,151 @@ export async function scanDriveLibrary(
       }
     }
 
-    // 2. Find matching cover image
+    // 2. Find cover image — strictly folder-local to avoid cross-series contamination
     let coverKey: string | null = null;
-    // Check if an image matches the series index or name
-    if (parsed.seriesIndex !== undefined) {
-      const matchedImg = imageFiles.find((img) => {
-        const lower = img.item.name.toLowerCase();
-        return (
-          lower.includes(`${parsed.seriesIndex}`) ||
-          (parsed.series?.toLowerCase().includes("acotar") &&
-            (parsed.seriesIndex === 1
-              ? lower.includes("acotar")
-              : parsed.seriesIndex === 2
-                ? lower.includes("acomaf")
-                : parsed.seriesIndex === 3
-                  ? lower.includes("acowar")
-                  : parsed.seriesIndex === 4
-                    ? lower.includes("acofas")
-                    : parsed.seriesIndex === 5
-                      ? lower.includes("acosf")
-                      : false))
-        );
-      });
-      if (matchedImg) {
-        coverKey = `gdrive:${matchedImg.item.id}`;
+
+    // Only consider images from the EXACT same parent folder as this audio file
+    const folderImages = imageFiles.filter((img) => img.parentFolderId === parentFolderId);
+
+    if (folderImages.length > 0) {
+      // Get or create the per-folder used-set
+      if (!usedCoverIdsByFolder.has(parentFolderId)) {
+        usedCoverIdsByFolder.set(parentFolderId, new Set());
       }
-    }
+      const usedInFolder = usedCoverIdsByFolder.get(parentFolderId)!;
 
-    if (!coverKey && imageFiles.length > 0) {
-      // Pick image from same folder if any
-      const folderImg = imageFiles.find((img) => img.parentFolderId === parentFolderId);
-      if (folderImg) {
-        coverKey = `gdrive:${folderImg.item.id}`;
-      }
-    }
+      // Score: how well does an image filename match this book?
+      const scoreCoverMatch = (imgName: string): number => {
+        // Strip extension for matching
+        const lower = imgName.toLowerCase().replace(/\.[^.]+$/, "");
+        let score = 0;
 
-    // 3. Estimate or parse duration
-    // Standard bitrate: M4B AAC 64kbps = 8,000 bytes/sec, MP3 128kbps = 16,000 bytes/sec
-    const bytesPerSecond = parsed.format === "mp3" ? 16000 : 8000;
-    let durationSeconds = Math.round(sizeBytes / bytesPerSecond);
+        // SeriesIndex: word-boundary match so "1" doesn't match inside "10" or "21"
+        if (parsed.seriesIndex !== undefined) {
+          const idxStr = String(Math.round(parsed.seriesIndex));
+          if (new RegExp(`(?<![0-9])${idxStr}(?![0-9])`).test(lower)) score += 3;
+        }
 
-    // Try reading first 128KB to parse actual atom duration if M4B
-    if (parsed.format === "m4b" && sizeBytes > 0) {
-      try {
-        const probeRes = await customFetch(
-          `https://www.googleapis.com/drive/v3/files/${item.id}?alt=media`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Range: "bytes=0-131071",
-            },
-          },
-        );
-        if (probeRes.ok || probeRes.status === 206) {
-          const probeBuf = new Uint8Array(await probeRes.arrayBuffer());
-          const meta = parseMp4Metadata(probeBuf);
-          if (meta.durationSeconds && meta.durationSeconds > 0) {
-            durationSeconds = Math.round(meta.durationSeconds);
+        // Title words (length > 3 to skip noise words)
+        for (const word of parsed.title.toLowerCase().split(/\s+/).filter((w) => w.length > 3)) {
+          if (lower.includes(word)) score += 2;
+        }
+
+        // Series name words
+        if (parsed.series) {
+          for (const word of parsed.series.toLowerCase().split(/\s+/).filter((w) => w.length > 3)) {
+            if (lower.includes(word)) score += 2;
           }
         }
-      } catch {
-        // Fallback to estimated duration
+
+        // Author name parts
+        for (const part of parsed.author.toLowerCase().split(/\s+/).filter((w) => w.length > 3)) {
+          if (lower.includes(part)) score += 1;
+        }
+
+        // ACOTAR shorthand codes (series-specific high-confidence matches)
+        if (
+          parsed.series?.toLowerCase().includes("acotar") ||
+          parsed.series?.toLowerCase().includes("court of thorns") ||
+          parsed.title?.toLowerCase().includes("court of")
+        ) {
+          const acoMap: Record<number, string> = {
+            1: "acotar",
+            2: "acomaf",
+            3: "acowar",
+            4: "acofas",
+            5: "acosf",
+          };
+          const sh = parsed.seriesIndex !== undefined ? acoMap[Math.round(parsed.seriesIndex)] : undefined;
+          if (sh && lower.includes(sh)) score += 5;
+        }
+
+        return score;
+      };
+
+      // Score and sort all folder images
+      const scored = folderImages
+        .map((img) => ({ img, score: scoreCoverMatch(img.item.name) }))
+        .sort((a, b) => b.score - a.score);
+
+      // Pick best scoring unused image; fall back to any unused if no scored match
+      const best = scored.find((s) => s.score > 0 && !usedInFolder.has(s.img.item.id));
+      const fallback = folderImages.find((img) => !usedInFolder.has(img.item.id));
+      const chosen = best?.img ?? fallback ?? null;
+
+      if (chosen) {
+        coverKey = `gdrive:${chosen.item.id}`;
+        // Mark as claimed — only for images with a clear 1:1 match (score >= 3)
+        // Shared series covers (score < 3) can be reused across books in same folder
+        if (best && best.score >= 3) {
+          usedInFolder.add(chosen.item.id);
+        }
       }
     }
+    // If folderImages is empty → coverKey stays null (no cover for this book)
 
-    // 4. Deterministic Book ID based on drive item ID
+    // 3. Look up existing book from D1 to avoid redundant network subrequests
     const bookId = `bk_${item.id.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
-
-    // Upsert into books table
     const existingBook = await db
       .select()
       .from(schema.books)
       .where(eq(schema.books.driveFolderId, item.id))
       .limit(1);
 
+    // Standard bitrate: M4B AAC 64kbps = 8,000 bytes/sec, MP3 128kbps = 16,000 bytes/sec
+    const bytesPerSecond = parsed.format === "mp3" ? 16000 : 8000;
+    const durationSeconds =
+      existingBook[0]?.durationSeconds && existingBook[0].durationSeconds > 0
+        ? existingBook[0].durationSeconds
+        : Math.round(sizeBytes / bytesPerSecond);
+
+    // 4. Enrich metadata via Open Library + Google Books (free, zero-auth)
+    // Re-use already enriched metadata from D1 if available to stay well within Cloudflare Worker subrequest limits
+    const prevBook = existingBook[0];
+    let enrichedAuthor =
+      prevBook?.author && prevBook.author !== "Unknown Author" ? prevBook.author : parsed.author;
+    let enrichedDescription = prevBook?.description ?? `${parsed.title} by ${enrichedAuthor}.`;
+    let enrichedPublishedYear: number | null = prevBook?.publishedYear ?? null;
+    let enrichedCoverUrl: string | null =
+      prevBook?.coverR2Key?.startsWith("http") ? prevBook.coverR2Key : null;
+
+    // Only query external API if:
+    // a) Author is still unknown, OR
+    // b) We don't have a verified square cover (mzstatic or Drive folder image)
+    const hasSquareCover =
+      Boolean(coverKey?.startsWith("gdrive:")) ||
+      Boolean(prevBook?.coverR2Key && prevBook.coverR2Key.includes("mzstatic.com"));
+
+    const needsEnrichment =
+      !coverKey && (enrichedAuthor === "Unknown Author" || !hasSquareCover);
+
+    if (needsEnrichment) {
+      try {
+        const enriched = await enrichBookMetadata(
+          parsed.title,
+          enrichedAuthor !== "Unknown Author" ? enrichedAuthor : undefined,
+          customFetch,
+        );
+
+        if (enrichedAuthor === "Unknown Author" && enriched.author && enriched.author !== "Unknown Author") {
+          enrichedAuthor = enriched.author;
+        }
+        if (enriched.description) {
+          enrichedDescription = enriched.description;
+        }
+        if (enriched.publishedYear) {
+          enrichedPublishedYear = enriched.publishedYear;
+        }
+        if (!coverKey && enriched.coverUrl) {
+          enrichedCoverUrl = enriched.coverUrl;
+        }
+      } catch (enrichErr) {
+        console.warn(`[scan] enrichment error for "${parsed.title}":`, enrichErr);
+      }
+    }
+
+    // Final cover: Drive gdrive: key takes priority, then API URL, then null
+    const finalCoverKey = coverKey ?? enrichedCoverUrl;
     const nowEpoch = Math.floor(Date.now() / 1000);
 
     if (existingBook[0]) {
@@ -331,14 +415,17 @@ export async function scanDriveLibrary(
         .update(schema.books)
         .set({
           title: parsed.title,
-          author: parsed.author,
+          author: enrichedAuthor,
           seriesId,
           seriesIndex: parsed.seriesIndex ?? null,
           narrator: parsed.narrator ?? existingBook[0].narrator,
+          description: enrichedDescription,
+          publishedYear: enrichedPublishedYear ?? existingBook[0].publishedYear,
           durationSeconds,
           fileSizeBytes: sizeBytes,
           format: parsed.format,
-          coverR2Key: coverKey ?? existingBook[0].coverR2Key,
+          // Always overwrite coverR2Key — null clears stale bad covers from previous scans
+          coverR2Key: finalCoverKey,
           updatedAt: nowEpoch,
         })
         .where(eq(schema.books.id, existingBook[0].id));
@@ -347,14 +434,14 @@ export async function scanDriveLibrary(
         id: bookId,
         driveFolderId: item.id,
         title: parsed.title,
-        author: parsed.author,
+        author: enrichedAuthor,
         seriesId,
         seriesIndex: parsed.seriesIndex ?? null,
         narrator: parsed.narrator ?? "Audiobook Narrator",
-        description: `${parsed.title} by ${parsed.author}.`,
-        coverR2Key: coverKey,
+        description: enrichedDescription,
+        coverR2Key: finalCoverKey,
         durationSeconds,
-        publishedYear: null,
+        publishedYear: enrichedPublishedYear,
         format: parsed.format,
         fileSizeBytes: sizeBytes,
         isActiveShelf: false,
@@ -407,7 +494,7 @@ export async function scanDriveLibrary(
     importedBooks.push({
       id: targetBookId,
       title: parsed.title,
-      author: parsed.author,
+      author: enrichedAuthor,
       series: parsed.series,
       seriesIndex: parsed.seriesIndex,
       format: parsed.format,

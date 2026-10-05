@@ -165,7 +165,8 @@ app.get("/api/covers/:bookId", async (c) => {
   }
 
   if (coverKey.startsWith("http://") || coverKey.startsWith("https://")) {
-    return c.redirect(coverKey);
+    c.header("Cache-Control", "public, max-age=604800, s-maxage=604800");
+    return c.redirect(coverKey, 302);
   }
 
   if (coverKey.startsWith("gdrive:")) {
@@ -192,9 +193,9 @@ app.get("/api/covers/:bookId", async (c) => {
 app.post("/api/library/scan", async (c) => {
   try {
     let folderId = c.env.GOOGLE_DRIVE_FOLDER_ID || "1E0mdkz7_wUBEHZ-GVGoeK9CZvM_lqwMw";
-    const body = await c.req.json<{ folderId?: string }>().catch(() => ({}));
-    if (body?.folderId) {
-      folderId = body.folderId;
+    const bodyRaw = await c.req.json<{ folderId?: string }>().catch(() => ({} as { folderId?: string }));
+    if (bodyRaw.folderId) {
+      folderId = bodyRaw.folderId;
     }
 
     const result = await scanDriveLibrary(c.env, folderId);
@@ -272,7 +273,7 @@ app.delete("/api/shelf/:bookId", requireAuth, requireAdmin, async (c) => {
   const bookId = c.req.param("bookId");
   const db = createDb(c.env.DB);
   const book = await db.query.books.findFirst({
-    where: eq(books.id, bookId),
+    where: eq(schema.books.id, bookId),
     with: { files: true },
   });
 
@@ -285,12 +286,12 @@ app.delete("/api/shelf/:bookId", requireAuth, requireAdmin, async (c) => {
   }
 
   await db
-    .update(books)
+    .update(schema.books)
     .set({
       isActiveShelf: false,
       updatedAt: Math.floor(Date.now() / 1000),
     })
-    .where(eq(books.id, bookId));
+    .where(eq(schema.books.id, bookId));
 
   return c.json({ success: true, bookId });
 });

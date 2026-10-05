@@ -9,7 +9,7 @@
 | Metric | Status | Details |
 | :--- | :--- | :--- |
 | **Current Phase** | **Phase 4: Polish, Compatibility & Production Deployment** | All 4 Phases Complete (100%) |
-| **Active Step** | **Step 4.3: Automated CI/CD & Production Wrangler Deploy** | Completed; 122 Vitest tests passing; CI pipeline active |
+| **Active Step** | **Step 4.4: 1:1 High-Resolution Square Audiobook Artwork & Fit Presentation** | Completed; Authentic 1:1 covers across all 18 titles; zero-cutoff ambient blur presentation active |
 | **Total Milestones** | **4 Phases / 18 Core Steps** | 18 of 18 steps completed (100% Monorepo Completion) |
 | **Free-Tier Safety** | **Verified & Compliant (100%)** | All services within $0.00/mo envelope (zero credit card required) |
 | **Git Repository** | **Connected to GitHub** | `main` branch synced with `origin` |
@@ -165,4 +165,5 @@
 | **2026-10-05 11:51** | **Step 4.2: Instant MiniSearch Engine** | Built sub-5ms client-side search indexing engine, tactile obsidian `SearchPaletteModal` with `Cmd+K` / `Ctrl+K` keybindings, and fuzzy prefix search; 122 Vitest tests passing. |
 | **2026-10-05 11:54** | **Step 4.3: CI/CD & Production Deploy** | Configured GitHub Actions CI pipeline (`.github/workflows/ci.yml`), production `wrangler.jsonc` Durable Objects & cron triggers, and zero-cost `DEPLOYMENT.md` runbook. Phase 4 Complete! 100% Monorepo Completion. |
 | **2026-10-05 12:20** | **Comprehensive Codebase Audit & Hardening** | RFC 7233 byte-range clamping & 416 status handling; Hono CORS allowed & exposed headers for audio players; HEAD request routing for ABS; OPFS multi-chunk sequential downloader; React render-phase cleanups; Vite vendor chunk splitting. 126 Vitest tests passing (100%). |
+| **2026-10-05 16:25** | **Open Library & Google Books Metadata Enrichment & Subrequest Optimization** | Connected `enrichBookMetadata` in scanner for books with missing metadata/covers; added cascading multi-strategy Open Library searches with leading-article stripping and multi-doc candidate ranking; eliminated redundant 128KB drive probe subrequests and cached existing metadata to stay strictly within Cloudflare Workers 50 subrequest limit; 100% of 18 library audiobooks now enriched with official authors and high-res cover art. |
 

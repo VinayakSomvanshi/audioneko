@@ -437,6 +437,18 @@ absRoutes.on(["GET", "HEAD"], "/items/:id/cover", async (c) => {
     return c.text("Not found", 404);
   }
 
+  // If external URL (e.g. Open Library or Google Books), redirect
+  if (book.coverR2Key?.startsWith("http://") || book.coverR2Key?.startsWith("https://")) {
+    c.header("Cache-Control", "public, max-age=604800, s-maxage=604800");
+    return c.redirect(book.coverR2Key, 302);
+  }
+
+  // If stored in Google Drive, stream directly
+  if (book.coverR2Key?.startsWith("gdrive:")) {
+    const driveFileId = book.coverR2Key.replace("gdrive:", "");
+    return handleAudioStreamRequest(c.req.raw, driveFileId, c.env);
+  }
+
   // If stored in R2, stream image directly
   if (c.env.R2 && book.coverR2Key) {
     try {
