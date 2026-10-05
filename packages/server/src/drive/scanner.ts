@@ -485,7 +485,7 @@ export async function scanDriveLibrary(
         author: enrichedAuthor,
         seriesId,
         seriesIndex: parsed.seriesIndex ?? null,
-        narrator: parsed.narrator ?? "Audiobook Narrator",
+        narrator: parsed.narrator ?? null,
         description: enrichedDescription,
         coverR2Key: finalCoverKey,
         durationSeconds,

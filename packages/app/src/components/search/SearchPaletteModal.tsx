@@ -248,9 +248,6 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
 
                       <div className="text-xs text-muted truncate mt-0.5">
                         <span>{book.author}</span>
-                        {book.narrator && (
-                          <span className="text-subtle"> • narrated by {book.narrator}</span>
-                        )}
                       </div>
                     </div>
                   </div>

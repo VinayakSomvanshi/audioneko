@@ -213,8 +213,8 @@ app.get("/api/series", async (c) => {
   const seriesList = Array.from(seriesMap.values())
     .filter((s) => s.books.length > 0)
     .map((s) => {
-      // Sort in strict chronological order by series index
-      s.books.sort((a, b) => (a.seriesIndex ?? 0) - (b.seriesIndex ?? 0));
+      // Sort in strict chronological order by series index (unnumbered/spinoffs at end)
+      s.books.sort((a, b) => (a.seriesIndex ?? 9999) - (b.seriesIndex ?? 9999));
       return s;
     })
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -283,7 +283,7 @@ app.get("/api/authors", async (c) => {
       // Sort books: first by series name, then by seriesIndex, then title
       a.books.sort((x, y) => {
         if (x.seriesName && y.seriesName && x.seriesName === y.seriesName) {
-          return (x.seriesIndex ?? 0) - (y.seriesIndex ?? 0);
+          return (x.seriesIndex ?? 9999) - (y.seriesIndex ?? 9999);
         }
         if (x.seriesName && !y.seriesName) return -1;
         if (!x.seriesName && y.seriesName) return 1;

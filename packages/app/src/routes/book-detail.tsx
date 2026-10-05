@@ -145,12 +145,6 @@ export function BookDetailPage() {
             </h1>
             <p className="text-sm font-mono text-muted">
               By <span className="text-text font-medium">{book.author}</span>
-              {book.narrator && (
-                <span>
-                  {" "}
-                  • Narrated by <span className="text-text">{book.narrator}</span>
-                </span>
-              )}
             </p>
             {/* Series badge */}
             {"series" in book && book.series && (

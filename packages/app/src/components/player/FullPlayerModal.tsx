@@ -189,7 +189,7 @@ export function FullPlayerModal() {
             {currentBook.title}
           </h2>
           <p className="text-sm font-mono text-muted truncate">
-            {currentBook.author} {currentBook.narrator ? `• ${currentBook.narrator}` : ""}
+            {currentBook.author}
           </p>
           {currentChapter && (
             <button

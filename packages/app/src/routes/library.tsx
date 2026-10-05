@@ -156,7 +156,7 @@ export function LibraryPage() {
                   {continueBook.title}
                 </h2>
                 <p className="text-xs font-mono text-muted">
-                  {continueBook.author} • Narrated by {continueBook.narrator || "Narrator"}
+                  {continueBook.author}
                 </p>
                 <div className="flex items-center gap-3 pt-1 text-[11px] font-mono text-subtle">
                   <span>{formatDuration(continueBook.durationSeconds)}</span>

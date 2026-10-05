@@ -92,7 +92,7 @@ export function SeriesPage() {
 
     return Array.from(map.values())
       .map((s) => {
-        s.books.sort((a, b) => (a.seriesIndex ?? 0) - (b.seriesIndex ?? 0));
+        s.books.sort((a, b) => (a.seriesIndex ?? 9999) - (b.seriesIndex ?? 9999));
         return s;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -295,7 +295,6 @@ export function SeriesPage() {
                     </Link>
                     <p className="text-xs font-mono text-muted line-clamp-1">
                       {book.author}
-                      {book.narrator && ` • Narrated by ${book.narrator}`}
                     </p>
                   </div>
                 </div>

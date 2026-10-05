@@ -113,7 +113,7 @@ export function MiniPlayer() {
                 {currentBook.title}
               </h4>
               <p className="text-[11px] font-mono text-muted truncate">
-                {currentBook.author} {currentBook.narrator ? `• ${currentBook.narrator}` : ""}
+                {currentBook.author}
               </p>
             </div>
 

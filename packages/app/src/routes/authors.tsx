@@ -91,7 +91,7 @@ export function AuthorsPage() {
         a.seriesCount = a.seriesNames.length;
         a.books.sort((x, y) => {
           if (x.series && y.series && x.series === y.series) {
-            return (x.seriesIndex ?? 0) - (y.seriesIndex ?? 0);
+            return (x.seriesIndex ?? 9999) - (y.seriesIndex ?? 9999);
           }
           if (x.series && !y.series) return -1;
           if (!x.series && y.series) return 1;
@@ -205,7 +205,7 @@ export function AuthorsPage() {
 
         {/* Series Sections */}
         {Array.from(seriesGroups.entries()).map(([seriesName, sBooks]) => {
-          sBooks.sort((a, b) => (a.seriesIndex ?? 0) - (b.seriesIndex ?? 0));
+          sBooks.sort((a, b) => (a.seriesIndex ?? 9999) - (b.seriesIndex ?? 9999));
 
           return (
             <div key={seriesName} className="space-y-4">
@@ -302,7 +302,7 @@ export function AuthorsPage() {
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-text">Authors Catalog</h1>
             <p className="text-xs font-mono text-muted mt-0.5">
-              Discover audiobooks by your favorite authors, series, and narrators
+              Discover audiobooks by your favorite authors and series
             </p>
           </div>
         </div>
@@ -473,11 +473,6 @@ function AuthorBookCard({
           >
             {book.title}
           </Link>
-          {book.narrator && (
-            <p className="text-[10px] font-mono text-muted line-clamp-1 mt-0.5">
-              Narrated by {book.narrator}
-            </p>
-          )}
         </div>
 
         <div className="pt-2 flex items-center justify-between text-[10px] font-mono text-subtle border-t border-border mt-2">
