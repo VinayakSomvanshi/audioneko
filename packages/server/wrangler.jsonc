@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "audioneko-server",
+  "name": "audioneko",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-01",
   "compatibility_flags": ["nodejs_compat"],
@@ -34,13 +34,20 @@
       {
         "name": "SYNC_ROOM",
         "class_name": "SyncRoom"
+      },
+      {
+        "name": "LISTEN_ALONG_ROOM",
+        "class_name": "ListenAlongRoom"
       }
     ]
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["SyncRoom"]
+      "new_sqlite_classes": ["SyncRoom", "ListenAlongRoom"]
     }
-  ]
+  ],
+  "triggers": {
+    "crons": ["0 */6 * * *"]
+  }
 }
