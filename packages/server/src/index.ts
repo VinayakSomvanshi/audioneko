@@ -9,6 +9,7 @@ import { createDb } from "./db";
 import * as schema from "./db/schema";
 import { scanDriveLibrary } from "./drive/scanner";
 import { handleAudioStreamRequest } from "./drive/stream";
+import { getGoogleAccessToken } from "./drive/token";
 import {
   ACTIVE_SHELF_PREFIX,
   dispatchShelfTask,
@@ -171,7 +172,45 @@ app.get("/api/covers/:bookId", async (c) => {
 
   if (coverKey.startsWith("gdrive:")) {
     const driveFileId = coverKey.replace("gdrive:", "");
-    return handleAudioStreamRequest(c.req.raw, driveFileId, c.env);
+    const cache =
+      typeof caches !== "undefined" && "default" in caches ? (caches as any).default : null;
+    const cacheKey = new Request(c.req.url, { method: "GET" });
+
+    if (cache) {
+      const cachedRes = await cache.match(cacheKey);
+      if (cachedRes) {
+        return cachedRes;
+      }
+    }
+
+    if (!c.env.GOOGLE_SA_KEY) {
+      return c.text("Google Drive credentials missing", 500);
+    }
+    const token = await getGoogleAccessToken(c.env.GOOGLE_SA_KEY, c.env.KV);
+    const driveRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+
+    if (!driveRes.ok) {
+      return c.text("Failed to fetch cover from Drive", driveRes.status as any);
+    }
+
+    const contentType = driveRes.headers.get("content-type") || "image/png";
+    const response = new Response(driveRes.body, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=604800, s-maxage=604800",
+      },
+    });
+
+    if (cache) {
+      c.executionCtx?.waitUntil(cache.put(cacheKey, response.clone()));
+    }
+    return response;
   }
 
   if (c.env.R2) {

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAudio } from "../../context/audio-context";
+import { getBookCoverUrl } from "../../lib/covers";
 import type { SleepTimerPreset } from "../../lib/sleep-timer";
 import { WaveformScrubber, formatScrubberTime } from "./WaveformScrubber";
 
@@ -147,13 +148,13 @@ export function FullPlayerModal() {
           {currentBook.coverR2Key ? (
             <>
               <img
-                src={`/api/covers/${currentBook.id}`}
+                src={getBookCoverUrl(currentBook)}
                 alt=""
                 aria-hidden="true"
                 className="absolute inset-0 w-full h-full object-cover blur-md opacity-35 scale-110 pointer-events-none select-none"
               />
               <img
-                src={`/api/covers/${currentBook.id}`}
+                src={getBookCoverUrl(currentBook)}
                 alt={currentBook.title}
                 className="relative z-10 w-full h-full object-contain select-none drop-shadow-lg"
               />

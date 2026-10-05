@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { BookOpen, Loader2, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAudio } from "../context/audio-context";
+import { getBookCoverUrl } from "../lib/covers";
 import { updateSearchIndex } from "../lib/search";
 
 export function LibraryPage() {
@@ -70,13 +71,13 @@ export function LibraryPage() {
                 {continueBook.coverR2Key ? (
                   <>
                     <img
-                      src={`/api/covers/${continueBook.id}`}
+                      src={getBookCoverUrl(continueBook)}
                       alt=""
                       aria-hidden="true"
                       className="absolute inset-0 w-full h-full object-cover blur-sm opacity-35 scale-110 pointer-events-none select-none"
                     />
                     <img
-                      src={`/api/covers/${continueBook.id}`}
+                      src={getBookCoverUrl(continueBook)}
                       alt={continueBook.title}
                       className="relative z-10 w-full h-full object-contain select-none"
                       onError={(e) => {
@@ -172,13 +173,13 @@ export function LibraryPage() {
                 {book.coverR2Key ? (
                   <>
                     <img
-                      src={`/api/covers/${book.id}`}
+                      src={getBookCoverUrl(book)}
                       alt=""
                       aria-hidden="true"
                       className="absolute inset-0 w-full h-full object-cover blur-sm opacity-35 scale-110 pointer-events-none select-none"
                     />
                     <img
-                      src={`/api/covers/${book.id}`}
+                      src={getBookCoverUrl(book)}
                       alt={book.title}
                       className="relative z-10 w-full h-full object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-sm select-none"
                       onError={(e) => {

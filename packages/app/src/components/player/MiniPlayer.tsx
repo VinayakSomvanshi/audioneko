@@ -1,6 +1,7 @@
 import { ChevronUp, FastForward, Moon, Pause, Play, Rewind, Zap } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { useAudio } from "../../context/audio-context";
+import { getBookCoverUrl } from "../../lib/covers";
 import { FullPlayerModal } from "./FullPlayerModal";
 import { formatScrubberTime } from "./WaveformScrubber";
 
@@ -82,13 +83,13 @@ export function MiniPlayer() {
               {currentBook.coverR2Key ? (
                 <>
                   <img
-                    src={`/api/covers/${currentBook.id}`}
+                    src={getBookCoverUrl(currentBook)}
                     alt=""
                     aria-hidden="true"
                     className="absolute inset-0 w-full h-full object-cover blur-sm opacity-35 scale-110 pointer-events-none select-none"
                   />
                   <img
-                    src={`/api/covers/${currentBook.id}`}
+                    src={getBookCoverUrl(currentBook)}
                     alt={currentBook.title}
                     className="relative z-10 w-full h-full object-contain select-none"
                   />

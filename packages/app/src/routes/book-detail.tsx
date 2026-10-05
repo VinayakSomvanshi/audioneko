@@ -4,6 +4,7 @@ import { Link, useParams } from "@tanstack/react-router";
 import { ArrowLeft, BookOpen, ListMusic, Loader2, Play } from "lucide-react";
 import { DownloadButton } from "../components/storage/DownloadButton";
 import { useAudio } from "../context/audio-context";
+import { getBookCoverUrl } from "../lib/covers";
 
 export function BookDetailPage() {
   const { id } = useParams({ strict: false });
@@ -113,13 +114,13 @@ export function BookDetailPage() {
           {book.coverR2Key ? (
             <>
               <img
-                src={`/api/covers/${book.id}`}
+                src={getBookCoverUrl(book)}
                 alt=""
                 aria-hidden="true"
                 className="absolute inset-0 w-full h-full object-cover blur-md opacity-35 scale-110 pointer-events-none select-none"
               />
               <img
-                src={`/api/covers/${book.id}`}
+                src={getBookCoverUrl(book)}
                 alt={book.title}
                 className="relative z-10 w-full h-full object-contain select-none drop-shadow-md"
                 onError={(e) => {
