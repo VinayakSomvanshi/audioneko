@@ -1,14 +1,14 @@
 import { Link } from "@tanstack/react-router";
-import { Moon, Search, Sun, User as UserIcon } from "lucide-react";
+import { Moon, Search, ShieldCheck, Sun, User as UserIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { signOut, useSession } from "../../lib/auth-client";
+import { signOut, useCurrentUser } from "../../lib/auth-client";
 
 interface HeaderProps {
   onSearchClick?: () => void;
 }
 
 export function Header({ onSearchClick }: HeaderProps) {
-  const { data: session } = useSession();
+  const { user, isAdmin } = useCurrentUser();
   const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
@@ -95,11 +95,19 @@ export function Header({ onSearchClick }: HeaderProps) {
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>
 
-        {session?.user ? (
+        {user ? (
           <div className="flex items-center gap-2 pl-1">
-            <span className="text-xs font-mono text-muted hidden lg:inline">
-              {session.user.name}
-            </span>
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-accent-bg text-accent border border-accent/40 hover:border-accent transition-colors font-medium"
+                title="Curator Admin Control Plane"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Admin</span>
+              </Link>
+            )}
+            <span className="text-xs font-mono text-muted hidden lg:inline">{user.name}</span>
             <button
               type="button"
               onClick={() => signOut()}

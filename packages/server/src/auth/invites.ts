@@ -169,3 +169,11 @@ export async function listInvites(db: Database) {
     .leftJoin(user, eq(invites.createdBy, user.id))
     .orderBy(desc(invites.createdAt));
 }
+
+/**
+ * Deletes / revokes an invite link by ID.
+ */
+export async function deleteInvite(db: Database, id: string): Promise<boolean> {
+  await db.delete(invites).where(eq(invites.id, id));
+  return true;
+}

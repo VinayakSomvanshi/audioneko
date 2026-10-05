@@ -1,4 +1,7 @@
+import { eq } from "drizzle-orm";
 import type { Context, MiddlewareHandler } from "hono";
+import { createDb } from "../db";
+import * as schema from "../db/schema";
 import type { Env } from "../types";
 import { createAuth } from "./index";
 
@@ -24,6 +27,26 @@ export interface AuthContextVariables {
 }
 
 /**
+ * Helper to ensure user role is strictly resolved from D1
+ */
+async function resolveUserWithRole(
+  env: Env,
+  rawUser: Record<string, unknown>,
+): Promise<AuthContextVariables["user"]> {
+  const userObj = { ...rawUser } as unknown as AuthContextVariables["user"];
+  if (!userObj.role) {
+    const db = createDb(env.DB);
+    const row = await db
+      .select({ role: schema.user.role })
+      .from(schema.user)
+      .where(eq(schema.user.id, userObj.id))
+      .limit(1);
+    userObj.role = (row[0]?.role as "admin" | "listener") || "listener";
+  }
+  return userObj;
+}
+
+/**
  * Enforces a valid Better Auth session on protected routes.
  * Returns 401 Unauthorized if the session cookie is missing or invalid.
  */
@@ -46,7 +69,11 @@ export const requireAuth: MiddlewareHandler<{
     );
   }
 
-  c.set("user", sessionData.user as AuthContextVariables["user"]);
+  const userWithRole = await resolveUserWithRole(
+    c.env,
+    sessionData.user as Record<string, unknown>,
+  );
+  c.set("user", userWithRole);
   c.set("session", sessionData.session as AuthContextVariables["session"]);
 
   await next();
@@ -66,7 +93,11 @@ export const optionalAuth: MiddlewareHandler<{
     });
 
     if (sessionData?.user && sessionData?.session) {
-      c.set("user", sessionData.user as AuthContextVariables["user"]);
+      const userWithRole = await resolveUserWithRole(
+        c.env,
+        sessionData.user as Record<string, unknown>,
+      );
+      c.set("user", userWithRole);
       c.set("session", sessionData.session as AuthContextVariables["session"]);
     }
   } catch {

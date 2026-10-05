@@ -1,5 +1,13 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Flame, HardDriveDownload, Library, Search, User as UserIcon } from "lucide-react";
+import {
+  Flame,
+  HardDriveDownload,
+  Library,
+  Search,
+  ShieldCheck,
+  User as UserIcon,
+} from "lucide-react";
+import { useCurrentUser } from "../../lib/auth-client";
 
 interface BottomNavProps {
   onSearchClick?: () => void;
@@ -7,13 +15,19 @@ interface BottomNavProps {
 
 export function BottomNav({ onSearchClick }: BottomNavProps) {
   const location = useLocation();
+  const { isAdmin } = useCurrentUser();
 
   const navItems = [
     { label: "Library", href: "/", icon: Library },
     { label: "Activity", href: "/analytics", icon: Flame },
     { label: "Offline", href: "/offline", icon: HardDriveDownload },
-    { label: "Account", href: "/login", icon: UserIcon },
   ];
+
+  if (isAdmin) {
+    navItems.push({ label: "Admin", href: "/admin", icon: ShieldCheck });
+  } else {
+    navItems.push({ label: "Account", href: "/login", icon: UserIcon });
+  }
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-30 h-14 bg-bg border-t border-border flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">

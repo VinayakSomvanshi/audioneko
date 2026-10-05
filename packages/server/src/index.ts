@@ -2,6 +2,7 @@ import { and, asc, eq, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { absRoutes } from "./abs/routes";
+import { adminRoutes } from "./admin/routes";
 import { createAuth } from "./auth";
 import {
   type AuthContextVariables,
@@ -74,6 +75,9 @@ app.all("/api/auth/*", (c) => {
 
 // Cryptographic invite routes (/api/invites/*)
 app.route("/api/invites", inviteRoutes);
+
+// Admin Control Plane routes (/api/admin/*)
+app.route("/api/admin", adminRoutes);
 
 // Resolve fileId: if it's a book ID, map to Google Drive file ID from files table
 async function resolveDriveFileId(db: ReturnType<typeof createDb>, param: string): Promise<string> {

@@ -1,4 +1,5 @@
 import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import { AdminDashboardPage } from "./routes/admin";
 import { AdminInvitesPage } from "./routes/admin-invites";
 import { AnalyticsPage } from "./routes/analytics";
 import { AuthorsPage } from "./routes/authors";
@@ -39,10 +40,16 @@ const loginRoute = createRoute({
   component: LoginPage,
 });
 
+const adminRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/admin",
+  component: AdminDashboardPage,
+});
+
 const adminInvitesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/admin/invites",
-  component: AdminInvitesPage,
+  component: AdminDashboardPage,
 });
 
 const offlineRoute = createRoute({
@@ -80,6 +87,7 @@ const routeTree = rootRoute.addChildren([
   bookDetailRoute,
   joinRoute,
   loginRoute,
+  adminRoute,
   adminInvitesRoute,
   offlineRoute,
   analyticsRoute,

@@ -25,6 +25,16 @@ export function createAuth(env: Env) {
         verification: schema.verification,
       },
     }),
+    user: {
+      additionalFields: {
+        role: {
+          type: "string",
+          required: false,
+          defaultValue: "listener",
+          input: false,
+        },
+      },
+    },
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,

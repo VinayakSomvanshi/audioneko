@@ -7,9 +7,10 @@ import {
   KeyRound,
   Library,
   Search,
+  ShieldCheck,
   Users,
 } from "lucide-react";
-import { useSession } from "../../lib/auth-client";
+import { useCurrentUser } from "../../lib/auth-client";
 
 interface SidebarProps {
   onSearchClick?: () => void;
@@ -17,8 +18,7 @@ interface SidebarProps {
 
 export function Sidebar({ onSearchClick }: SidebarProps) {
   const location = useLocation();
-  const { data: session } = useSession();
-  const isAdmin = (session?.user as { role?: string })?.role === "admin";
+  const { isAdmin } = useCurrentUser();
 
   const navItems = [
     { label: "Library", href: "/", icon: Library },
@@ -30,7 +30,7 @@ export function Sidebar({ onSearchClick }: SidebarProps) {
   ];
 
   if (isAdmin) {
-    navItems.push({ label: "Invites (Admin)", href: "/admin/invites", icon: KeyRound });
+    navItems.push({ label: "Admin Console", href: "/admin", icon: ShieldCheck });
   }
 
   return (
