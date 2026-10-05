@@ -2,13 +2,16 @@ import type { Book } from "@audioneko/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
+  AlertCircle,
   ArrowLeft,
   Bookmark,
   FolderPlus,
   HardDrive,
   Info,
   Layers,
+  Loader2,
   Plus,
+  Search,
   Sparkles,
   Trash2,
   Zap,
@@ -53,6 +56,9 @@ export function ShelvesPage() {
   const [activeTab, setActiveTab] = useState<"custom" | "active-shelf">("active-shelf");
   const [newShelfName, setNewShelfName] = useState("");
   const [isCreatingShelf, setIsCreatingShelf] = useState(false);
+  const [stageSearch, setStageSearch] = useState("");
+  const [stagingBookId, setStagingBookId] = useState<string | null>(null);
+  const [stageError, setStageError] = useState<string | null>(null);
 
   // 1. Fetch Active Shelf (R2 Cache) status
   const { data: shelfStatus } = useQuery<ActiveShelfStatus>({
@@ -103,13 +109,30 @@ export function ShelvesPage() {
   // Precache mutation (Stage to R2)
   const precacheMutation = useMutation({
     mutationFn: async (bookId: string) => {
+      setStagingBookId(bookId);
+      setStageError(null);
       const res = await fetch(`/api/shelf/precache/${bookId}`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed to precache");
+      if (!res.ok) {
+        const errorData = (await res.json().catch(() => ({}))) as {
+          error?: string;
+          message?: string;
+        };
+        throw new Error(
+          errorData.error || errorData.message || "Failed to stage audiobook to Active Shelf",
+        );
+      }
       return res.json();
     },
     onSuccess: () => {
+      setStageError(null);
       queryClient.invalidateQueries({ queryKey: ["shelfStatus"] });
       queryClient.invalidateQueries({ queryKey: ["books"] });
+    },
+    onError: (err: Error) => {
+      setStageError(err.message);
+    },
+    onSettled: () => {
+      setStagingBookId(null);
     },
   });
 
@@ -158,6 +181,13 @@ export function ShelvesPage() {
 
   const allBooks = booksData?.books ?? [];
   const customShelves = shelvesData?.shelves ?? [];
+
+  const unstagedBooks = allBooks.filter((b) => !b.isActiveShelf);
+  const filteredUnstagedBooks = unstagedBooks.filter((b) => {
+    if (!stageSearch.trim()) return true;
+    const q = stageSearch.trim().toLowerCase();
+    return b.title.toLowerCase().includes(q) || Boolean(b.author?.toLowerCase().includes(q));
+  });
 
   const formatBytes = (bytes: number) => {
     if (!bytes || bytes === 0) return "0 MB";
@@ -252,14 +282,66 @@ export function ShelvesPage() {
       {/* ========================================== */}
       {activeTab === "active-shelf" && (
         <div className="space-y-6">
+          {/* Status Alert if R2 is not active */}
+          {!shelfStatus?.isR2Enabled && (
+            <div className="p-4 rounded surface-card border border-warning/30 space-y-2 text-xs font-mono">
+              <div className="flex items-center gap-2 text-warning font-semibold">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>Zero-Cost Direct Google Drive Mode Active (R2 Inactive)</span>
+              </div>
+              <p className="text-muted leading-relaxed">
+                Your audiobooks are currently streamed{" "}
+                <strong className="text-text">directly from Google Drive (Tier 1 Cold)</strong> with
+                zero cloud server storage or egress fees.
+              </p>
+              <p className="text-subtle text-[11px] leading-relaxed">
+                To activate fast &lt;50ms edge staging to Cloudflare R2 (10 GB free tier), enable R2
+                in your Cloudflare dashboard and configure the R2 bucket binding in{" "}
+                <code className="text-accent bg-elevated px-1 py-0.5 rounded">
+                  packages/server/wrangler.jsonc
+                </code>
+                .
+              </p>
+            </div>
+          )}
+
+          {/* Staging Error Toast / Alert Banner */}
+          {stageError && (
+            <div className="p-3.5 rounded border border-error/40 bg-error/10 text-xs font-mono flex items-start justify-between gap-3 text-error">
+              <div className="flex items-start gap-2 min-w-0">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="font-semibold">Staging Operation Note</div>
+                  <div className="text-[11px] opacity-90 break-words">{stageError}</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStageError(null)}
+                className="text-xs hover:underline cursor-pointer opacity-70 hover:opacity-100 shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* Storage Meter Card */}
           <div className="surface-card p-6 border border-border space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <HardDrive className="w-4 h-4 text-accent" />
                 <h2 className="text-sm font-bold font-mono text-text uppercase">
                   Tier 2 Active Shelf Capacity
                 </h2>
+                {shelfStatus?.isR2Enabled ? (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-accent/30 bg-accent-bg text-accent">
+                    R2 EDGE ACTIVE
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded border border-warning/30 bg-warning/10 text-warning">
+                    DIRECT DRIVE MODE
+                  </span>
+                )}
               </div>
               <div className="text-xs font-mono text-muted">
                 <span className="text-accent font-semibold">{formatBytes(cachedBytes)}</span> /{" "}
@@ -299,8 +381,9 @@ export function ShelvesPage() {
                 <Zap className="w-8 h-8 text-muted mx-auto" />
                 <h4 className="text-sm font-semibold text-text">Active Shelf is currently empty</h4>
                 <p className="text-xs font-mono text-muted max-w-md mx-auto">
-                  When you listen to an audiobook or click "Stage to R2" below, the file is
-                  pre-cached on Cloudflare R2 for instant playback.
+                  {shelfStatus?.isR2Enabled
+                    ? "When you listen to an audiobook or click 'Stage' below, the file is pre-cached on Cloudflare R2 for instant playback."
+                    : "Audiobooks stream directly from your Google Drive. Once Cloudflare R2 is enabled on your account, audiobooks can be staged to the edge cache."}
                 </p>
               </div>
             ) : (
@@ -356,54 +439,113 @@ export function ShelvesPage() {
           </div>
 
           {/* Quick Staging Section: Books not yet on Active Shelf */}
-          <div className="space-y-3 pt-4">
-            <div className="border-b border-border pb-2">
-              <h3 className="text-xs font-mono uppercase tracking-wider text-text font-bold">
-                Available to Stage (From Tier 1 Drive Cold)
-              </h3>
+          <div className="space-y-4 pt-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+              <div className="flex items-center gap-2.5">
+                <h3 className="text-xs font-mono uppercase tracking-wider text-text font-bold">
+                  Available to Stage (From Tier 1 Drive Cold)
+                </h3>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface border border-border text-muted">
+                  {filteredUnstagedBooks.length}
+                  {filteredUnstagedBooks.length !== unstagedBooks.length
+                    ? ` / ${unstagedBooks.length}`
+                    : ""}{" "}
+                  available
+                </span>
+              </div>
+
+              {/* Search filter for books to stage */}
+              <div className="relative w-full sm:w-64">
+                <Search className="w-3.5 h-3.5 text-muted absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Filter audiobooks..."
+                  value={stageSearch}
+                  onChange={(e) => setStageSearch(e.target.value)}
+                  className="w-full bg-elevated border border-border focus:border-accent rounded pl-8 pr-3 py-1.5 text-xs font-mono text-text placeholder:text-muted focus:outline-none transition-colors"
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {allBooks
-                .filter((b) => !b.isActiveShelf)
-                .slice(0, 9)
-                .map((book) => (
-                  <div
-                    key={book.id}
-                    className="surface-card p-3 border border-border flex items-center justify-between gap-3"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-9 h-9 rounded border border-border bg-surface overflow-hidden shrink-0">
-                        {book.coverR2Key ? (
-                          <img
-                            src={getBookCoverUrl(book)}
-                            alt={book.title}
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <Bookmark className="w-4 h-4 text-muted m-auto mt-2.5" />
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs font-medium text-text truncate">{book.title}</div>
-                        <div className="text-[10px] font-mono text-muted truncate">
-                          {book.author}
+            {filteredUnstagedBooks.length === 0 ? (
+              <div className="surface-card p-6 border border-border text-center text-xs font-mono text-muted space-y-1">
+                {stageSearch.trim() ? (
+                  <>
+                    <p className="text-text font-medium">No matching audiobooks found</p>
+                    <p className="text-[11px] text-subtle">
+                      No unstaged books match "{stageSearch}". Clear the search to view all{" "}
+                      {unstagedBooks.length} available books.
+                    </p>
+                  </>
+                ) : (
+                  <p>All books in your library are currently staged on the Active Shelf!</p>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filteredUnstagedBooks.map((book) => {
+                  const isThisBookStaging = stagingBookId === book.id;
+                  const canStage = !!shelfStatus?.isR2Enabled;
+
+                  return (
+                    <div
+                      key={book.id}
+                      className="surface-card p-3 border border-border flex items-center justify-between gap-3 hover:border-border/80 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-10 h-10 rounded border border-border bg-surface overflow-hidden shrink-0">
+                          {book.coverR2Key ? (
+                            <img
+                              src={getBookCoverUrl(book)}
+                              alt={book.title}
+                              className="w-full h-full object-contain"
+                            />
+                          ) : (
+                            <Bookmark className="w-4 h-4 text-muted m-auto mt-3" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <Link
+                            to="/book/$id"
+                            params={{ id: book.id }}
+                            className="text-xs font-medium text-text hover:text-accent truncate block"
+                          >
+                            {book.title}
+                          </Link>
+                          <div className="text-[10px] font-mono text-muted truncate">
+                            {book.author}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => precacheMutation.mutate(book.id)}
-                      disabled={precacheMutation.isPending}
-                      className="px-2.5 py-1 rounded bg-elevated border border-border hover:border-accent text-xs font-mono text-text hover:text-accent transition-colors shrink-0 cursor-pointer flex items-center gap-1"
-                    >
-                      <Zap className="w-3 h-3 text-accent" />
-                      <span>Stage</span>
-                    </button>
-                  </div>
-                ))}
-            </div>
+                      <button
+                        type="button"
+                        onClick={() => precacheMutation.mutate(book.id)}
+                        disabled={precacheMutation.isPending || !canStage}
+                        title={
+                          !canStage
+                            ? "Audiobooks stream directly from Google Drive. Enable R2 in your Cloudflare dashboard to stage books to edge cache."
+                            : "Stage to Cloudflare R2 edge cache"
+                        }
+                        className="px-2.5 py-1.5 rounded bg-elevated border border-border hover:border-accent text-xs font-mono text-text hover:text-accent disabled:opacity-40 disabled:hover:border-border disabled:hover:text-text disabled:cursor-not-allowed transition-colors shrink-0 cursor-pointer flex items-center gap-1.5"
+                      >
+                        {isThisBookStaging ? (
+                          <>
+                            <Loader2 className="w-3 h-3 text-accent animate-spin" />
+                            <span>Staging...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Zap className="w-3 h-3 text-accent" />
+                            <span>Stage</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}

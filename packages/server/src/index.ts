@@ -500,6 +500,17 @@ app.get("/api/shelf/status", async (c) => {
 
 // Pre-cache an audiobook to R2 Active Shelf
 app.post("/api/shelf/precache/:bookId", requireAuth, async (c) => {
+  if (!c.env.R2) {
+    return c.json(
+      {
+        error:
+          "R2 Active Shelf is currently in Zero-Cost Direct Google Drive Mode. Cloudflare R2 is not enabled on this deployment. Audiobooks stream directly from Google Drive. To activate edge caching (<50ms start time), enable R2 in your Cloudflare dashboard (free 10 GB/month) and bind an R2 bucket in wrangler.jsonc.",
+        code: "r2_disabled",
+        isR2Enabled: false,
+      },
+      400,
+    );
+  }
   const bookId = c.req.param("bookId");
   const result = await dispatchShelfTask(
     c.env,
@@ -511,6 +522,9 @@ app.post("/api/shelf/precache/:bookId", requireAuth, async (c) => {
 
 // Trigger LRU eviction check (Admin only)
 app.post("/api/shelf/evict", requireAuth, requireAdmin, async (c) => {
+  if (!c.env.R2) {
+    return c.json({ evictedBookIds: [], freedBytes: 0, reason: "r2_disabled" });
+  }
   const body = (await c.req.json().catch(() => ({}))) as { requiredBytes?: number };
   const requiredBytes = typeof body.requiredBytes === "number" ? body.requiredBytes : 0;
   const result = await evictLruBooks(requiredBytes, c.env);
