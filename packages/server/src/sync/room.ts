@@ -165,6 +165,14 @@ export class SyncRoom extends DurableObject<Env> {
   }
 
   /**
+   * Deletes a progress record from SQLite (e.g. when resetting progress or starting over).
+   */
+  public deleteProgress(bookId: string): void {
+    this.ensureSchema();
+    this.ctx.storage.sql.exec("DELETE FROM book_progress WHERE book_id = ?", bookId);
+  }
+
+  /**
    * Handles incoming HTTP and WebSocket upgrade requests.
    */
   async fetch(request: Request): Promise<Response> {
@@ -178,6 +186,10 @@ export class SyncRoom extends DurableObject<Env> {
 
     if (url.pathname.startsWith("/progress/")) {
       const bookId = url.pathname.slice("/progress/".length);
+      if (request.method === "DELETE") {
+        this.deleteProgress(bookId);
+        return Response.json({ success: true, deleted: bookId });
+      }
       const record = this.getProgress(bookId);
       return Response.json({ record });
     }

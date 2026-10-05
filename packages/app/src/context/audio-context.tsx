@@ -1,4 +1,5 @@
 import type { Book, BookProgressRecord, Chapter } from "@audioneko/shared";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   type ReactNode,
   createContext,
@@ -61,11 +62,13 @@ export interface AudioContextType {
   setShakeToExtend: (enabled: boolean) => void;
   togglePiP: () => Promise<boolean>;
   getSavedProgress: (bookId: string) => { position: number; duration: number } | null;
+  resetProgress: (bookId: string) => Promise<void>;
 }
 
 const AudioContext = createContext<AudioContextType | null>(null);
 
 export function AudioProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -521,6 +524,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
       if (initialPosition > 0 && Number.isFinite(initialPosition)) {
         audio.currentTime = initialPosition;
+      } else {
+        audio.currentTime = 0;
       }
 
       audioEngine
@@ -533,6 +538,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
             duration: audio.duration || book.durationSeconds || 0,
             playbackRate: playbackRateRef.current,
             isPlaying: true,
+            isExplicitSeek: true,
           });
           lastListenTickRef.current = {
             time: Date.now(),
@@ -644,6 +650,45 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     setRemoteResumePrompt(null);
   }, []);
 
+  const resetProgress = useCallback(
+    async (bookId: string) => {
+      // 1. Clear local progress store
+      clearProgress(bookId);
+
+      // 2. If resetting currently active/playing book, reset audio element & position
+      if (currentBookRef.current?.id === bookId) {
+        setCurrentTime(0);
+        currentTimeRef.current = 0;
+        if (audioRef.current) {
+          audioRef.current.currentTime = 0;
+        }
+      }
+
+      // 3. Inform sync client with explicit seek to 0 so DO HLC conflict resolution accepts 0
+      syncClientRef.current?.sendUpdate({
+        bookId,
+        currentTime: 0,
+        duration: durationRef.current || 0,
+        playbackRate: playbackRateRef.current,
+        isPlaying: false,
+        isExplicitSeek: true,
+      });
+
+      // 4. Delete on server sync room
+      try {
+        await fetch(`/api/sync/progress/${encodeURIComponent(bookId)}`, { method: "DELETE" });
+      } catch (err) {
+        console.warn("[audioneko] Failed to delete progress on server:", err);
+      }
+
+      // 5. Invalidate TanStack queries so UI updates immediately
+      queryClient.invalidateQueries({ queryKey: ["syncState"] });
+      queryClient.invalidateQueries({ queryKey: ["book", bookId] });
+      queryClient.invalidateQueries({ queryKey: ["books"] });
+    },
+    [queryClient],
+  );
+
   const jumpToRemotePosition = useCallback(() => {
     setRemoteResumePrompt((prompt) => {
       if (prompt) {
@@ -695,6 +740,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         setShakeToExtend,
         togglePiP,
         getSavedProgress: (bookId: string) => getProgress(bookId),
+        resetProgress,
       }}
     >
       {children}

@@ -1,14 +1,34 @@
-import type { Book, Chapter } from "@audioneko/shared";
+import {
+  type Book,
+  type Chapter,
+  getPlaybackPercent,
+  isPlaybackCompleted,
+  isPlaybackInProgress,
+} from "@audioneko/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
-import { ArrowLeft, BookOpen, ListMusic, Loader2, Play, RotateCcw } from "lucide-react";
+import { ArrowLeft, BookOpen, Check, ListMusic, Loader2, Play, RotateCcw, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { DownloadButton } from "../components/storage/DownloadButton";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
 
 export function BookDetailPage() {
   const { id } = useParams({ strict: false });
-  const { playBook, currentBook, isPlaying, seekTo, getSavedProgress } = useAudio();
+  const { playBook, currentBook, isPlaying, seekTo, getSavedProgress, resetProgress, currentTime } =
+    useAudio();
+  const [showStartOverModal, setShowStartOverModal] = useState(false);
+
+  // Close modal on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showStartOverModal) {
+        setShowStartOverModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showStartOverModal]);
 
   const { data: bookData, isLoading } = useQuery({
     queryKey: ["book", id],
@@ -28,19 +48,23 @@ export function BookDetailPage() {
   const savedProgress = id ? getSavedProgress(id) : null;
   const savedPosition = savedProgress?.position ?? 0;
   const totalDuration = savedProgress?.duration || book?.durationSeconds || 0;
-  const progressPercent =
-    totalDuration > 0 && savedPosition > 0 ? (savedPosition / totalDuration) * 100 : 0;
 
-  // Which chapter does the saved position fall in?
+  const isCurrentBookLoaded = currentBook?.id === book?.id;
+  const activePosition = isCurrentBookLoaded && currentTime > 0 ? currentTime : savedPosition;
+  const isCompleted = isPlaybackCompleted(activePosition, totalDuration);
+  const inProgress = isPlaybackInProgress(activePosition, totalDuration);
+  const progressPercent = getPlaybackPercent(activePosition, totalDuration);
+
+  // Which chapter does the active position fall in?
   const resumeChapter =
-    savedPosition > 0 && chapters.length > 0
+    activePosition > 0 && chapters.length > 0
       ? (chapters.find(
           (c) =>
-            savedPosition >= (c.startTime ?? 0) && savedPosition < (c.endTime ?? totalDuration),
+            activePosition >= (c.startTime ?? 0) && activePosition < (c.endTime ?? totalDuration),
         ) ?? chapters[0])
       : null;
 
-  const hasProgress = savedPosition > 3 && progressPercent > 0.1;
+  const hasProgress = inProgress && activePosition > 3;
 
   const formatSeconds = (secs: number) => {
     const h = Math.floor(secs / 3600);
@@ -54,11 +78,21 @@ export function BookDetailPage() {
   const handleResume = () => {
     if (!book) return;
     if (currentBook?.id === book.id) {
-      // Already loaded — just seek
-      seekTo(savedPosition);
+      seekTo(activePosition);
     } else {
-      playBook(book, savedPosition, chapters.length > 0 ? chapters : undefined);
+      playBook(book, activePosition, chapters.length > 0 ? chapters : undefined);
     }
+  };
+
+  const handleStartOverClick = () => {
+    setShowStartOverModal(true);
+  };
+
+  const handleConfirmStartOver = async () => {
+    if (!book) return;
+    setShowStartOverModal(false);
+    await resetProgress(book.id);
+    playBook(book, 0, chapters.length > 0 ? chapters : undefined);
   };
 
   const handlePlayFromStart = () => {
@@ -233,9 +267,10 @@ export function BookDetailPage() {
                   )}
                 </span>
                 <span className="text-subtle">
-                  {formatSeconds(savedPosition)}
+                  {formatSeconds(activePosition)}
                   <span className="text-muted/50"> / </span>
                   {formatSeconds(totalDuration)}
+                  <span className="text-accent ml-2 font-medium">({progressPercent}%)</span>
                 </span>
               </div>
 
@@ -265,7 +300,7 @@ export function BookDetailPage() {
               {chapters.length > 1 && chapters.length <= 40 && (
                 <div className="flex items-center gap-0.5 overflow-hidden">
                   {chapters.map((ch) => {
-                    const isListened = savedPosition >= (ch.endTime ?? ch.startTime + 1);
+                    const isListened = activePosition >= (ch.endTime ?? ch.startTime + 1);
                     const isCurrent = resumeChapter?.id === ch.id;
                     return (
                       <div
@@ -279,6 +314,14 @@ export function BookDetailPage() {
                   })}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Completed badge if already finished */}
+          {isCompleted && (
+            <div className="flex items-center gap-2 text-xs font-mono text-accent pt-1">
+              <Check className="w-4 h-4" />
+              <span>You have listened to this entire audiobook.</span>
             </div>
           )}
 
@@ -296,15 +339,27 @@ export function BookDetailPage() {
                   <span>{isCurrentlyPlaying ? "NOW PLAYING" : "RESUME"}</span>
                 </button>
 
-                {/* Secondary: Start from Beginning */}
+                {/* Secondary: Start from Beginning with Pop-up Confirmation Warning */}
                 <button
                   type="button"
-                  onClick={handlePlayFromStart}
+                  onClick={handleStartOverClick}
                   className="px-4 py-2.5 rounded border border-border bg-surface text-muted font-mono text-xs flex items-center gap-2 hover:bg-elevated hover:text-text transition-colors cursor-pointer"
-                  title="Start from Beginning"
+                  title="Start from Beginning (resets progress)"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Start Over</span>
+                </button>
+              </>
+            ) : isCompleted ? (
+              <>
+                {/* Listen again if finished */}
+                <button
+                  type="button"
+                  onClick={handleStartOverClick}
+                  className="px-6 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  <span>START OVER</span>
                 </button>
               </>
             ) : (
@@ -402,6 +457,68 @@ export function BookDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Pop-up confirmation warning when clicking Start from Beginning */}
+      {showStartOverModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
+          {/* Click outside backdrop button */}
+          <button
+            type="button"
+            className="fixed inset-0 cursor-default bg-transparent border-0 p-0 w-full h-full"
+            onClick={() => setShowStartOverModal(false)}
+            aria-label="Close confirmation dialog"
+            tabIndex={-1}
+          />
+
+          <div className="surface-card border border-border p-6 max-w-md w-full shadow-2xl space-y-4 relative z-10">
+            <button
+              type="button"
+              onClick={() => setShowStartOverModal(false)}
+              className="absolute top-4 right-4 text-muted hover:text-text transition-colors p-1 cursor-pointer"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-start gap-3.5">
+              <div className="w-10 h-10 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center text-accent shrink-0 mt-0.5">
+                <RotateCcw className="w-5 h-5" />
+              </div>
+              <div className="space-y-1.5 flex-1 pr-4">
+                <h3 id="start-over-title" className="text-base font-semibold text-text">
+                  Reset Listening Progress?
+                </h3>
+                <p className="text-xs font-mono text-muted leading-relaxed">
+                  Starting <span className="text-text font-medium">"{book.title}"</span> from the
+                  beginning will reset your saved progress (
+                  <span className="text-accent font-semibold">
+                    {formatSeconds(activePosition)} · {progressPercent}%
+                  </span>
+                  ) back to 0:00. This cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setShowStartOverModal(false)}
+                className="px-4 py-2 rounded border border-border bg-surface text-muted font-mono text-xs hover:bg-elevated hover:text-text transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmStartOver}
+                className="px-4 py-2 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset & Start Over</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

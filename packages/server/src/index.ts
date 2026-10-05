@@ -488,6 +488,23 @@ app.get("/api/sync/state", requireAuth, async (c) => {
   return c.newResponse(res.body, res.status as 200, Object.fromEntries(res.headers.entries()));
 });
 
+// REST endpoint to delete / reset progress for a book
+app.delete("/api/sync/progress/:bookId", requireAuth, async (c) => {
+  const user = c.get("user");
+  if (!user?.id) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const bookId = c.req.param("bookId");
+  const doId = c.env.SYNC_ROOM.idFromName(user.id);
+  const stub = c.env.SYNC_ROOM.get(doId);
+
+  const res = await stub.fetch(
+    new Request(`https://sync/progress/${encodeURIComponent(bookId)}`, { method: "DELETE" }),
+  );
+  return c.newResponse(res.body, res.status as 200, Object.fromEntries(res.headers.entries()));
+});
+
 // ==========================================
 // Cloudflare R2 "Active Shelf" Cache Routes
 // ==========================================

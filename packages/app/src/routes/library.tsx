@@ -1,16 +1,31 @@
-import type { Book, BookProgressRecord } from "@audioneko/shared";
+import {
+  type Book,
+  type BookProgressRecord,
+  getPlaybackPercent,
+  isPlaybackCompleted,
+  isPlaybackInProgress,
+} from "@audioneko/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, Clock, HardDriveDownload, Loader2, Play } from "lucide-react";
-import { useEffect, useState } from "react";
+import { BookOpen, Check, Clock, HardDriveDownload, Loader2, Pause, Play } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
 import { getDownloadedBooks } from "../lib/opfs";
+import { PROGRESS_CHANGE_EVENT, getAllProgress } from "../lib/progress-store";
 import { updateSearchIndex } from "../lib/search";
 
 export function LibraryPage() {
-  const { playBook, currentBook, isPlaying, currentTime } = useAudio();
+  const { playBook, pause, resume, currentBook, isPlaying, currentTime, duration } = useAudio();
   const [activeFilter, setActiveFilter] = useState<"all" | "in-progress" | "downloaded">("all");
+  const [, setProgressTick] = useState(0);
+
+  // Re-render when local progress changes
+  useEffect(() => {
+    const handleProgressChange = () => setProgressTick((t) => t + 1);
+    window.addEventListener(PROGRESS_CHANGE_EVENT, handleProgressChange);
+    return () => window.removeEventListener(PROGRESS_CHANGE_EVENT, handleProgressChange);
+  }, []);
 
   const { data: booksData, isLoading } = useQuery({
     queryKey: ["books"],
@@ -63,24 +78,76 @@ export function LibraryPage() {
     return `${hours}h ${mins}m`;
   };
 
-  // In-progress book tracking
-  const inProgressRecords = (syncData?.books ?? []).filter(
-    (rec) => rec.currentTime > 10 && rec.currentTime < (rec.duration || 999999) - 30,
-  );
-  const inProgressIds = new Set(inProgressRecords.map((r) => r.bookId));
-  if (currentBook && (isPlaying || currentTime > 10)) {
-    inProgressIds.add(currentBook.id);
-  }
+  // Unified progress map merging server sync records, local storage, and live player state
+  const bookProgressMap = useMemo(() => {
+    const map = new Map<string, { currentTime: number; duration: number; updatedAt: number }>();
 
-  // Continue listening hero: ONLY show if the user actually has an active or in-progress book
-  const latestProgressBookId =
-    currentBook && (isPlaying || currentTime > 10)
-      ? currentBook.id
-      : inProgressRecords.sort((a, b) => b.updatedAt - a.updatedAt)[0]?.bookId;
+    // 1. Seed from server sync records
+    for (const rec of syncData?.books ?? []) {
+      map.set(rec.bookId, {
+        currentTime: rec.currentTime,
+        duration: rec.duration || 0,
+        updatedAt: rec.updatedAt || 0,
+      });
+    }
 
-  const continueBook = latestProgressBookId
-    ? (booksList.find((b) => b.id === latestProgressBookId) ?? null)
-    : null;
+    // 2. Merge local localStorage progress (if newer or not in sync)
+    const localMap = getAllProgress();
+    for (const [bookId, local] of Object.entries(localMap)) {
+      const existing = map.get(bookId);
+      if (!existing || local.updatedAt >= existing.updatedAt) {
+        map.set(bookId, {
+          currentTime: local.position,
+          duration: local.duration || existing?.duration || 0,
+          updatedAt: local.updatedAt,
+        });
+      }
+    }
+
+    // 3. Live active playback state in player (highest precedence)
+    if (currentBook) {
+      map.set(currentBook.id, {
+        currentTime,
+        duration: duration || currentBook.durationSeconds || 0,
+        updatedAt: Date.now(),
+      });
+    }
+
+    return map;
+  }, [syncData?.books, currentBook, currentTime, duration]);
+
+  // In-progress book IDs: started (currentTime > 0) and not completed (with 30s / 98% credit headroom)
+  const inProgressIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const [bookId, entry] of bookProgressMap.entries()) {
+      if (isPlaybackInProgress(entry.currentTime, entry.duration)) {
+        set.add(bookId);
+      }
+    }
+    return set;
+  }, [bookProgressMap]);
+
+  // Continue listening hero: the last audiobook the user started playing that is not yet completed
+  const continueBook = useMemo(() => {
+    // 1. If current loaded book is active/playing and not completed:
+    if (currentBook) {
+      const activeEntry = bookProgressMap.get(currentBook.id);
+      const curT = activeEntry?.currentTime ?? currentTime;
+      const curDur = activeEntry?.duration ?? duration ?? currentBook.durationSeconds;
+      if (isPlaybackInProgress(curT, curDur) || isPlaying) {
+        return currentBook;
+      }
+    }
+
+    // 2. Otherwise find the uncompleted started book with the latest updatedAt timestamp:
+    const candidates = Array.from(bookProgressMap.entries())
+      .filter(([_, entry]) => isPlaybackInProgress(entry.currentTime, entry.duration))
+      .sort((a, b) => b[1].updatedAt - a[1].updatedAt);
+
+    const latestId = candidates[0]?.[0];
+    if (!latestId) return null;
+    return booksList.find((b) => b.id === latestId) ?? null;
+  }, [currentBook, currentTime, duration, isPlaying, bookProgressMap, booksList]);
 
   // Filtered books based on active tab
   const downloadedIds = new Set(downloadedBooks.map((b) => b.bookId));
@@ -166,13 +233,31 @@ export function LibraryPage() {
 
             <button
               type="button"
-              onClick={() => playBook(continueBook)}
+              onClick={() => {
+                if (currentBook?.id === continueBook.id) {
+                  if (isPlaying) {
+                    pause();
+                  } else {
+                    resume();
+                  }
+                } else {
+                  const saved = bookProgressMap.get(continueBook.id);
+                  playBook(continueBook, saved?.currentTime ?? 0);
+                }
+              }}
               className="w-full md:w-auto px-5 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center justify-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shrink-0 shadow-sm"
             >
-              <Play className="w-4 h-4 fill-current" />
-              <span>
-                {isPlaying && currentBook?.id === continueBook.id ? "PAUSE" : "RESUME PLAYBACK"}
-              </span>
+              {isPlaying && currentBook?.id === continueBook.id ? (
+                <>
+                  <Pause className="w-4 h-4 fill-current" />
+                  <span>PAUSE PLAYBACK</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>RESUME PLAYBACK</span>
+                </>
+              )}
             </button>
           </div>
         </section>
@@ -243,77 +328,126 @@ export function LibraryPage() {
         )
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {filteredBooks.map((book) => (
-            <Link
-              key={book.id}
-              to="/book/$id"
-              params={{ id: book.id }}
-              className="group surface-card overflow-hidden flex flex-col transition-all hover:border-text-subtle cursor-pointer block select-none"
-            >
-              <div className="aspect-square bg-surface relative flex items-center justify-center border-b border-border overflow-hidden">
-                {book.coverR2Key ? (
-                  <>
-                    <img
-                      src={getBookCoverUrl(book)}
-                      alt=""
-                      aria-hidden="true"
-                      className="absolute inset-0 w-full h-full object-cover blur-sm opacity-35 scale-110 pointer-events-none select-none"
-                    />
-                    <img
-                      src={getBookCoverUrl(book)}
-                      alt={book.title}
-                      className="relative z-10 w-full h-full object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-sm select-none"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = "none";
-                      }}
-                    />
-                  </>
-                ) : (
-                  <span className="font-mono text-sm font-semibold text-subtle">
-                    {book.format.toUpperCase()}
+          {filteredBooks.map((book) => {
+            const progress = bookProgressMap.get(book.id);
+            const pos = progress?.currentTime ?? 0;
+            const dur = progress?.duration || book.durationSeconds || 0;
+            const isCompleted = isPlaybackCompleted(pos, dur);
+            const inProgress = isPlaybackInProgress(pos, dur);
+            const percent = getPlaybackPercent(pos, dur);
+            const isThisPlaying = isPlaying && currentBook?.id === book.id;
+
+            return (
+              <Link
+                key={book.id}
+                to="/book/$id"
+                params={{ id: book.id }}
+                className="group surface-card overflow-hidden flex flex-col transition-all hover:border-text-subtle cursor-pointer block select-none"
+              >
+                <div className="aspect-square bg-surface relative flex items-center justify-center border-b border-border overflow-hidden">
+                  {book.coverR2Key ? (
+                    <>
+                      <img
+                        src={getBookCoverUrl(book)}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 w-full h-full object-cover blur-sm opacity-35 scale-110 pointer-events-none select-none"
+                      />
+                      <img
+                        src={getBookCoverUrl(book)}
+                        alt={book.title}
+                        className="relative z-10 w-full h-full object-contain transition-transform duration-300 group-hover:scale-105 drop-shadow-sm select-none"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <span className="font-mono text-sm font-semibold text-subtle">
+                      {book.format.toUpperCase()}
+                    </span>
+                  )}
+
+                  {/* Status Badges */}
+                  {isCompleted ? (
+                    <span className="absolute top-2 left-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface/90 border border-border text-accent z-10 flex items-center gap-1 font-medium">
+                      <Check className="w-2.5 h-2.5" />
+                      <span>COMPLETED</span>
+                    </span>
+                  ) : inProgress ? (
+                    <span className="absolute top-2 left-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface/90 border border-border text-accent z-10 font-bold">
+                      {percent}%
+                    </span>
+                  ) : null}
+
+                  {/* Hover quick play/pause button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (isThisPlaying) {
+                        pause();
+                      } else if (currentBook?.id === book.id) {
+                        resume();
+                      } else {
+                        playBook(book, inProgress ? pos : 0);
+                      }
+                    }}
+                    className="absolute bottom-2.5 right-2.5 w-10 h-10 rounded-full bg-accent text-bg flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all z-20 hover:scale-110 cursor-pointer"
+                    aria-label={`Play ${book.title}`}
+                  >
+                    {isThisPlaying ? (
+                      <Pause className="w-4 h-4 fill-current" />
+                    ) : (
+                      <Play className="w-4 h-4 translate-x-0.5 fill-current" />
+                    )}
+                  </button>
+
+                  <span className="absolute top-2 right-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg/90 border border-border text-subtle z-10">
+                    {formatDuration(book.durationSeconds)}
                   </span>
-                )}
 
-                {/* Hover quick play button */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    playBook(book);
-                  }}
-                  className="absolute bottom-2.5 right-2.5 w-10 h-10 rounded-full bg-accent text-bg flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all z-20 hover:scale-110 cursor-pointer"
-                  aria-label={`Play ${book.title}`}
-                >
-                  <Play className="w-4 h-4 translate-x-0.5 fill-current" />
-                </button>
-
-                <span className="absolute top-2 right-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg/90 border border-border text-subtle z-10">
-                  {formatDuration(book.durationSeconds)}
-                </span>
-              </div>
-
-              <div className="p-3 flex-1 flex flex-col justify-between">
-                <div>
-                  <h3 className="text-xs font-semibold text-text line-clamp-1 group-hover:text-accent transition-colors">
-                    {book.title}
-                  </h3>
-                  <p className="text-[11px] font-mono text-muted line-clamp-1 mt-0.5">
-                    {book.author}
-                  </p>
-                </div>
-
-                <div className="pt-3 flex items-center justify-between text-[10px] font-mono text-subtle border-t border-border mt-3">
-                  <span>
-                    {book.publishedYear || (book.format ? book.format.toUpperCase() : "—")}
-                  </span>
-                  {book.isActiveShelf && (
-                    <span className="text-accent text-[9px] font-medium">SHELF</span>
+                  {/* Slim progress bar along bottom of cover */}
+                  {inProgress && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-elevated/90 z-10">
+                      <div
+                        className="h-full bg-accent transition-all duration-300"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
                   )}
                 </div>
-              </div>
-            </Link>
-          ))}
+
+                <div className="p-3 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-1">
+                      <h3 className="text-xs font-semibold text-text line-clamp-1 group-hover:text-accent transition-colors flex-1">
+                        {book.title}
+                      </h3>
+                      {inProgress && (
+                        <span className="text-[10px] font-mono font-medium text-accent shrink-0">
+                          {percent}%
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] font-mono text-muted line-clamp-1 mt-0.5">
+                      {book.author}
+                    </p>
+                  </div>
+
+                  <div className="pt-3 flex items-center justify-between text-[10px] font-mono text-subtle border-t border-border mt-3">
+                    <span>
+                      {book.publishedYear || (book.format ? book.format.toUpperCase() : "—")}
+                    </span>
+                    {book.isActiveShelf && (
+                      <span className="text-accent text-[9px] font-medium">SHELF</span>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

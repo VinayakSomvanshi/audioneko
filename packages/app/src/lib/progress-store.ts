@@ -36,6 +36,19 @@ function save(map: ProgressMap): void {
   }
 }
 
+export const PROGRESS_CHANGE_EVENT = "audioneko_progress_changed";
+
+function notifyProgressChange(bookId: string): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(PROGRESS_CHANGE_EVENT, { detail: { bookId } }));
+  }
+}
+
+/** Returns all saved progress entries from localStorage. */
+export function getAllProgress(): ProgressMap {
+  return load();
+}
+
 /** Returns the saved progress entry for a book, or null if none. */
 export function getProgress(bookId: string): ProgressEntry | null {
   const map = load();
@@ -55,13 +68,15 @@ export function setProgress(bookId: string, position: number, duration: number):
   }
 
   save(pruned);
+  notifyProgressChange(bookId);
 }
 
-/** Clears saved progress for a book (e.g. after finishing). */
+/** Clears saved progress for a book (e.g. after finishing or resetting). */
 export function clearProgress(bookId: string): void {
   const map = load();
   delete map[bookId];
   save(map);
+  notifyProgressChange(bookId);
 }
 
 /**
