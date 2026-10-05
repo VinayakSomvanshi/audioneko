@@ -31,6 +31,19 @@ export interface ParsedBookInfo {
 }
 
 /**
+ * Normalizes inverted "LastName, FirstName" into "FirstName LastName"
+ */
+export function normalizeAuthor(authorStr: string): string {
+  const trimmed = authorStr.trim();
+  if (!trimmed || trimmed === "Unknown Author") return "Unknown Author";
+  const inverted = trimmed.match(/^([^,]+),\s*([^,]+)$/);
+  if (inverted && !/^(inc|llc|ltd|co|corp)$/i.test(inverted[2])) {
+    return `${inverted[2].trim()} ${inverted[1].trim()}`;
+  }
+  return trimmed;
+}
+
+/**
  * Extracts book title, author, series, seriesIndex from filenames and folder names
  */
 export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBookInfo {
@@ -63,10 +76,31 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
       series = "Addicted";
       const byMatch = parentFolderName.match(/by\s+(.+)$/i);
       if (byMatch?.[1]) {
-        author = byMatch[1].trim();
+        author = normalizeAuthor(byMatch[1]);
       }
+    } else if (parentFolderName.toLowerCase().includes("windy city")) {
+      series = "Windy City";
+      author = "Liz Tomforde";
     }
   }
+
+  // Extract bracketed series info before pattern matching:
+  // e.g. [Windy City Series, Book 2] or [Windy City, Book 2] or [Windy City Series #2]
+  const bracketSeriesMatch = cleanName.match(/\[\s*(.+?)(?:\s+Series)?(?:,\s*(?:Book|#)?\s*(\d+(?:\.\d+)?))?\s*\]/i);
+  if (bracketSeriesMatch) {
+    const candidateSeries = bracketSeriesMatch[1].trim();
+    if (!/^(unabridged|abridged|mp3|m4b|audiobook|retail|re-up|cd\s*\d+)$/i.test(candidateSeries)) {
+      if (!series) {
+        series = candidateSeries;
+      }
+      if (bracketSeriesMatch[2]) {
+        seriesIndex = Number.parseFloat(bracketSeriesMatch[2]);
+      }
+    }
+    cleanName = cleanName.replace(bracketSeriesMatch[0], "").trim();
+  }
+  // Strip any remaining brackets like [Unabridged], [MP3]
+  cleanName = cleanName.replace(/\[.*?\]/g, "").trim();
 
   // Pattern 1: Series #Index - Title by Author (e.g. "Windy City #1 - Mile High by Liz Tomforde")
   const seriesByMatch = cleanName.match(/^(.+?)\s*#(\d+(?:\.\d+)?)\s*-\s*(.+?)\s+by\s+(.+)$/i);
@@ -74,39 +108,50 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     series = seriesByMatch[1].trim();
     seriesIndex = Number.parseFloat(seriesByMatch[2]);
     title = seriesByMatch[3].trim();
-    author = seriesByMatch[4].trim();
+    author = normalizeAuthor(seriesByMatch[4]);
     return { title, author, series, seriesIndex, narrator, format };
   }
 
-  // Pattern 2: Author - Title (e.g. "Lana Ferguson - The Nanny")
+  // Pattern 2: Author - Title (e.g. "Liz Tomforde - The Right Move" or "Tomforde, Liz - Rewind It Back")
   const authorTitleMatch = cleanName.match(/^([^-]+)\s*-\s*(.+)$/);
-  if (authorTitleMatch?.[1] && authorTitleMatch[2] && !series) {
+  if (authorTitleMatch?.[1] && authorTitleMatch[2]) {
     const left = authorTitleMatch[1].trim();
     const right = authorTitleMatch[2].trim();
     if (/^\d+$/.test(left)) {
       seriesIndex = Number.parseFloat(left);
       title = right;
     } else {
-      author = left;
+      author = normalizeAuthor(left);
       title = right;
     }
-    return { title, author, series, seriesIndex, narrator, format };
+  } else {
+    // Pattern 3: Number - Title (e.g. "01 - House of Earth and Blood")
+    const numTitleMatch = cleanName.match(/^(\d+)\s*-\s*(.+)$/);
+    if (numTitleMatch?.[1] && numTitleMatch[2]) {
+      seriesIndex = Number.parseFloat(numTitleMatch[1]);
+      title = numTitleMatch[2].trim();
+    } else {
+      // Pattern 4: B01 Title (e.g. "B01 Addicted to You")
+      const bNumMatch = cleanName.match(/^B(\d+)\s+(.+)$/i);
+      if (bNumMatch?.[1] && bNumMatch[2]) {
+        seriesIndex = Number.parseFloat(bNumMatch[1]);
+        title = bNumMatch[2].trim();
+      } else {
+        title = cleanName;
+      }
+    }
   }
 
-  // Pattern 3: Number - Title (e.g. "01 - House of Earth and Blood")
-  const numTitleMatch = cleanName.match(/^(\d+)\s*-\s*(.+)$/);
-  if (numTitleMatch?.[1] && numTitleMatch[2]) {
-    seriesIndex = Number.parseFloat(numTitleMatch[1]);
-    title = numTitleMatch[2].trim();
-    return { title, author, series, seriesIndex, narrator, format };
-  }
-
-  // Pattern 4: B01 Title (e.g. "B01 Addicted to You")
-  const bNumMatch = cleanName.match(/^B(\d+)\s+(.+)$/i);
-  if (bNumMatch?.[1] && bNumMatch[2]) {
-    seriesIndex = Number.parseFloat(bNumMatch[1]);
-    title = bNumMatch[2].trim();
-    return { title, author, series, seriesIndex, narrator, format };
+  // Known series heuristics for Liz Tomforde Windy City books
+  if (author === "Liz Tomforde") {
+    if (!series) {
+      series = "Windy City";
+    }
+    if (seriesIndex === undefined) {
+      if (title.toLowerCase().includes("rewind it back")) {
+        seriesIndex = 5;
+      }
+    }
   }
 
   return { title, author, series, seriesIndex, narrator, format };
@@ -365,18 +410,21 @@ export async function scanDriveLibrary(
     // Re-use already enriched metadata from D1 if available to stay well within Cloudflare Worker subrequest limits
     const prevBook = existingBook[0];
     let enrichedAuthor =
-      prevBook?.author && prevBook.author !== "Unknown Author" ? prevBook.author : parsed.author;
-    let enrichedDescription = prevBook?.description ?? `${parsed.title} by ${enrichedAuthor}.`;
-    let enrichedPublishedYear: number | null = prevBook?.publishedYear ?? null;
-    let enrichedCoverUrl: string | null =
-      prevBook?.coverR2Key?.startsWith("http") ? prevBook.coverR2Key : null;
+      parsed.author && parsed.author !== "Unknown Author"
+        ? parsed.author
+        : prevBook?.author && prevBook.author !== "Unknown Author"
+          ? normalizeAuthor(prevBook.author)
+          : "Unknown Author";
 
-    // Only query external API if:
-    // a) Author is still unknown, OR
-    // b) We don't have a verified square cover (mzstatic or Drive folder image)
+    // Only consider covers square if from Drive folder image or Apple Books mzstatic
     const hasSquareCover =
       Boolean(coverKey?.startsWith("gdrive:")) ||
       Boolean(prevBook?.coverR2Key && prevBook.coverR2Key.includes("mzstatic.com"));
+
+    let enrichedDescription = prevBook?.description ?? `${parsed.title} by ${enrichedAuthor}.`;
+    let enrichedPublishedYear: number | null = prevBook?.publishedYear ?? null;
+    let enrichedCoverUrl: string | null =
+      hasSquareCover && prevBook?.coverR2Key?.startsWith("http") ? prevBook.coverR2Key : null;
 
     const needsEnrichment =
       !coverKey && (enrichedAuthor === "Unknown Author" || !hasSquareCover);

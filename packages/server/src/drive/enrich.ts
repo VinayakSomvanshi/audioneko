@@ -70,23 +70,35 @@ interface GoogleBooksResponse {
 /**
  * Enriches book metadata by querying Open Library and Google Books
  */
+function normalizeAuthor(authorStr: string): string {
+  const trimmed = authorStr.trim();
+  if (!trimmed || trimmed === "Unknown Author") return "Unknown Author";
+  const inverted = trimmed.match(/^([^,]+),\s*([^,]+)$/);
+  if (inverted && !/^(inc|llc|ltd|co|corp)$/i.test(inverted[2])) {
+    return `${inverted[2].trim()} ${inverted[1].trim()}`;
+  }
+  return trimmed;
+}
+
 export async function enrichBookMetadata(
   title: string,
   author?: string,
   customFetch: typeof fetch = fetch,
 ): Promise<EnrichedBookMetadata> {
+  const normalizedAuthor =
+    author && author !== "Unknown Author" ? normalizeAuthor(author) : "";
   const result: EnrichedBookMetadata = {
     title,
-    author: author && author !== "Unknown Author" ? author : "Unknown Author",
+    author: normalizedAuthor || "Unknown Author",
     genres: [],
   };
 
-  const cleanTitle = title.trim();
-  const hasKnownAuthor = Boolean(author && author.trim() !== "" && author.trim() !== "Unknown Author");
-  // Extract primary author if multiple joined by & or ,
+  const cleanTitle = title.replace(/\[.*?\]/g, "").replace(/\(.*?\)/g, "").trim() || title.trim();
+  const hasKnownAuthor = Boolean(normalizedAuthor);
+  // Extract primary author if multiple joined by & or and
   const primaryAuthor =
-    hasKnownAuthor && author
-      ? author.split(/\s*(?:&|and|,)\s*/i)[0]?.trim() || ""
+    hasKnownAuthor
+      ? normalizedAuthor.split(/\s*(?:&|and)\s*/i)[0]?.trim() || ""
       : "";
 
   // 1. Query Apple Books / iTunes Audiobook API for authentic 1:1 square artwork & metadata

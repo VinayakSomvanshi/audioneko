@@ -43,5 +43,8 @@
   ],
   "triggers": {
     "crons": ["0 */6 * * *"]
+  },
+  "vars": {
+    "GOOGLE_DRIVE_FOLDER_ID": "1Eb41o9yGeJoojEYniUZvRCjaxBziLN-Z"
   }
 }

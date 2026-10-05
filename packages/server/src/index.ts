@@ -231,7 +231,7 @@ app.get("/api/covers/:bookId", async (c) => {
 // Google Drive Library Scanner endpoint
 app.post("/api/library/scan", async (c) => {
   try {
-    let folderId = c.env.GOOGLE_DRIVE_FOLDER_ID || "1E0mdkz7_wUBEHZ-GVGoeK9CZvM_lqwMw";
+    let folderId = c.env.GOOGLE_DRIVE_FOLDER_ID || "1Eb41o9yGeJoojEYniUZvRCjaxBziLN-Z";
     const bodyRaw = await c.req.json<{ folderId?: string }>().catch(() => ({} as { folderId?: string }));
     if (bodyRaw.folderId) {
       folderId = bodyRaw.folderId;
