@@ -1,14 +1,15 @@
-import type { Book } from "@audioneko/shared";
+import type { Book, BookProgressRecord } from "@audioneko/shared";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, Loader2, Play } from "lucide-react";
+import { BookOpen, Clock, HardDriveDownload, Loader2, Play } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
+import { getDownloadedBooks } from "../lib/opfs";
 import { updateSearchIndex } from "../lib/search";
 
 export function LibraryPage() {
-  const { playBook, currentBook, isPlaying } = useAudio();
+  const { playBook, currentBook, isPlaying, currentTime } = useAudio();
   const [activeFilter, setActiveFilter] = useState<"all" | "in-progress" | "downloaded">("all");
 
   const { data: booksData, isLoading } = useQuery({
@@ -19,6 +20,32 @@ export function LibraryPage() {
       return (await res.json()) as { books: Book[] };
     },
     staleTime: 30_000,
+  });
+
+  const { data: syncData } = useQuery({
+    queryKey: ["syncState"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/sync/state");
+        if (!res.ok) return { books: [] as BookProgressRecord[] };
+        return (await res.json()) as { books: BookProgressRecord[] };
+      } catch {
+        return { books: [] as BookProgressRecord[] };
+      }
+    },
+    staleTime: 10_000,
+  });
+
+  const { data: downloadedBooks = [] } = useQuery({
+    queryKey: ["downloadedBooks"],
+    queryFn: async () => {
+      try {
+        return await getDownloadedBooks();
+      } catch {
+        return [];
+      }
+    },
+    staleTime: 10_000,
   });
 
   const booksList = booksData?.books ?? [];
@@ -36,7 +63,37 @@ export function LibraryPage() {
     return `${hours}h ${mins}m`;
   };
 
-  const continueBook = currentBook || (booksList.length > 0 ? booksList[0] : null);
+  // In-progress book tracking
+  const inProgressRecords = (syncData?.books ?? []).filter(
+    (rec) => rec.currentTime > 10 && rec.currentTime < (rec.duration || 999999) - 30,
+  );
+  const inProgressIds = new Set(inProgressRecords.map((r) => r.bookId));
+  if (currentBook && (isPlaying || currentTime > 10)) {
+    inProgressIds.add(currentBook.id);
+  }
+
+  // Continue listening hero: ONLY show if the user actually has an active or in-progress book
+  const latestProgressBookId =
+    currentBook && (isPlaying || currentTime > 10)
+      ? currentBook.id
+      : inProgressRecords.sort((a, b) => b.updatedAt - a.updatedAt)[0]?.bookId;
+
+  const continueBook = latestProgressBookId
+    ? booksList.find((b) => b.id === latestProgressBookId) ?? null
+    : null;
+
+  // Filtered books based on active tab
+  const downloadedIds = new Set(downloadedBooks.map((b) => b.bookId));
+
+  const filteredBooks = booksList.filter((book) => {
+    if (activeFilter === "in-progress") {
+      return inProgressIds.has(book.id);
+    }
+    if (activeFilter === "downloaded") {
+      return downloadedIds.has(book.id);
+    }
+    return true;
+  });
 
   // Loading skeleton
   if (isLoading) {
@@ -62,7 +119,7 @@ export function LibraryPage() {
 
   return (
     <div className="space-y-8 pb-24">
-      {/* Hero: Continue Listening */}
+      {/* Hero: Continue Listening (only renders when a book has actual progress) */}
       {continueBook && (
         <section className="surface-card p-5 md:p-6 relative overflow-hidden border border-border">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
@@ -143,28 +200,50 @@ export function LibraryPage() {
         </div>
 
         <div className="text-xs font-mono text-subtle">
-          <span>{booksList.length} titles</span>
+          <span>{filteredBooks.length} titles</span>
         </div>
       </div>
 
       {/* Book Grid or Empty State */}
-      {booksList.length === 0 ? (
-        <div className="surface-card p-12 border border-border flex flex-col items-center justify-center gap-4 text-center">
-          <BookOpen className="w-12 h-12 text-muted" />
-          <div className="space-y-2">
-            <h2 className="text-base font-semibold text-text">Library is empty</h2>
-            <p className="text-xs font-mono text-muted max-w-sm">
-              No audiobooks have been scanned yet. Ask your admin to trigger a library scan from
-              the Google Drive folder.
-            </p>
+      {filteredBooks.length === 0 ? (
+        activeFilter === "in-progress" ? (
+          <div className="surface-card p-12 border border-border flex flex-col items-center justify-center gap-4 text-center">
+            <Clock className="w-12 h-12 text-muted" />
+            <div className="space-y-2">
+              <h2 className="text-base font-semibold text-text">No audiobooks in progress</h2>
+              <p className="text-xs font-mono text-muted max-w-sm">
+                Select and play any audiobook from your library. Your listening progress will automatically appear here.
+              </p>
+            </div>
           </div>
-          <div className="text-[11px] font-mono text-subtle border border-border rounded px-3 py-2 bg-elevated">
-            Admin: POST /api/library/scan to index audiobooks
+        ) : activeFilter === "downloaded" ? (
+          <div className="surface-card p-12 border border-border flex flex-col items-center justify-center gap-4 text-center">
+            <HardDriveDownload className="w-12 h-12 text-muted" />
+            <div className="space-y-2">
+              <h2 className="text-base font-semibold text-text">No downloaded audiobooks</h2>
+              <p className="text-xs font-mono text-muted max-w-sm">
+                You can download audiobooks to your browser's private offline storage to listen on the go without an internet connection.
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="surface-card p-12 border border-border flex flex-col items-center justify-center gap-4 text-center">
+            <BookOpen className="w-12 h-12 text-muted" />
+            <div className="space-y-2">
+              <h2 className="text-base font-semibold text-text">Library is empty</h2>
+              <p className="text-xs font-mono text-muted max-w-sm">
+                No audiobooks have been scanned yet. Ask your admin to trigger a library scan from
+                the Google Drive folder.
+              </p>
+            </div>
+            <div className="text-[11px] font-mono text-subtle border border-border rounded px-3 py-2 bg-elevated">
+              Admin: POST /api/library/scan to index audiobooks
+            </div>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {booksList.map((book) => (
+          {filteredBooks.map((book) => (
             <div
               key={book.id}
               className="group surface-card overflow-hidden flex flex-col transition-all hover:border-text-subtle"
