@@ -249,11 +249,15 @@ export function SeriesPage() {
             return (
               <div
                 key={book.id}
-                className={`surface-card p-4 border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-accent/40 ${
+                className={`group surface-card p-4 border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-accent/40 ${
                   isCurrent ? "border-accent bg-accent-bg/30" : "border-border"
                 }`}
               >
-                <div className="flex items-center gap-4">
+                <Link
+                  to="/book/$id"
+                  params={{ id: book.id }}
+                  className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer select-none"
+                >
                   {/* Series Index Badge */}
                   <div className="w-9 h-9 rounded-lg bg-elevated border border-border flex items-center justify-center shrink-0 font-mono text-xs font-bold text-accent">
                     #{bookNumber}
@@ -265,7 +269,7 @@ export function SeriesPage() {
                       <img
                         src={getBookCoverUrl(book)}
                         alt={book.title}
-                        className="w-full h-full object-contain select-none"
+                        className="w-full h-full object-contain select-none group-hover:scale-105 transition-transform"
                       />
                     ) : (
                       <span className="text-[10px] font-mono text-subtle">
@@ -275,7 +279,7 @@ export function SeriesPage() {
                   </div>
 
                   {/* Book Metadata */}
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-surface border border-border text-subtle">
                         Book {bookNumber}
@@ -286,18 +290,14 @@ export function SeriesPage() {
                         </span>
                       )}
                     </div>
-                    <Link
-                      to="/book/$id"
-                      params={{ id: book.id }}
-                      className="text-sm font-semibold text-text hover:text-accent transition-colors line-clamp-1"
-                    >
+                    <h3 className="text-sm font-semibold text-text group-hover:text-accent transition-colors line-clamp-1">
                       {book.title}
-                    </Link>
+                    </h3>
                     <p className="text-xs font-mono text-muted line-clamp-1">
                       {book.author}
                     </p>
                   </div>
-                </div>
+                </Link>
 
                 {/* Duration and Play Action */}
                 <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 pl-13 sm:pl-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-border/50">
@@ -308,7 +308,11 @@ export function SeriesPage() {
 
                   <button
                     type="button"
-                    onClick={() => playBook(book)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      playBook(book);
+                    }}
                     className={`px-3 py-1.5 rounded font-mono text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
                       isCurrent && isPlaying
                         ? "bg-accent text-bg font-semibold"

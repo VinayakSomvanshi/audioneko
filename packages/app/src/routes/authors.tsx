@@ -418,7 +418,11 @@ function AuthorBookCard({
   const isCurrent = currentBookId === book.id;
 
   return (
-    <div className="group surface-card overflow-hidden flex flex-col border border-border hover:border-text-subtle transition-all">
+    <Link
+      to="/book/$id"
+      params={{ id: book.id }}
+      className="group surface-card overflow-hidden flex flex-col border border-border hover:border-text-subtle transition-all cursor-pointer block select-none"
+    >
       <div className="aspect-square bg-surface relative flex items-center justify-center border-b border-border overflow-hidden">
         {book.coverR2Key ? (
           <>
@@ -444,35 +448,33 @@ function AuthorBookCard({
         {/* Hover Quick Play */}
         <button
           type="button"
-          onClick={() => onPlay(book)}
-          className="absolute inset-0 bg-bg/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onPlay(book);
+          }}
+          className="absolute bottom-2.5 right-2.5 w-10 h-10 rounded-full bg-accent text-bg flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all z-20 hover:scale-110 cursor-pointer"
           aria-label={`Play ${book.title}`}
         >
-          <div className="w-10 h-10 rounded-full bg-accent text-bg flex items-center justify-center shadow-md">
-            <Play className="w-5 h-5 translate-x-0.5 fill-current" />
-          </div>
+          <Play className="w-4 h-4 translate-x-0.5 fill-current" />
         </button>
 
         {book.seriesIndex && (
-          <span className="absolute top-2 left-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg/90 border border-border text-accent font-bold">
+          <span className="absolute top-2 left-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg/90 border border-border text-accent font-bold z-10">
             #{book.seriesIndex}
           </span>
         )}
 
-        <span className="absolute top-2 right-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg/90 border border-border text-subtle">
+        <span className="absolute top-2 right-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg/90 border border-border text-subtle z-10">
           {formatDuration(book.durationSeconds)}
         </span>
       </div>
 
       <div className="p-3 flex-1 flex flex-col justify-between">
         <div>
-          <Link
-            to="/book/$id"
-            params={{ id: book.id }}
-            className="text-xs font-semibold text-text line-clamp-1 hover:text-accent transition-colors"
-          >
+          <h3 className="text-xs font-semibold text-text line-clamp-1 group-hover:text-accent transition-colors">
             {book.title}
-          </Link>
+          </h3>
         </div>
 
         <div className="pt-2 flex items-center justify-between text-[10px] font-mono text-subtle border-t border-border mt-2">
@@ -482,6 +484,6 @@ function AuthorBookCard({
           )}
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

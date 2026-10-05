@@ -244,9 +244,11 @@ export function LibraryPage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {filteredBooks.map((book) => (
-            <div
+            <Link
               key={book.id}
-              className="group surface-card overflow-hidden flex flex-col transition-all hover:border-text-subtle"
+              to="/book/$id"
+              params={{ id: book.id }}
+              className="group surface-card overflow-hidden flex flex-col transition-all hover:border-text-subtle cursor-pointer block select-none"
             >
               <div className="aspect-square bg-surface relative flex items-center justify-center border-b border-border overflow-hidden">
                 {book.coverR2Key ? (
@@ -275,29 +277,27 @@ export function LibraryPage() {
                 {/* Hover quick play button */}
                 <button
                   type="button"
-                  onClick={() => playBook(book)}
-                  className="absolute inset-0 bg-bg/80 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    playBook(book);
+                  }}
+                  className="absolute bottom-2.5 right-2.5 w-10 h-10 rounded-full bg-accent text-bg flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all z-20 hover:scale-110 cursor-pointer"
                   aria-label={`Play ${book.title}`}
                 >
-                  <div className="w-10 h-10 rounded-full bg-accent text-bg flex items-center justify-center shadow-md">
-                    <Play className="w-5 h-5 translate-x-0.5 fill-current" />
-                  </div>
+                  <Play className="w-4 h-4 translate-x-0.5 fill-current" />
                 </button>
 
-                <span className="absolute top-2 right-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg/90 border border-border text-subtle">
+                <span className="absolute top-2 right-2 text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg/90 border border-border text-subtle z-10">
                   {formatDuration(book.durationSeconds)}
                 </span>
               </div>
 
               <div className="p-3 flex-1 flex flex-col justify-between">
                 <div>
-                  <Link
-                    to="/book/$id"
-                    params={{ id: book.id }}
-                    className="text-xs font-semibold text-text line-clamp-1 hover:text-accent transition-colors"
-                  >
+                  <h3 className="text-xs font-semibold text-text line-clamp-1 group-hover:text-accent transition-colors">
                     {book.title}
-                  </Link>
+                  </h3>
                   <p className="text-[11px] font-mono text-muted line-clamp-1 mt-0.5">
                     {book.author}
                   </p>
@@ -310,7 +310,7 @@ export function LibraryPage() {
                   )}
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

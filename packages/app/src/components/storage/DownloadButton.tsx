@@ -1,5 +1,7 @@
+import type { Book } from "@audioneko/shared";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import { getBookCoverUrl } from "../../lib/covers";
 import {
   type DownloadProgress,
   type OfflineBookMeta,
@@ -10,13 +12,15 @@ import {
 } from "../../lib/opfs";
 
 interface DownloadButtonProps {
-  meta: OfflineBookMeta;
+  meta?: OfflineBookMeta;
+  book?: Book;
   onDownloadedChange?: (downloaded: boolean) => void;
   className?: string;
 }
 
 export const DownloadButton: React.FC<DownloadButtonProps> = ({
   meta,
+  book,
   onDownloadedChange,
   className = "",
 }) => {
@@ -28,10 +32,26 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
 
   const supported = isOpfsSupported();
 
+  const bookMeta: OfflineBookMeta | null = meta
+    ? meta
+    : book
+      ? {
+          bookId: book.id,
+          title: book.title,
+          author: book.author,
+          coverUrl: book.coverR2Key ? getBookCoverUrl(book) : undefined,
+          durationSeconds: book.durationSeconds,
+          format: book.format,
+          fileSizeBytes: book.fileSizeBytes,
+        }
+      : null;
+
+  const targetBookId = bookMeta?.bookId;
+
   useEffect(() => {
     let mounted = true;
-    if (supported && meta.bookId) {
-      isBookDownloaded(meta.bookId).then((downloaded) => {
+    if (supported && targetBookId) {
+      isBookDownloaded(targetBookId).then((downloaded) => {
         if (mounted) {
           setIsDownloaded(downloaded);
           onDownloadedChange?.(downloaded);
@@ -41,9 +61,9 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
     return () => {
       mounted = false;
     };
-  }, [supported, meta.bookId, onDownloadedChange]);
+  }, [supported, targetBookId, onDownloadedChange]);
 
-  if (!supported) return null;
+  if (!supported || !bookMeta) return null;
 
   const handleDownload = async () => {
     if (isDownloading) {
@@ -56,7 +76,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
 
     if (isDownloaded) {
       // Remove downloaded book
-      await deleteDownloadedBook(meta.bookId);
+      await deleteDownloadedBook(bookMeta.bookId);
       setIsDownloaded(false);
       onDownloadedChange?.(false);
       return;
@@ -70,7 +90,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
     abortControllerRef.current = controller;
 
     try {
-      await downloadBookToOpfs(meta, {
+      await downloadBookToOpfs(bookMeta, {
         signal: controller.signal,
         onProgress: (p: DownloadProgress) => {
           setProgress(p.progressPercent);
