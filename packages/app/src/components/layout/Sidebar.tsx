@@ -34,7 +34,7 @@ export function Sidebar({ onSearchClick }: SidebarProps) {
   }
 
   return (
-    <aside className="w-56 hidden md:flex flex-col border-r border-border bg-bg p-3 shrink-0 select-none">
+    <aside className="w-56 hidden md:flex flex-col border-r border-border bg-bg p-3 shrink-0 select-none h-full overflow-y-auto">
       <div className="mb-2">
         <button
           type="button"

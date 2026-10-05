@@ -32,13 +32,13 @@ export function RootLayout() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-bg text-text flex flex-col antialiased selection:bg-accent-bg selection:text-accent">
+    <div className="h-screen h-dvh bg-bg text-text flex flex-col antialiased selection:bg-accent-bg selection:text-accent overflow-hidden">
       <Header onSearchClick={() => setIsSearchOpen(true)} />
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         <Sidebar onSearchClick={() => setIsSearchOpen(true)} />
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <main className="flex-1 overflow-y-auto min-h-0 p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
             <Outlet />
           </div>
