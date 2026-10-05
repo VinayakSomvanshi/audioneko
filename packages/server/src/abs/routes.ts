@@ -218,7 +218,7 @@ const DEFAULT_LIBRARY: AbsLibrary = {
   icon: "books",
 };
 
-absRoutes.get("/libraries", optionalAbsAuth, async (c) => {
+absRoutes.get("/libraries", requireAbsAuth, async (c) => {
   const db = createDb(c.env.DB);
   const allBooks = await db.query.books.findMany({ columns: { id: true } });
 
@@ -230,7 +230,7 @@ absRoutes.get("/libraries", optionalAbsAuth, async (c) => {
   return c.json({ libraries: [libraryWithCount] });
 });
 
-absRoutes.get("/libraries/:libraryId", optionalAbsAuth, async (c) => {
+absRoutes.get("/libraries/:libraryId", requireAbsAuth, async (c) => {
   const db = createDb(c.env.DB);
   const allBooks = await db.query.books.findMany({ columns: { id: true } });
 
@@ -241,7 +241,7 @@ absRoutes.get("/libraries/:libraryId", optionalAbsAuth, async (c) => {
 });
 
 // Personalized home feed (Continue Listening & Recently Added)
-absRoutes.get("/libraries/:libraryId/personalized", optionalAbsAuth, async (c) => {
+absRoutes.get("/libraries/:libraryId/personalized", requireAbsAuth, async (c) => {
   const db = createDb(c.env.DB);
   const currentUser = c.get("user");
 
@@ -310,7 +310,7 @@ absRoutes.get("/libraries/:libraryId/personalized", optionalAbsAuth, async (c) =
 });
 
 // Library items with pagination and search filter
-absRoutes.get("/libraries/:libraryId/items", optionalAbsAuth, async (c) => {
+absRoutes.get("/libraries/:libraryId/items", requireAbsAuth, async (c) => {
   const db = createDb(c.env.DB);
   const currentUser = c.get("user");
 
@@ -366,7 +366,7 @@ absRoutes.get("/libraries/:libraryId/items", optionalAbsAuth, async (c) => {
 });
 
 // Library series list
-absRoutes.get("/libraries/:libraryId/series", optionalAbsAuth, async (c) => {
+absRoutes.get("/libraries/:libraryId/series", requireAbsAuth, async (c) => {
   const db = createDb(c.env.DB);
   const allSeries = await db.query.series.findMany({
     with: {
@@ -394,7 +394,7 @@ absRoutes.get("/libraries/:libraryId/series", optionalAbsAuth, async (c) => {
 // 4. Single Item & Media Player Endpoints
 // ==========================================
 
-absRoutes.get("/items/:id", optionalAbsAuth, async (c) => {
+absRoutes.get("/items/:id", requireAbsAuth, async (c) => {
   const id = c.req.param("id");
   const db = createDb(c.env.DB);
   const currentUser = c.get("user");
@@ -490,14 +490,14 @@ absRoutes.on(["GET", "HEAD"], "/items/:id/cover", async (c) => {
   });
 });
 
-// Stream audio file (supports both GET audio chunks and HEAD range probes)
-absRoutes.on(["GET", "HEAD"], "/items/:id/file/:fileId", (c) => {
+// Stream audio file (supports both GET audio chunks and HEAD range probes) - Protected
+absRoutes.on(["GET", "HEAD"], "/items/:id/file/:fileId", requireAbsAuth, (c) => {
   const fileId = c.req.param("fileId");
   return handleAudioStreamRequest(c.req.raw, fileId, c.env);
 });
 
 // ABS Play session start endpoint
-absRoutes.get("/items/:id/play", optionalAbsAuth, async (c) => {
+absRoutes.get("/items/:id/play", requireAbsAuth, async (c) => {
   const id = c.req.param("id");
   const db = createDb(c.env.DB);
   const currentUser = c.get("user");

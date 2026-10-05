@@ -12,6 +12,7 @@ import {
 } from "react";
 import { ResumeBanner } from "../components/player/ResumeBanner";
 import { audioEngine } from "../lib/audio-engine";
+import { useCurrentUser } from "../lib/auth-client";
 import {
   registerMediaSessionHandlers,
   setMediaSessionMetadata,
@@ -69,6 +70,7 @@ const AudioContext = createContext<AudioContextType | null>(null);
 
 export function AudioProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const { user, isLoading: isUserLoading } = useCurrentUser();
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -111,7 +113,16 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const currentChapterRef = useRef<Chapter | null>(null);
   const sleepTimerStateRef = useRef(sleepTimerState);
 
+  const userRef = useRef(user);
+  const isUserLoadingRef = useRef(isUserLoading);
+
   // Keep refs in sync
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+  useEffect(() => {
+    isUserLoadingRef.current = isUserLoading;
+  }, [isUserLoading]);
   useEffect(() => {
     currentBookRef.current = currentBook;
   }, [currentBook]);
@@ -367,6 +378,15 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       console.warn("[audioneko] Audio error:", err?.code, err?.message);
       setIsPlaying(false);
       isPlayingRef.current = false;
+      if (typeof window !== "undefined") {
+        fetch("/api/admin/me")
+          .then((res) => {
+            if (!res.ok) {
+              window.location.href = "/login";
+            }
+          })
+          .catch(() => {});
+      }
     };
 
     // Flush position to localStorage on tab close / navigation
@@ -502,6 +522,13 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const playBook = useCallback((book: Book, initialPosition = 0, bookChapters: Chapter[] = []) => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    if (!isUserLoadingRef.current && !userRef.current) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      return;
+    }
 
     setCurrentBook(book);
     currentBookRef.current = book;

@@ -1,14 +1,22 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Loader2, LogIn, ShieldAlert } from "lucide-react";
-import { type FormEvent, useState } from "react";
-import { signIn } from "../lib/auth-client";
+import { type FormEvent, useEffect, useState } from "react";
+import { signIn, useCurrentUser } from "../lib/auth-client";
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { user, isLoading } = useCurrentUser();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!isLoading && user) {
+      navigate({ to: "/" });
+    }
+  }, [user, isLoading, navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

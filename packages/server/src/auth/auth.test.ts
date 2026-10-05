@@ -126,4 +126,15 @@ describe("Better Auth & Session Middleware Engine", () => {
     expect(body.ok).toBe(true);
     expect(body.admin).toBe("Test Admin");
   });
+
+  it("requireAuth middleware blocks unauthenticated audio stream requests with 401", async () => {
+    const app = new Hono<{ Bindings: Env; Variables: AuthContextVariables }>();
+    app.get("/api/stream/:fileId", requireAuth, (c) => c.text("streaming audio data"));
+
+    const res = await app.request("https://audioneko.app/api/stream/file_xyz", {}, mockEnv);
+    expect(res.status).toBe(401);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe("Unauthorized");
+    expect(body.message).toContain("authentication session or token required");
+  });
 });

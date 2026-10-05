@@ -89,23 +89,23 @@ async function resolveDriveFileId(db: ReturnType<typeof createDb>, param: string
   return fileRecord[0]?.driveFileId || param;
 }
 
-// Audio streaming range proxy endpoint (GET and HEAD)
-app.get("/api/stream/:fileId", async (c) => {
+// Audio streaming range proxy endpoint (GET and HEAD) - Protected by requireAuth
+app.get("/api/stream/:fileId", requireAuth, async (c) => {
   const fileId = c.req.param("fileId");
   const db = createDb(c.env.DB);
   const resolved = await resolveDriveFileId(db, fileId);
   return handleAudioStreamRequest(c.req.raw, resolved, c.env);
 });
 
-app.on("HEAD", "/api/stream/:fileId", async (c) => {
+app.on("HEAD", "/api/stream/:fileId", requireAuth, async (c) => {
   const fileId = c.req.param("fileId");
   const db = createDb(c.env.DB);
   const resolved = await resolveDriveFileId(db, fileId);
   return handleAudioStreamRequest(c.req.raw, resolved, c.env);
 });
 
-// Library Books API
-app.get("/api/books", async (c) => {
+// Library Books API - Protected by requireAuth
+app.get("/api/books", requireAuth, async (c) => {
   const db = createDb(c.env.DB);
   const allBooks = await db
     .select({
@@ -137,7 +137,7 @@ app.get("/api/books", async (c) => {
   return c.json({ books: mapped });
 });
 
-app.get("/api/books/:id", async (c) => {
+app.get("/api/books/:id", requireAuth, async (c) => {
   const id = c.req.param("id");
   const db = createDb(c.env.DB);
   const bookList = await db.select().from(schema.books).where(eq(schema.books.id, id)).limit(1);
@@ -195,8 +195,8 @@ app.get("/api/books/:id", async (c) => {
   });
 });
 
-// Series API: Returns all series with their books in chronological order
-app.get("/api/series", async (c) => {
+// Series API: Returns all series with their books in chronological order - Protected by requireAuth
+app.get("/api/series", requireAuth, async (c) => {
   const db = createDb(c.env.DB);
   const allSeries = await db.select().from(schema.series);
   const allBooks = await db
@@ -267,8 +267,8 @@ app.get("/api/series", async (c) => {
   return c.json({ series: seriesList });
 });
 
-// Authors API: Returns all authors with their books and series information
-app.get("/api/authors", async (c) => {
+// Authors API: Returns all authors with their books and series information - Protected by requireAuth
+app.get("/api/authors", requireAuth, async (c) => {
   const db = createDb(c.env.DB);
   const allBooks = await db
     .select({
@@ -436,8 +436,8 @@ app.get("/api/covers/:bookId", async (c) => {
   return c.text("Cover not found", 404);
 });
 
-// Google Drive Library Scanner endpoint
-app.post("/api/library/scan", async (c) => {
+// Google Drive Library Scanner endpoint - Admin only
+app.post("/api/library/scan", requireAuth, requireAdmin, async (c) => {
   try {
     let folderId = c.env.GOOGLE_DRIVE_FOLDER_ID || "1Eb41o9yGeJoojEYniUZvRCjaxBziLN-Z";
     const bodyRaw = await c.req
@@ -510,7 +510,7 @@ app.delete("/api/sync/progress/:bookId", requireAuth, async (c) => {
 // ==========================================
 
 // Get current Active Shelf status, total size, and cached books
-app.get("/api/shelf/status", async (c) => {
+app.get("/api/shelf/status", requireAuth, async (c) => {
   const status = await getActiveShelfStatus(c.env);
   return c.json(status);
 });
@@ -581,7 +581,7 @@ app.delete("/api/shelf/:bookId", requireAuth, requireAdmin, async (c) => {
 // ==========================================
 
 // Get user's custom shelves with their contained books
-app.get("/api/shelves", optionalAuth, async (c) => {
+app.get("/api/shelves", requireAuth, async (c) => {
   const user = c.get("user");
   if (!user?.id) {
     return c.json({ shelves: [] });
