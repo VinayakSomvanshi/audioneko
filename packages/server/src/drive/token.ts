@@ -96,20 +96,32 @@ export async function createSignedJwt(
   return `${signingInput}.${encodedSignature}`;
 }
 
+let memoryTokenCache: { token: string; expiresAt: number } | null = null;
+
+export function _resetTokenMemoryCache(): void {
+  memoryTokenCache = null;
+}
+
 /**
  * Obtains a valid Google OAuth2 access token for Google Drive API v3
- * Reads from Cloudflare KV cache first. On miss, mints RS256 JWT, exchanges with Google, and caches.
+ * Reads from Worker memory and Cloudflare KV cache first. On miss, mints RS256 JWT, exchanges with Google, and caches.
  */
 export async function getGoogleAccessToken(
   serviceAccountJsonString: string,
   kv?: KVNamespace,
   customFetch: typeof fetch = fetch,
 ): Promise<string> {
+  const now = Date.now();
+  if (memoryTokenCache && memoryTokenCache.expiresAt > now) {
+    return memoryTokenCache.token;
+  }
+
   // 1. Check KV Cache first (Fast path - 0ms network overhead)
   if (kv) {
     try {
       const cached = await kv.get(KV_TOKEN_CACHE_KEY);
       if (cached) {
+        memoryTokenCache = { token: cached, expiresAt: now + 3000_000 };
         return cached;
       }
     } catch {
@@ -156,6 +168,8 @@ export async function getGoogleAccessToken(
   if (!accessToken) {
     throw new Error("Google OAuth2 response did not contain an access_token");
   }
+
+  memoryTokenCache = { token: accessToken, expiresAt: now + 3000_000 };
 
   // 5. Cache token in Cloudflare KV (Default TTL: 3300 seconds / 55 mins)
   if (kv) {

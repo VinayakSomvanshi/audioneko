@@ -45,6 +45,7 @@ export interface AudioContextType {
   jumpToRemotePosition: () => void;
   setIsFullPlayerOpen: (open: boolean) => void;
   playBook: (book: Book, initialPosition?: number, bookChapters?: Chapter[]) => void;
+  prewarmBook: (book: Book, initialPosition?: number) => void;
   pause: () => void;
   resume: () => void;
   togglePlay: () => void;
@@ -221,7 +222,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       playBookRef.current?.(book, currentTimeRef.current);
       return;
     }
-    if (audio.currentTime === 0 && currentTimeRef.current > 0) {
+    if (
+      currentTimeRef.current > 0 &&
+      Math.abs(audio.currentTime - currentTimeRef.current) > 1.5 &&
+      audio.readyState >= 1
+    ) {
       try {
         audio.currentTime = currentTimeRef.current;
       } catch (e) {
@@ -329,7 +334,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   // Initialize the Audio element ONCE - stable empty dep array
   useEffect(() => {
     const audio = new Audio();
-    audio.preload = "metadata";
+    audio.preload = "auto";
     // NO crossOrigin="anonymous" - Drive proxy doesn't send CORS headers,
     // setting this would block playback in Chromium via CORS error
     audioRef.current = audio;
@@ -539,7 +544,57 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     audioEngine.setVolume(effectiveVolume);
   }, [volume, sleepTimerState.volumeMultiplier]);
 
-  // playBook - waits for canplay/loadedmetadata before seeking/playing
+  // prewarmBook - Preloads audio data into the browser cache/RAM for instant playback
+  const prewarmBook = useCallback((book: Book, initialPosition?: number) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (
+      currentBookRef.current?.id === book.id &&
+      audio.src &&
+      audio.src.includes(`/api/stream/${book.id}`)
+    ) {
+      return;
+    }
+
+    let startPos = 0;
+    if (initialPosition !== undefined && initialPosition > 0 && Number.isFinite(initialPosition)) {
+      startPos = initialPosition;
+    } else if (initialPosition === undefined) {
+      const saved = getProgress(book.id);
+      if (saved && saved.position > 0) {
+        startPos = saved.position;
+      }
+    }
+
+    setCurrentBook(book);
+    currentBookRef.current = book;
+    setCurrentTime(startPos);
+    currentTimeRef.current = startPos;
+    setDuration(book.durationSeconds || 0);
+    durationRef.current = book.durationSeconds || 0;
+
+    const streamUrl = `/api/stream/${book.id}`;
+    const targetUrl = startPos > 0 ? `${streamUrl}#t=${startPos}` : streamUrl;
+    audio.preload = "auto";
+    audio.src = targetUrl;
+    if (startPos > 0) {
+      const onMeta = () => {
+        audio.removeEventListener("loadedmetadata", onMeta);
+        if (Math.abs(audio.currentTime - startPos) > 1.0) {
+          try {
+            audio.currentTime = startPos;
+          } catch {}
+        }
+      };
+      if (audio.readyState >= 1) {
+        onMeta();
+      } else {
+        audio.addEventListener("loadedmetadata", onMeta, { once: true });
+      }
+    }
+  }, []);
+
+  // playBook - Instant playback triggered directly in user gesture
   const playBook = useCallback(
     (book: Book, initialPosition?: number, bookChapters: Chapter[] = []) => {
       const audio = audioRef.current;
@@ -552,10 +607,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Determine target playback start position:
-      // 1. Explicit positive initialPosition if provided
-      // 2. Otherwise check saved progress in localStorage store
-      // 3. Otherwise start from 0
+      // Determine target playback start position
       let startPos = 0;
       if (
         initialPosition !== undefined &&
@@ -574,32 +626,59 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       currentBookRef.current = book;
       setChapters(bookChapters);
       chaptersRef.current = bookChapters;
-      // Set currentTime immediately so UI, progress maps, and Continue Listening stay rock-solid
       setCurrentTime(startPos);
       currentTimeRef.current = startPos;
       setDuration(book.durationSeconds || 0);
       durationRef.current = book.durationSeconds || 0;
-      setIsPlaying(false);
-      isPlayingRef.current = false;
 
-      audio.src = `/api/stream/${book.id}`;
+      const streamUrl = `/api/stream/${book.id}`;
+      const targetUrl = startPos > 0 ? `${streamUrl}#t=${startPos}` : streamUrl;
+      const isSameBook = audio.src?.includes(`/api/stream/${book.id}`);
+
+      audio.preload = "auto";
       audio.playbackRate = playbackRateRef.current;
       audioEngine.setBasePlaybackRate(playbackRateRef.current, audio);
 
-      const onCanPlay = () => {
-        audio.removeEventListener("canplay", onCanPlay);
-        audio.removeEventListener("loadedmetadata", onCanPlay);
-
-        if (startPos > 0 && Number.isFinite(startPos)) {
+      if (isSameBook) {
+        // Fast path: already on this book! Just seek if needed and play instantly!
+        if (startPos > 0 && Math.abs(audio.currentTime - startPos) > 1.5) {
           try {
             audio.currentTime = startPos;
           } catch (e) {
-            console.warn("[audioneko] Seek failed:", e);
+            console.warn("[audioneko] Fast path seek error:", e);
           }
-        } else {
-          audio.currentTime = 0;
+        }
+        audioEngine
+          .playWithRamp(audio)
+          .then(() => {
+            setMediaSessionPlaybackState("playing");
+            syncClientRef.current?.sendUpdate({
+              bookId: book.id,
+              currentTime: audio.currentTime,
+              duration: audio.duration || book.durationSeconds || 0,
+              playbackRate: playbackRateRef.current,
+              isPlaying: true,
+              isExplicitSeek: true,
+            });
+            lastListenTickRef.current = {
+              time: Date.now(),
+              position: audio.currentTime,
+              bookId: book.id,
+            };
+          })
+          .catch((err) => console.warn("Playback resume error:", err));
+      } else {
+        // New book: set src directly with fragment and start playing IMMEDIATELY in user gesture
+        audio.src = targetUrl;
+        if (startPos > 0 && Number.isFinite(startPos)) {
+          try {
+            audio.currentTime = startPos;
+          } catch {
+            // Browser will apply via #t or loadedmetadata
+          }
         }
 
+        // Trigger playback immediately in the user gesture
         audioEngine
           .playWithRamp(audio)
           .then(() => {
@@ -619,11 +698,18 @@ export function AudioProvider({ children }: { children: ReactNode }) {
             };
           })
           .catch((err) => console.warn("Auto-playback deferred:", err));
-      };
 
-      audio.addEventListener("canplay", onCanPlay, { once: true });
-      audio.addEventListener("loadedmetadata", onCanPlay, { once: true });
-      audio.load();
+        // Precision sync: verify position once metadata loads
+        const onMeta = () => {
+          audio.removeEventListener("loadedmetadata", onMeta);
+          if (startPos > 0 && Math.abs(audio.currentTime - startPos) > 1.5) {
+            try {
+              audio.currentTime = startPos;
+            } catch {}
+          }
+        };
+        audio.addEventListener("loadedmetadata", onMeta, { once: true });
+      }
 
       setMediaSessionMetadata({
         title: book.title,
@@ -797,6 +883,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         jumpToRemotePosition,
         setIsFullPlayerOpen,
         playBook,
+        prewarmBook,
         pause,
         resume,
         togglePlay,

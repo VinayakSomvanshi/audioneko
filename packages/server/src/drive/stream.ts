@@ -63,7 +63,6 @@ export function parseRangeHeader(
       end = totalSize - 1;
     }
   } else {
-    // Open-ended range "bytes=X-": Stream to end of file without artificial buffer fragmentation
     end = totalSize - 1;
   }
 
@@ -91,8 +90,14 @@ export function getChunkBounds(
   return { chunkIndex, chunkStart, chunkEnd };
 }
 
+const memoryMetaCache = new Map<string, { meta: DriveFileMetadata; expiresAt: number }>();
+
+export function _resetMetadataMemoryCache(): void {
+  memoryMetaCache.clear();
+}
+
 /**
- * Fetches file metadata from Google Drive API v3 (cached in KV for 24h)
+ * Fetches file metadata from Google Drive API v3 (cached in Worker memory and KV for 24h)
  */
 export async function getDriveFileMetadata(
   fileId: string,
@@ -100,13 +105,21 @@ export async function getDriveFileMetadata(
   kv?: KVNamespace,
   customFetch: typeof fetch = fetch,
 ): Promise<DriveFileMetadata> {
+  const now = Date.now();
+  const memCached = memoryMetaCache.get(fileId);
+  if (memCached && memCached.expiresAt > now) {
+    return memCached.meta;
+  }
+
   const cacheKey = `gdrive_meta_${fileId}`;
 
   if (kv) {
     try {
       const cached = await kv.get(cacheKey, "json");
       if (cached) {
-        return cached as DriveFileMetadata;
+        const meta = cached as DriveFileMetadata;
+        memoryMetaCache.set(fileId, { meta, expiresAt: now + 3600_000 });
+        return meta;
       }
     } catch {
       // Fallback to fetch on KV read error
@@ -134,6 +147,8 @@ export async function getDriveFileMetadata(
     name: data.name || "audiobook.m4b",
   };
 
+  memoryMetaCache.set(fileId, { meta: metadata, expiresAt: now + 3600_000 });
+
   if (kv && metadata.size > 0) {
     try {
       await kv.put(cacheKey, JSON.stringify(metadata), {
@@ -160,6 +175,7 @@ export async function handleAudioStreamRequest(
   fileId: string,
   env: Env,
   customFetch: typeof fetch = fetch,
+  preloadedMetadata?: DriveFileMetadata,
 ): Promise<Response> {
   if (!env.GOOGLE_SA_KEY) {
     return new Response(
@@ -171,11 +187,14 @@ export async function handleAudioStreamRequest(
     );
   }
 
-  // 1. Obtain Google OAuth2 access token (cached in KV)
+  // 1. Obtain Google OAuth2 access token (cached in KV and memory)
   const accessToken = await getGoogleAccessToken(env.GOOGLE_SA_KEY, env.KV, customFetch);
 
-  // 2. Fetch File Metadata (size and mimeType, cached in KV for 24h)
-  const metadata = await getDriveFileMetadata(fileId, accessToken, env.KV, customFetch);
+  // 2. Fetch File Metadata (use preloaded if valid, otherwise query KV / Drive)
+  const metadata =
+    preloadedMetadata && preloadedMetadata.size > 0
+      ? preloadedMetadata
+      : await getDriveFileMetadata(fileId, accessToken, env.KV, customFetch);
   const totalSize = metadata.size;
 
   if (totalSize <= 0) {

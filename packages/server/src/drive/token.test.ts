@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  _resetTokenMemoryCache,
   base64UrlEncode,
   createSignedJwt,
   getGoogleAccessToken,
@@ -8,6 +9,9 @@ import {
 } from "./token";
 
 describe("Google Service Account Token Minter", () => {
+  beforeEach(() => {
+    _resetTokenMemoryCache();
+  });
   it("correctly base64url encodes strings and byte arrays", () => {
     expect(base64UrlEncode("hello world")).toBe("aGVsbG8gd29ybGQ");
     expect(base64UrlEncode(new Uint8Array([1, 2, 3, 4]))).toBe("AQIDBA");

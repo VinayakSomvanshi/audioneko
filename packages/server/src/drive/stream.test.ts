@@ -1,8 +1,18 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Env } from "../types";
-import { CHUNK_SIZE, getChunkBounds, handleAudioStreamRequest, parseRangeHeader } from "./stream";
+import {
+  CHUNK_SIZE,
+  _resetMetadataMemoryCache,
+  getChunkBounds,
+  handleAudioStreamRequest,
+  parseRangeHeader,
+} from "./stream";
 
 describe("Audio Stream Engine & Range Proxy", () => {
+  beforeEach(() => {
+    _resetMetadataMemoryCache();
+  });
+
   const TOTAL_SIZE = 10 * 1024 * 1024; // 10 MB
 
   it("parses explicit byte ranges accurately", () => {

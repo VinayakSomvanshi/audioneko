@@ -83,6 +83,17 @@ async function resolveUserWithRole(
   return userObj;
 }
 
+interface CachedAuth {
+  user: AuthContextVariables["user"];
+  session: AuthContextVariables["session"];
+  expiresAt: number;
+}
+const authMemoryCache = new Map<string, CachedAuth>();
+
+export function _resetAuthMemoryCache(): void {
+  authMemoryCache.clear();
+}
+
 /**
  * Resolves authenticated user and session using Better Auth or token from D1
  */
@@ -93,6 +104,20 @@ export async function authenticateRequest(
   user: AuthContextVariables["user"];
   session: AuthContextVariables["session"];
 } | null> {
+  const cacheKey =
+    req.headers.get("cookie") ||
+    req.headers.get("authorization") ||
+    req.headers.get("x-token") ||
+    extractTokenFromRequest(req);
+
+  const now = Date.now();
+  if (cacheKey) {
+    const cached = authMemoryCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return { user: cached.user, session: cached.session };
+    }
+  }
+
   // 1. Check Better Auth session via cookies or Authorization header
   try {
     const auth = createAuth(env);
@@ -105,10 +130,15 @@ export async function authenticateRequest(
         env,
         sessionData.user as Record<string, unknown>,
       );
-      return {
+      const res = {
         user: userWithRole,
         session: sessionData.session as AuthContextVariables["session"],
       };
+      if (cacheKey) {
+        if (authMemoryCache.size > 1000) authMemoryCache.clear();
+        authMemoryCache.set(cacheKey, { ...res, expiresAt: now + 120_000 });
+      }
+      return res;
     }
   } catch {
     // Fall back to token verification
@@ -146,7 +176,12 @@ export async function authenticateRequest(
           ipAddress: sessionRow.ipAddress,
           userAgent: sessionRow.userAgent,
         };
-        return { user: userObj, session: sessionObj };
+        const res = { user: userObj, session: sessionObj };
+        if (cacheKey) {
+          if (authMemoryCache.size > 1000) authMemoryCache.clear();
+          authMemoryCache.set(cacheKey, { ...res, expiresAt: now + 120_000 });
+        }
+        return res;
       }
     } catch {
       // Ignore database lookup error

@@ -36,7 +36,8 @@ export type LibrarySortOption =
   | "year-asc";
 
 export function LibraryPage() {
-  const { playBook, pause, resume, currentBook, isPlaying, currentTime, duration } = useAudio();
+  const { playBook, prewarmBook, pause, resume, currentBook, isPlaying, currentTime, duration } =
+    useAudio();
   const [activeFilter, setActiveFilter] = useState<"all" | "in-progress" | "downloaded">("all");
   const [sortBy, setSortBy] = useState<LibrarySortOption>(() => {
     if (typeof window !== "undefined") {
@@ -282,6 +283,17 @@ export function LibraryPage() {
     }
   }, [filteredBooks, sortBy, bookProgressMap]);
 
+  // Pre-warm continueBook into audio context on load so pressing Play is INSTANT
+  useEffect(() => {
+    if (continueBook && !currentBook) {
+      const entry = bookProgressMap.get(continueBook.id);
+      const local = getProgress(continueBook.id);
+      const resumePos =
+        entry?.currentTime && entry.currentTime > 0 ? entry.currentTime : (local?.position ?? 0);
+      prewarmBook(continueBook, resumePos);
+    }
+  }, [continueBook, currentBook, prewarmBook, bookProgressMap]);
+
   // Loading skeleton
   if (isLoading) {
     return (
@@ -493,6 +505,9 @@ export function LibraryPage() {
                 key={book.id}
                 to="/book/$id"
                 params={{ id: book.id }}
+                onMouseEnter={() => prewarmBook(book, inProgress ? pos : 0)}
+                onTouchStart={() => prewarmBook(book, inProgress ? pos : 0)}
+                onFocus={() => prewarmBook(book, inProgress ? pos : 0)}
                 className="group surface-card overflow-hidden flex flex-col transition-all hover:border-text-subtle cursor-pointer block select-none"
               >
                 <div className="aspect-square bg-surface relative flex items-center justify-center border-b border-border overflow-hidden">

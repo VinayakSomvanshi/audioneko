@@ -79,29 +79,95 @@ app.route("/api/invites", inviteRoutes);
 // Admin Control Plane routes (/api/admin/*)
 app.route("/api/admin", adminRoutes);
 
-// Resolve fileId: if it's a book ID, map to Google Drive file ID from files table
-async function resolveDriveFileId(db: ReturnType<typeof createDb>, param: string): Promise<string> {
+export interface ResolvedFileInfo {
+  driveFileId: string;
+  sizeBytes: number;
+  mimeType: string;
+  name: string;
+}
+
+const fileInfoCache = new Map<string, ResolvedFileInfo>();
+
+export function _resetFileInfoCache(): void {
+  fileInfoCache.clear();
+}
+
+// Resolve fileId: if it's a book ID or file ID, map to Google Drive file ID & metadata from files table
+async function resolveDriveFileInfo(
+  db: ReturnType<typeof createDb>,
+  param: string,
+): Promise<ResolvedFileInfo> {
+  const cached = fileInfoCache.get(param);
+  if (cached) return cached;
+
   const fileRecord = await db
-    .select({ driveFileId: schema.files.driveFileId })
+    .select({
+      driveFileId: schema.files.driveFileId,
+      sizeBytes: schema.files.sizeBytes,
+      mimeType: schema.files.mimeType,
+      name: schema.files.name,
+    })
     .from(schema.files)
-    .where(or(eq(schema.files.bookId, param), eq(schema.files.id, param)))
+    .where(
+      or(
+        eq(schema.files.bookId, param),
+        eq(schema.files.id, param),
+        eq(schema.files.driveFileId, param),
+      ),
+    )
     .limit(1);
-  return fileRecord[0]?.driveFileId || param;
+
+  const resolved: ResolvedFileInfo = fileRecord[0]
+    ? {
+        driveFileId: fileRecord[0].driveFileId,
+        sizeBytes: fileRecord[0].sizeBytes,
+        mimeType: fileRecord[0].mimeType,
+        name: fileRecord[0].name,
+      }
+    : {
+        driveFileId: param,
+        sizeBytes: 0,
+        mimeType: "audio/mp4",
+        name: "audiobook.m4b",
+      };
+
+  if (fileInfoCache.size > 2000) fileInfoCache.clear();
+  fileInfoCache.set(param, resolved);
+  if (resolved.driveFileId !== param) {
+    fileInfoCache.set(resolved.driveFileId, resolved);
+  }
+  return resolved;
 }
 
 // Audio streaming range proxy endpoint (GET and HEAD) - Protected by requireAuth
 app.get("/api/stream/:fileId", requireAuth, async (c) => {
   const fileId = c.req.param("fileId");
   const db = createDb(c.env.DB);
-  const resolved = await resolveDriveFileId(db, fileId);
-  return handleAudioStreamRequest(c.req.raw, resolved, c.env);
+  const fileInfo = await resolveDriveFileInfo(db, fileId);
+  const preloadedMeta =
+    fileInfo.sizeBytes > 0
+      ? {
+          size: fileInfo.sizeBytes,
+          mimeType: fileInfo.mimeType,
+          name: fileInfo.name,
+        }
+      : undefined;
+  return handleAudioStreamRequest(c.req.raw, fileInfo.driveFileId, c.env, fetch, preloadedMeta);
 });
 
 app.on("HEAD", "/api/stream/:fileId", requireAuth, async (c) => {
   const fileId = c.req.param("fileId");
   const db = createDb(c.env.DB);
-  const resolved = await resolveDriveFileId(db, fileId);
-  return handleAudioStreamRequest(c.req.raw, resolved, c.env);
+  const fileInfo = await resolveDriveFileInfo(db, fileId);
+  const preloadedMeta =
+    fileInfo.sizeBytes > 0
+      ? {
+          size: fileInfo.sizeBytes,
+          mimeType: fileInfo.mimeType,
+          name: fileInfo.name,
+        }
+      : undefined;
+  return handleAudioStreamRequest(c.req.raw, fileInfo.driveFileId, c.env, fetch, preloadedMeta);
 });
 
 // Library Books API - Protected by requireAuth

@@ -127,27 +127,20 @@ export class AudioEngine {
   }
 
   /**
-   * Smooth 40ms linear gain ramp-up on play to eliminate speaker clicks
+   * Zero-latency playback trigger: ensures Web Audio graph is live and unmuted
    */
   public async playWithRamp(audioElement: HTMLAudioElement): Promise<void> {
-    await this.ensureContext();
+    if (this.ctx && this.ctx.state === "suspended") {
+      this.ctx.resume().catch(() => {});
+    }
 
     if (this.gainNode && this.ctx) {
       const now = this.ctx.currentTime;
       this.gainNode.gain.cancelScheduledValues(now);
-      this.gainNode.gain.setValueAtTime(0.001, now);
+      this.gainNode.gain.setValueAtTime(this.currentVolume, now);
     }
 
-    try {
-      await audioElement.play();
-    } finally {
-      if (this.gainNode && this.ctx) {
-        const now = this.ctx.currentTime;
-        this.gainNode.gain.cancelScheduledValues(now);
-        this.gainNode.gain.setValueAtTime(0.001, now);
-        this.gainNode.gain.linearRampToValueAtTime(this.currentVolume, now + 0.04);
-      }
-    }
+    return audioElement.play();
   }
 
   /**
