@@ -1,9 +1,8 @@
 import { Hono } from "hono";
 import { describe, expect, it, vi } from "vitest";
 import type { AuthContextVariables } from "../auth/middleware";
-import type { Database } from "../db";
 import type { Env } from "../types";
-import { extractAbsToken, requireAbsAuth, resolveAbsUser } from "./auth";
+import { extractAbsToken, requireAbsAuth } from "./auth";
 import { mapBookToAbsItem, mapProgressToAbs } from "./mapper";
 import { absRoutes } from "./routes";
 

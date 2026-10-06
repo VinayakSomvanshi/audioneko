@@ -90,17 +90,26 @@ export function WaveformScrubber({
     return list;
   }, []);
 
-  const effectiveTime = isScrubbing ? scrubTime : currentTime;
-  const progressRatio = duration > 0 ? Math.min(1, Math.max(0, effectiveTime / duration)) : 0;
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+  const safeCurrentTime = Number.isFinite(currentTime) && currentTime >= 0 ? currentTime : 0;
+  const safeBufferedTime = Number.isFinite(bufferedTime) && bufferedTime >= 0 ? bufferedTime : 0;
+  const effectiveTime = isScrubbing
+    ? Number.isFinite(scrubTime) && scrubTime >= 0
+      ? scrubTime
+      : 0
+    : safeCurrentTime;
+  const progressRatio =
+    safeDuration > 0 ? Math.min(1, Math.max(0, effectiveTime / safeDuration)) : 0;
   const activeBarIndex = Math.floor(progressRatio * TOTAL_BARS);
-  const bufferedRatio = duration > 0 ? Math.min(1, Math.max(0, bufferedTime / duration)) : 0;
+  const bufferedRatio =
+    safeDuration > 0 ? Math.min(1, Math.max(0, safeBufferedTime / safeDuration)) : 0;
   const bufferedBarIndex = Math.floor(bufferedRatio * TOTAL_BARS);
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!containerRef.current || duration <= 0) return;
+    if (!containerRef.current || safeDuration <= 0) return;
     const rect = containerRef.current.getBoundingClientRect();
     const clickRatio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const initialTime = clickRatio * duration;
+    const initialTime = clickRatio * safeDuration;
 
     dragRef.current = {
       startX: e.clientX,
@@ -123,7 +132,7 @@ export function WaveformScrubber({
   };
 
   const handlePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!isScrubbing || !containerRef.current || duration <= 0) return;
+    if (!isScrubbing || !containerRef.current || safeDuration <= 0) return;
 
     const rect = containerRef.current.getBoundingClientRect();
     const trackWidth = rect.width;
@@ -137,12 +146,12 @@ export function WaveformScrubber({
     dragRef.current.lastX = e.clientX;
 
     // Apply decelerated time delta proportional to track width
-    const timeDelta = (dx / trackWidth) * duration * multiplier;
-    const nextTime = Math.max(0, Math.min(duration, dragRef.current.activeTime + timeDelta));
+    const timeDelta = (dx / trackWidth) * safeDuration * multiplier;
+    const nextTime = Math.max(0, Math.min(safeDuration, dragRef.current.activeTime + timeDelta));
     dragRef.current.activeTime = nextTime;
 
     setScrubTime(nextTime);
-    setScrubX(Math.max(0, Math.min(trackWidth, (nextTime / duration) * trackWidth)));
+    setScrubX(Math.max(0, Math.min(trackWidth, (nextTime / safeDuration) * trackWidth)));
   };
 
   const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -157,12 +166,14 @@ export function WaveformScrubber({
       // Ignore
     }
 
-    onSeek(dragRef.current.activeTime);
+    if (Number.isFinite(dragRef.current.activeTime)) {
+      onSeek(Math.max(0, Math.min(safeDuration, dragRef.current.activeTime)));
+    }
   };
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>) => {
-      if (duration <= 0) return;
+      if (safeDuration <= 0) return;
       let offset = 0;
       if (e.key === "ArrowLeft") offset = e.shiftKey ? -30 : -5;
       else if (e.key === "ArrowRight") offset = e.shiftKey ? 30 : 5;
@@ -172,16 +183,16 @@ export function WaveformScrubber({
         return;
       } else if (e.key === "End") {
         e.preventDefault();
-        onSeek(duration);
+        onSeek(safeDuration);
         return;
       } else {
         return;
       }
 
       e.preventDefault();
-      onSeek(Math.max(0, Math.min(duration, currentTime + offset)));
+      onSeek(Math.max(0, Math.min(safeDuration, safeCurrentTime + offset)));
     },
-    [currentTime, duration, onSeek],
+    [safeCurrentTime, safeDuration, onSeek],
   );
 
   return (

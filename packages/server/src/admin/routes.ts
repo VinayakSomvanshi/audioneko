@@ -1,6 +1,6 @@
 import { count, countDistinct, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { deleteInvite, listInvites } from "../auth/invites";
+import { deleteInvite } from "../auth/invites";
 import {
   type AuthContextVariables,
   optionalAuth,

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Database } from "../db";
-import { ONLINE_THRESHOLD_SECONDS, getFriendsPresence } from "./presence";
+import { getFriendsPresence } from "./presence";
 
 describe("Edge Social Presence Engine", () => {
   it("classifies friends as online or offline based on the 5-minute threshold", async () => {

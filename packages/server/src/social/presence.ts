@@ -6,7 +6,7 @@
  */
 
 import type { FriendPresence, SocialPresenceResponse } from "@audioneko/shared";
-import { and, desc, eq, ne } from "drizzle-orm";
+import { desc, eq, ne } from "drizzle-orm";
 import type { Database } from "../db";
 import { books, progress, user } from "../db/schema";
 

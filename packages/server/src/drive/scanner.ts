@@ -9,7 +9,7 @@ import { createDb } from "../db";
 import * as schema from "../db/schema";
 import type { Env } from "../types";
 import { enrichBookMetadata } from "./enrich";
-import { extractChaptersFromM4b, parseId3Metadata, parseMp4Metadata } from "./metadata";
+import { extractChaptersFromM4b } from "./metadata";
 import { getGoogleAccessToken } from "./token";
 
 export interface DriveItem {

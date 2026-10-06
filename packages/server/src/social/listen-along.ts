@@ -14,7 +14,7 @@ import type { Env } from "../types";
 
 export class ListenAlongRoom implements DurableObject {
   private ctx: DurableObjectState;
-  private env: Env;
+  public readonly env: Env;
   private state: ListenAlongRoomState | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {

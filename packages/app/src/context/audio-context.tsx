@@ -282,10 +282,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   }, [pause, resume]);
 
   const seekTo = useCallback((seconds: number) => {
+    if (!Number.isFinite(seconds)) return;
     const audio = audioRef.current;
     if (!audio) return;
-    const dur = durationRef.current || audio.duration || 0;
-    const clamped = Math.max(0, Math.min(seconds, dur || seconds));
+    const rawDur = durationRef.current || audio.duration || 0;
+    const dur = Number.isFinite(rawDur) ? Math.max(0, rawDur) : 0;
+    const clamped = Math.max(0, dur > 0 ? Math.min(seconds, dur) : Math.max(0, seconds));
     audio.currentTime = clamped;
     setCurrentTime(clamped);
     currentTimeRef.current = clamped;
@@ -309,9 +311,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
   const skipBy = useCallback(
     (seconds: number) => {
+      if (!Number.isFinite(seconds)) return;
       const audio = audioRef.current;
       if (!audio) return;
-      seekTo(audio.currentTime + seconds);
+      const current = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+      seekTo(current + seconds);
     },
     [seekTo],
   );
@@ -468,9 +472,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       setIsPlaying(false);
       isPlayingRef.current = false;
       if (typeof window !== "undefined") {
-        fetch("/api/admin/me")
+        fetch("/api/auth/get-session")
           .then((res) => {
-            if (!res.ok) {
+            if (res.status === 401) {
               window.location.href = "/login";
             }
           })
@@ -788,12 +792,13 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   playBookRef.current = playBook;
 
   const setRate = useCallback((rate: number) => {
-    setPlaybackRate(rate);
-    playbackRateRef.current = rate;
-    audioEngine.setBasePlaybackRate(rate, audioRef.current || undefined);
+    const validRate = Number.isFinite(rate) ? Math.max(0.25, Math.min(3.0, rate)) : 1.0;
+    setPlaybackRate(validRate);
+    playbackRateRef.current = validRate;
+    audioEngine.setBasePlaybackRate(validRate, audioRef.current || undefined);
     setMediaSessionPositionState({
       duration: durationRef.current,
-      playbackRate: rate,
+      playbackRate: validRate,
       position: audioRef.current?.currentTime ?? currentTimeRef.current,
     });
     const book = currentBookRef.current;
@@ -802,14 +807,15 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         bookId: book.id,
         currentTime: audioRef.current?.currentTime ?? currentTimeRef.current,
         duration: durationRef.current,
-        playbackRate: rate,
+        playbackRate: validRate,
         isPlaying: isPlayingRef.current,
       });
     }
   }, []);
 
   const setVol = useCallback((vol: number) => {
-    const clamped = Math.max(0, Math.min(1, vol));
+    const validVol = Number.isFinite(vol) ? vol : 1.0;
+    const clamped = Math.max(0, Math.min(1, validVol));
     setVolume(clamped);
     if (clamped > 0) {
       setIsMuted(false);

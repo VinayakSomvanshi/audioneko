@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { Database } from "../db";
 import type { Env, ShelfQueueMessage } from "../types";
 import {
-  ACTIVE_SHELF_PREFIX,
   MAX_ACTIVE_SHELF_BYTES,
   dispatchShelfTask,
   evictLruBooks,

@@ -6,7 +6,7 @@
  * The plaintext token is only returned once upon creation and never persisted to the database.
  */
 
-import { and, desc, eq, gt, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import type { Database } from "../db";
 import { invites, user } from "../db/schema";
 

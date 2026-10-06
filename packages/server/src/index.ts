@@ -4,12 +4,7 @@ import { cors } from "hono/cors";
 import { absRoutes } from "./abs/routes";
 import { adminRoutes } from "./admin/routes";
 import { createAuth } from "./auth";
-import {
-  type AuthContextVariables,
-  optionalAuth,
-  requireAdmin,
-  requireAuth,
-} from "./auth/middleware";
+import { type AuthContextVariables, requireAdmin, requireAuth } from "./auth/middleware";
 import { inviteRoutes } from "./auth/routes";
 import { createDb } from "./db";
 import * as schema from "./db/schema";
@@ -61,6 +56,19 @@ app.use(
     maxAge: 86400,
   }),
 );
+
+// Global uncaught exception handler
+app.onError((err, c) => {
+  console.error(`[audioneko:error] ${c.req.method} ${c.req.url}:`, err);
+  return c.json(
+    {
+      error: err.message || "Internal Server Error",
+      code: "INTERNAL_ERROR",
+      status: 500,
+    },
+    500,
+  );
+});
 
 // Health check endpoint
 app.get("/api/health", (c) => {
@@ -769,70 +777,106 @@ app.delete("/api/shelves/:id/books/:bookId", requireAuth, async (c) => {
 
 // Get all bookmarks for a specific book by authenticated user
 app.get("/api/bookmarks/:bookId", requireAuth, async (c) => {
-  const user = c.get("user");
-  const bookId = c.req.param("bookId");
-  const db = createDb(c.env.DB);
-  const userBookmarks = await db
-    .select()
-    .from(schema.bookmarks)
-    .where(and(eq(schema.bookmarks.userId, user.id), eq(schema.bookmarks.bookId, bookId)))
-    .orderBy(asc(schema.bookmarks.positionSeconds));
-  return c.json({ bookmarks: userBookmarks });
+  try {
+    const user = c.get("user");
+    const bookId = c.req.param("bookId");
+    if (!bookId) {
+      return c.json({ error: "Missing required parameter: bookId" }, 400);
+    }
+    const db = createDb(c.env.DB);
+    const userBookmarks = await db
+      .select()
+      .from(schema.bookmarks)
+      .where(and(eq(schema.bookmarks.userId, user.id), eq(schema.bookmarks.bookId, bookId)))
+      .orderBy(asc(schema.bookmarks.positionSeconds));
+    return c.json({ bookmarks: userBookmarks });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to fetch bookmarks";
+    return c.json({ error: message, code: "BOOKMARKS_FETCH_FAILED" }, 500);
+  }
 });
 
 // Create a new bookmark at current audio position
 app.post("/api/bookmarks", requireAuth, async (c) => {
-  const user = c.get("user");
-  const body = await c.req.json<{
-    bookId: string;
-    positionSeconds: number;
-    chapterTitle?: string;
-    note?: string;
-  }>();
+  try {
+    const user = c.get("user");
+    const body = await c.req
+      .json<{
+        bookId: string;
+        positionSeconds: number;
+        chapterTitle?: string;
+        note?: string;
+      }>()
+      .catch(() => null);
 
-  if (!body.bookId || body.positionSeconds === undefined) {
-    return c.json({ error: "Missing required fields: bookId, positionSeconds" }, 400);
-  }
+    if (
+      !body ||
+      !body.bookId ||
+      typeof body.bookId !== "string" ||
+      body.positionSeconds === undefined ||
+      !Number.isFinite(body.positionSeconds) ||
+      body.positionSeconds < 0
+    ) {
+      return c.json(
+        { error: "Missing required fields: bookId, positionSeconds (must be non-negative number)" },
+        400,
+      );
+    }
 
-  const db = createDb(c.env.DB);
-  const bookmarkId = `bm_${crypto.randomUUID()}`;
-  const now = Math.floor(Date.now() / 1000);
+    const db = createDb(c.env.DB);
+    const bookmarkId = `bm_${crypto.randomUUID()}`;
+    const now = Math.floor(Date.now() / 1000);
+    const sanitizedChapter = body.chapterTitle ? String(body.chapterTitle).slice(0, 255) : null;
+    const sanitizedNote = body.note ? String(body.note).slice(0, 2000) : null;
+    const sanitizedPos = Math.max(0, body.positionSeconds);
 
-  await db.insert(schema.bookmarks).values({
-    id: bookmarkId,
-    userId: user.id,
-    bookId: body.bookId,
-    positionSeconds: body.positionSeconds,
-    chapterTitle: body.chapterTitle || null,
-    note: body.note || null,
-    createdAt: now,
-  });
-
-  return c.json(
-    {
+    await db.insert(schema.bookmarks).values({
       id: bookmarkId,
       userId: user.id,
       bookId: body.bookId,
-      positionSeconds: body.positionSeconds,
-      chapterTitle: body.chapterTitle || null,
-      note: body.note || null,
+      positionSeconds: sanitizedPos,
+      chapterTitle: sanitizedChapter,
+      note: sanitizedNote,
       createdAt: now,
-    },
-    201,
-  );
+    });
+
+    return c.json(
+      {
+        id: bookmarkId,
+        userId: user.id,
+        bookId: body.bookId,
+        positionSeconds: sanitizedPos,
+        chapterTitle: sanitizedChapter,
+        note: sanitizedNote,
+        createdAt: now,
+      },
+      201,
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to create bookmark";
+    return c.json({ error: message, code: "BOOKMARK_CREATE_FAILED" }, 500);
+  }
 });
 
 // Delete a bookmark by ID
 app.delete("/api/bookmarks/:id", requireAuth, async (c) => {
-  const user = c.get("user");
-  const bookmarkId = c.req.param("id");
-  const db = createDb(c.env.DB);
+  try {
+    const user = c.get("user");
+    const bookmarkId = c.req.param("id");
+    if (!bookmarkId) {
+      return c.json({ error: "Missing bookmark ID" }, 400);
+    }
+    const db = createDb(c.env.DB);
 
-  await db
-    .delete(schema.bookmarks)
-    .where(and(eq(schema.bookmarks.id, bookmarkId), eq(schema.bookmarks.userId, user.id)));
+    await db
+      .delete(schema.bookmarks)
+      .where(and(eq(schema.bookmarks.id, bookmarkId), eq(schema.bookmarks.userId, user.id)));
 
-  return c.json({ success: true });
+    return c.json({ success: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to delete bookmark";
+    return c.json({ error: message, code: "BOOKMARK_DELETE_FAILED" }, 500);
+  }
 });
 
 // ==========================================
@@ -936,7 +980,7 @@ app.on(["GET", "HEAD"], "*", async (c) => {
 
     // Do not intercept API requests
     if (pathname.startsWith("/api/")) {
-      return c.text("Not Found", 404);
+      return c.json({ error: "Endpoint not found", code: "NOT_FOUND", status: 404 }, 404);
     }
 
     // Explicit root or HTML requests: serve fresh index.html with no-cache
@@ -994,6 +1038,15 @@ app.on(["GET", "HEAD"], "*", async (c) => {
     return serveSpaIndexHtml(c.env, c.req.url);
   }
   return c.text("audioneko API Active", 200);
+});
+
+// Explicit notFound handler for unmatched routes
+app.notFound((c) => {
+  const url = new URL(c.req.url);
+  if (url.pathname.startsWith("/api/")) {
+    return c.json({ error: "Endpoint not found", code: "NOT_FOUND", status: 404 }, 404);
+  }
+  return c.text("Not Found", 404);
 });
 
 export default {

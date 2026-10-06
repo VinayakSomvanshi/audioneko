@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { Context, MiddlewareHandler } from "hono";
+import type { MiddlewareHandler } from "hono";
 import { createDb } from "../db";
 import * as schema from "../db/schema";
 import type { Env } from "../types";

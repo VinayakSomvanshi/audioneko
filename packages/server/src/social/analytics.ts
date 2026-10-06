@@ -10,7 +10,7 @@ import type {
   ListeningAnalyticsResponse,
   RecordListeningEventRequest,
 } from "@audioneko/shared";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import type { Database } from "../db";
 import { listeningEvents, progress } from "../db/schema";
 

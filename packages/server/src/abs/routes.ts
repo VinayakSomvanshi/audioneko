@@ -8,10 +8,10 @@ import { Hono } from "hono";
 import { createAuth } from "../auth";
 import type { AuthContextVariables } from "../auth/middleware";
 import { createDb } from "../db";
-import { books, progress, series, session, user } from "../db/schema";
+import { books, progress, session, user } from "../db/schema";
 import { handleAudioStreamRequest } from "../drive/stream";
 import type { Env } from "../types";
-import { optionalAbsAuth, requireAbsAuth } from "./auth";
+import { requireAbsAuth } from "./auth";
 import { mapBookToAbsItem, mapProgressToAbs } from "./mapper";
 import type {
   AbsItemsResponse,

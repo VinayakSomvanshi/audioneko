@@ -45,7 +45,13 @@ export function MiniPlayer() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+  const safeCurrentTime = Number.isFinite(currentTime) && currentTime >= 0 ? currentTime : 0;
+  const safeBufferedTime = Number.isFinite(bufferedTime) && bufferedTime >= 0 ? bufferedTime : 0;
+  const progressPercent =
+    safeDuration > 0 ? Math.min(100, Math.max(0, (safeCurrentTime / safeDuration) * 100)) : 0;
+  const bufferedPercent =
+    safeDuration > 0 ? Math.min(100, Math.max(0, (safeBufferedTime / safeDuration) * 100)) : 0;
 
   const cycleRate = () => {
     const rates = [1.0, 1.25, 1.5, 1.75, 2.0];
@@ -55,7 +61,9 @@ export function MiniPlayer() {
 
   const handleSeekChange = (e: ChangeEvent<HTMLInputElement>) => {
     const nextVal = Number.parseFloat(e.target.value);
-    seekTo((nextVal / 100) * duration);
+    if (Number.isFinite(nextVal) && safeDuration > 0) {
+      seekTo(Math.max(0, Math.min(safeDuration, (nextVal / 100) * safeDuration)));
+    }
   };
 
   return (
@@ -69,7 +77,7 @@ export function MiniPlayer() {
           <div
             className="absolute top-0 bottom-0 left-0 bg-text/30 pointer-events-none transition-all duration-150"
             style={{
-              width: `${Math.min(100, Math.max(0, duration > 0 ? (bufferedTime / duration) * 100 : 0))}%`,
+              width: `${bufferedPercent}%`,
             }}
           />
           {/* Played track */}
