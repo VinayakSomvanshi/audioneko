@@ -203,14 +203,35 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }, [flushListeningEvent]);
 
+  const playBookRef = useRef<
+    ((book: Book, initialPosition?: number, bookChapters?: Chapter[]) => void) | null
+  >(null);
+
   const resume = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    const book = currentBookRef.current;
+    if (
+      book &&
+      (!audio.src ||
+        audio.src === "" ||
+        audio.src === window.location.href ||
+        audio.src.endsWith("/"))
+    ) {
+      playBookRef.current?.(book, currentTimeRef.current);
+      return;
+    }
+    if (audio.currentTime === 0 && currentTimeRef.current > 0) {
+      try {
+        audio.currentTime = currentTimeRef.current;
+      } catch (e) {
+        console.warn("[audioneko] Resume seek error:", e);
+      }
+    }
     audioEngine
       .playWithRamp(audio)
       .then(() => {
         setMediaSessionPlaybackState("playing");
-        const book = currentBookRef.current;
         if (book) {
           lastListenTickRef.current = {
             time: Date.now(),
@@ -518,75 +539,102 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     audioEngine.setVolume(effectiveVolume);
   }, [volume, sleepTimerState.volumeMultiplier]);
 
-  // playBook - waits for canplay before seeking/playing
-  const playBook = useCallback((book: Book, initialPosition = 0, bookChapters: Chapter[] = []) => {
-    const audio = audioRef.current;
-    if (!audio) return;
+  // playBook - waits for canplay/loadedmetadata before seeking/playing
+  const playBook = useCallback(
+    (book: Book, initialPosition?: number, bookChapters: Chapter[] = []) => {
+      const audio = audioRef.current;
+      if (!audio) return;
 
-    if (!isUserLoadingRef.current && !userRef.current) {
-      if (typeof window !== "undefined") {
-        window.location.href = "/login";
-      }
-      return;
-    }
-
-    setCurrentBook(book);
-    currentBookRef.current = book;
-    setChapters(bookChapters);
-    chaptersRef.current = bookChapters;
-    setCurrentTime(0);
-    currentTimeRef.current = 0;
-    setDuration(book.durationSeconds || 0);
-    durationRef.current = book.durationSeconds || 0;
-    setIsPlaying(false);
-    isPlayingRef.current = false;
-
-    audio.src = `/api/stream/${book.id}`;
-    audio.playbackRate = playbackRateRef.current;
-    audioEngine.setBasePlaybackRate(playbackRateRef.current, audio);
-
-    const onCanPlay = () => {
-      audio.removeEventListener("canplay", onCanPlay);
-      audio.removeEventListener("loadedmetadata", onCanPlay);
-
-      if (initialPosition > 0 && Number.isFinite(initialPosition)) {
-        audio.currentTime = initialPosition;
-      } else {
-        audio.currentTime = 0;
+      if (!isUserLoadingRef.current && !userRef.current) {
+        if (typeof window !== "undefined") {
+          window.location.href = "/login";
+        }
+        return;
       }
 
-      audioEngine
-        .playWithRamp(audio)
-        .then(() => {
-          setMediaSessionPlaybackState("playing");
-          syncClientRef.current?.sendUpdate({
-            bookId: book.id,
-            currentTime: audio.currentTime,
-            duration: audio.duration || book.durationSeconds || 0,
-            playbackRate: playbackRateRef.current,
-            isPlaying: true,
-            isExplicitSeek: true,
-          });
-          lastListenTickRef.current = {
-            time: Date.now(),
-            position: audio.currentTime,
-            bookId: book.id,
-          };
-        })
-        .catch((err) => console.warn("Auto-playback deferred:", err));
-    };
+      // Determine target playback start position:
+      // 1. Explicit positive initialPosition if provided
+      // 2. Otherwise check saved progress in localStorage store
+      // 3. Otherwise start from 0
+      let startPos = 0;
+      if (
+        initialPosition !== undefined &&
+        initialPosition > 0 &&
+        Number.isFinite(initialPosition)
+      ) {
+        startPos = initialPosition;
+      } else if (initialPosition === undefined) {
+        const saved = getProgress(book.id);
+        if (saved && saved.position > 0) {
+          startPos = saved.position;
+        }
+      }
 
-    audio.addEventListener("canplay", onCanPlay, { once: true });
-    audio.addEventListener("loadedmetadata", onCanPlay, { once: true });
-    audio.load();
+      setCurrentBook(book);
+      currentBookRef.current = book;
+      setChapters(bookChapters);
+      chaptersRef.current = bookChapters;
+      // Set currentTime immediately so UI, progress maps, and Continue Listening stay rock-solid
+      setCurrentTime(startPos);
+      currentTimeRef.current = startPos;
+      setDuration(book.durationSeconds || 0);
+      durationRef.current = book.durationSeconds || 0;
+      setIsPlaying(false);
+      isPlayingRef.current = false;
 
-    setMediaSessionMetadata({
-      title: book.title,
-      artist: book.author,
-      album: book.seriesIndex ? `Series #${book.seriesIndex}` : "audioneko",
-      artworkUrl: book.coverR2Key ? `/api/covers/${book.id}` : undefined,
-    });
-  }, []);
+      audio.src = `/api/stream/${book.id}`;
+      audio.playbackRate = playbackRateRef.current;
+      audioEngine.setBasePlaybackRate(playbackRateRef.current, audio);
+
+      const onCanPlay = () => {
+        audio.removeEventListener("canplay", onCanPlay);
+        audio.removeEventListener("loadedmetadata", onCanPlay);
+
+        if (startPos > 0 && Number.isFinite(startPos)) {
+          try {
+            audio.currentTime = startPos;
+          } catch (e) {
+            console.warn("[audioneko] Seek failed:", e);
+          }
+        } else {
+          audio.currentTime = 0;
+        }
+
+        audioEngine
+          .playWithRamp(audio)
+          .then(() => {
+            setMediaSessionPlaybackState("playing");
+            syncClientRef.current?.sendUpdate({
+              bookId: book.id,
+              currentTime: audio.currentTime,
+              duration: audio.duration || book.durationSeconds || 0,
+              playbackRate: playbackRateRef.current,
+              isPlaying: true,
+              isExplicitSeek: true,
+            });
+            lastListenTickRef.current = {
+              time: Date.now(),
+              position: audio.currentTime,
+              bookId: book.id,
+            };
+          })
+          .catch((err) => console.warn("Auto-playback deferred:", err));
+      };
+
+      audio.addEventListener("canplay", onCanPlay, { once: true });
+      audio.addEventListener("loadedmetadata", onCanPlay, { once: true });
+      audio.load();
+
+      setMediaSessionMetadata({
+        title: book.title,
+        artist: book.author,
+        album: book.seriesIndex ? `Series #${book.seriesIndex}` : "audioneko",
+        artworkUrl: book.coverR2Key ? `/api/covers/${book.id}` : undefined,
+      });
+    },
+    [],
+  );
+  playBookRef.current = playBook;
 
   const setRate = useCallback((rate: number) => {
     setPlaybackRate(rate);

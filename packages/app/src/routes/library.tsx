@@ -21,7 +21,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
 import { getDownloadedBooks } from "../lib/opfs";
-import { PROGRESS_CHANGE_EVENT, getAllProgress } from "../lib/progress-store";
+import {
+  PROGRESS_CHANGE_EVENT,
+  getAllProgress,
+  getProgress,
+} from "../lib/progress-store";
 import { updateSearchIndex } from "../lib/search";
 
 export type LibrarySortOption =
@@ -137,12 +141,17 @@ export function LibraryPage() {
       }
     }
 
-    // 3. Live active playback state in player (highest precedence)
+    // 3. Live active playback state in player (only override if actively playing or currentTime > 0)
     if (currentBook) {
+      const existing = map.get(currentBook.id);
+      const effectiveTime = currentTime > 0 ? currentTime : (existing?.currentTime ?? 0);
+      const effectiveDur = duration || existing?.duration || currentBook.durationSeconds || 0;
+      const effectiveUpdated = currentTime > 0 ? Date.now() : (existing?.updatedAt ?? Date.now());
+
       map.set(currentBook.id, {
-        currentTime,
-        duration: duration || currentBook.durationSeconds || 0,
-        updatedAt: Date.now(),
+        currentTime: effectiveTime,
+        duration: effectiveDur,
+        updatedAt: effectiveUpdated,
       });
     }
 
@@ -356,8 +365,13 @@ export function LibraryPage() {
                     resume();
                   }
                 } else {
-                  const saved = bookProgressMap.get(continueBook.id);
-                  playBook(continueBook, saved?.currentTime ?? 0);
+                  const entry = bookProgressMap.get(continueBook.id);
+                  const local = getProgress(continueBook.id);
+                  const resumePos =
+                    entry?.currentTime && entry.currentTime > 0
+                      ? entry.currentTime
+                      : (local?.position ?? 0);
+                  playBook(continueBook, resumePos);
                 }
               }}
               className="w-full md:w-auto px-5 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center justify-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shrink-0 shadow-sm"

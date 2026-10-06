@@ -15,8 +15,16 @@ import { getBookCoverUrl } from "../lib/covers";
 
 export function BookDetailPage() {
   const { id } = useParams({ strict: false });
-  const { playBook, currentBook, isPlaying, seekTo, getSavedProgress, resetProgress, currentTime } =
-    useAudio();
+  const {
+    playBook,
+    currentBook,
+    isPlaying,
+    seekTo,
+    resume,
+    getSavedProgress,
+    resetProgress,
+    currentTime,
+  } = useAudio();
   const [showStartOverModal, setShowStartOverModal] = useState(false);
 
   // Close modal on Escape
@@ -79,6 +87,9 @@ export function BookDetailPage() {
     if (!book) return;
     if (currentBook?.id === book.id) {
       seekTo(activePosition);
+      if (!isPlaying) {
+        resume();
+      }
     } else {
       playBook(book, activePosition, chapters.length > 0 ? chapters : undefined);
     }
