@@ -18,6 +18,14 @@ The complete technical architecture, data model, performance budget, security th
 ### 1. Audio Player and Web Audio DSP Engine
 * **Dual-Engine Audio Transport**: Hybrid pipeline pairing an HTML5 `HTMLMediaElement` for smooth stream buffering with a Web Audio API audio graph for low-latency digital signal processing.
 * **Speculative Zero-Latency Pre-Warming**: Pre-warms audio streams on card hover, focus, and pointer down events, achieving sub-100ms Time-to-First-Audio (TTFA).
+* **Smart Resume Rewind**: Adaptive context rewind upon resuming audio after an interruption or pause:
+  * Resumed within 30 seconds: 0 seconds (seamless resume).
+  * Paused 30 seconds to 5 minutes: 5 seconds rewind.
+  * Paused 5 minutes to 30 minutes: 10 seconds rewind.
+  * Paused 30 minutes to 3 hours: 15 seconds rewind.
+  * Paused 3 hours to 24 hours: 20 seconds rewind.
+  * Paused over 24 hours: 25 seconds rewind.
+  * Toggable on demand directly in the full player view.
 * **Smart Speed (Silence Trimming)**: Client-side `AudioWorkletNode` executing rolling-window RMS energy calculations. Detects non-vocal pauses below -42 dB and accelerates playback without pitch distortion or clipping speech.
 * **Voice Boost Parametric Equalizer**: 3-band speech intelligibility biquad filter consisting of an 85 Hz high-pass rumble filter, a 2.2 kHz dialogue presence lift, and a 7.5 kHz sibilance taming notch.
 * **Loudness Normalization and Compression**: Real-time `DynamicsCompressorNode` enforcing a consistent -16 LUFS broadcast target to smooth abrupt volume variances between different narrators and productions.
@@ -56,7 +64,9 @@ The complete technical architecture, data model, performance budget, security th
 
 ### 5. Library Discovery, Shelves and Organization
 * **Google Drive Cold Vault**: Secure primary storage in Google Drive with hierarchical traversal supporting single-file chaptered M4B files, multi-track MP3 folders, and nested directory layouts.
+* **Google Drive Push Notification Webhooks**: Webhook endpoint (`/api/webhooks/drive`) supporting the Google Drive `changes.watch` protocol. Automatically triggers instant incremental scans upon file additions or modifications without waiting for scheduled crons.
 * **Heuristic Metadata Extraction**: Automatic tokenizer parsing author names, book titles, series name, volume numbers, release years, and narrator tags directly from folder and file naming structures.
+* **Dynamic Author Metadata and Portraits**: Automated author portrait ingestion resolving via local Drive image assets, Open Library Authors API, and verified literary profiles. Dedicated Author catalog and profile views at `/authors`.
 * **Multi-Tier Cover Art Cascade**: Priority extraction from embedded `covr` / `APIC` binary tags -> local `cover.jpg` / `folder.png` -> Open Library Covers API -> Google Books API -> client-side procedural gradient.
 * **1:1 High-Resolution Square Artwork Presentation**: Uniform 1:1 aspect ratio layout with zero-cutoff fit and ambient background reflection across all views.
 * **Dynamic Smart Shelves**:
@@ -73,10 +83,12 @@ The complete technical architecture, data model, performance budget, security th
 * **Fuzzy Typo Tolerance and Prefix Matching**: Resilient search matching queries with spelling errors or partial word stems.
 * **Global Command Palette (`Cmd+K` / `Ctrl+K`)**: Keyboard-driven modal with live query execution latency tracking, arrow-key navigation, and instant play triggering.
 
-### 7. Bookmarks, Notes and Annotations
+### 7. Notebook, Annotations and Content Tools
 * **Single-Tap Bookmarking**: Creates instant timestamped bookmarks capturing exact playback offset, active chapter, and creation date.
-* **Note-Taking Drawer**: Slide-over drawer to compose and edit personal annotations associated with specific audiobook passages.
-* **Dedicated REST API**: Backed by `/api/bookmarks` with input sanitization, user isolation, and atomic persistence in Cloudflare D1.
+* **Notebook Timeline (`/bookmarks`, `/notebook`)**: Consolidated timeline across the entire audiobook library featuring live search, book covers, audio jump links, and inline note editing.
+* **Markdown Annotation Export**: One-click download of all highlights and notes formatted in clean Markdown (`/api/bookmarks/export/markdown`), grouped hierarchically by book and chapter.
+* **High-Resolution Quote Card Generator**: Built-in HTML5 Canvas generator rendering 1200x675 exportable PNG quote cards with typographic styling and customizable aesthetic themes (`editorial-dark`, `sober-minimal`, `warm-paper`).
+* **Dedicated REST API**: Backed by `/api/bookmarks` and `/api/bookmarks/:id` with input sanitization, user isolation, and atomic persistence in Cloudflare D1.
 
 ### 8. Real-Time Multi-Device Sync and Social Presence
 * **Cloudflare Durable Objects (`SyncRoom`)**: Stateful, hibernatable WebSocket connections maintaining real-time listener state across browser tabs, smartphones, and desktop computers.
@@ -91,9 +103,12 @@ The complete technical architecture, data model, performance budget, security th
 * **Storage Management Dashboard (`/offline`)**: Detailed client storage meter displaying total device quota, consumed bytes per audiobook, and one-tap chapter/book eviction.
 * **PWA Standalone App**: Installable Progressive Web App with standalone window display, custom theme colors, and offline app shell caching.
 
-### 10. Listening Analytics and Engagement
+### 10. Listening Analytics and Community Metrics
 * **Consecutive Day Listening Streaks**: Automated daily streak counter tracking active listening consistency.
 * **GitHub-Style Activity Heatmap**: Interactive 365-day contribution grid displaying daily listening engagement and duration on the `/analytics` route.
+* **Weekly Reading Velocity**: Computes active listening time over the past 7 days with trend analysis.
+* **Playback Pace Analysis**: Calculates weighted average playback rates across completed listening sessions.
+* **Peak Listening Hour**: Identifies listener peak engagement time windows throughout the 24-hour cycle.
 * **Session Metrics**: Tracks total hours listened, top authors, and completion percentages.
 
 ### 11. Audiobookshelf (ABS) API Compatibility
@@ -144,24 +159,24 @@ audioneko/
 ├── packages/
 │   ├── app/                 # TanStack React 19 Single Page App
 │   │   ├── src/
-│   │   │   ├── components/  # Player, Library, Shelf, Social, and Admin components
+│   │   │   ├── components/  # Player, Library, Content, Shelf, Social, and Admin
 │   │   │   ├── context/     # Audio player context and Web Audio bridge
-│   │   │   ├── lib/         # Audio engine, OPFS storage, search, sleep timer
-│   │   │   └── routes/      # Declarative TanStack Router views
+│   │   │   ├── lib/         # Audio engine, OPFS storage, search, sleep timer, smart rewind
+│   │   │   └── routes/      # Declarative TanStack Router views (Timeline, Shelves, Books)
 │   │   └── index.html
 │   ├── server/              # Hono application deployed to Cloudflare Workers
 │   │   ├── src/
 │   │   │   ├── abs/         # Audiobookshelf API compatibility layer
-│   │   │   ├── admin/       # Control plane and library scan routes
+│   │   │   ├── admin/       # Control plane, watch channels, and scan routes
 │   │   │   ├── auth/        # Better Auth setup, invites, middleware
 │   │   │   ├── db/          # D1 schema and database clients
-│   │   │   ├── drive/       # Google Drive token manager, scanner, and stream proxy
+│   │   │   ├── drive/       # Drive auth, author enricher, webhooks, stream proxy
 │   │   │   ├── shelf/       # Edge active shelf queue and LRU maintenance
 │   │   │   ├── social/      # Listening analytics, presence, and listen-along rooms
 │   │   │   ├── sync/        # Real-time multi-device playback synchronization
-│   │   │   └── index.ts     # Edge router, cron handler, and asset fallback
+│   │   │   └── index.ts     # Edge router, webhook handler, cron handler, asset fallback
 │   │   └── wrangler.jsonc   # Cloudflare Workers configuration and resource bindings
-│   └── shared/              # Common data models, constants, and utilities
+│   └── shared/              # Common data models, contracts, and utilities
 ├── package.json             # Turborepo and pnpm root workspace configuration
 ├── biome.json               # Code formatting and linting rules
 └── tsconfig.base.json       # Monorepo TypeScript base configuration
