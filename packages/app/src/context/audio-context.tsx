@@ -20,7 +20,13 @@ import {
   setMediaSessionPositionState,
 } from "../lib/media-session";
 import { pipManager } from "../lib/pip-visualizer";
-import { clearProgress, getProgress, progressTracker, setProgress } from "../lib/progress-store";
+import {
+  PROGRESS_CHANGE_EVENT,
+  clearProgress,
+  getProgress,
+  progressTracker,
+  setProgress,
+} from "../lib/progress-store";
 import { SleepTimer, type SleepTimerPreset, type SleepTimerState } from "../lib/sleep-timer";
 import {
   computeSmartRewind,
@@ -549,15 +555,36 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     syncClientRef.current = client;
     const unsubConn = client.onConnectionChange(setIsSyncConnected);
     const unsubRemote = client.onRemoteProgress((record) => {
+      // 1. Save remote progress into localStorage so library/shelves know immediately
+      const existing = getProgress(record.bookId);
+      if (!existing || (record.updatedAt || 0) >= (existing.updatedAt || 0)) {
+        setProgress(record.bookId, record.currentTime, record.duration, record.updatedAt);
+      }
+      // 2. Dispatch event for UI updates across the app
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(PROGRESS_CHANGE_EVENT, { detail: record }));
+      }
       if (currentBookRef.current?.id === record.bookId) {
         const timeDiff = Math.abs(record.currentTime - currentTimeRef.current);
         if (timeDiff > 5) setRemoteResumePrompt(record);
+      }
+    });
+    const unsubInitial = client.onInitialState((books) => {
+      for (const b of books) {
+        const existing = getProgress(b.bookId);
+        if (!existing || (b.updatedAt || 0) > (existing.updatedAt || 0)) {
+          setProgress(b.bookId, b.currentTime, b.duration, b.updatedAt);
+        }
+      }
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(PROGRESS_CHANGE_EVENT));
       }
     });
     client.connect();
     return () => {
       unsubConn();
       unsubRemote();
+      unsubInitial();
       client.disconnect();
       syncClientRef.current = null;
     };
@@ -643,6 +670,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const prewarmBook = useCallback((book: Book, initialPosition?: number) => {
     const audio = audioRef.current;
     if (!audio) return;
+    // CRITICAL: Never interrupt or hijack active playback
+    if (isPlayingRef.current) return;
+    // If another book is already loaded in player, do not hijack it
+    if (currentBookRef.current && currentBookRef.current.id !== book.id) return;
     if (
       currentBookRef.current?.id === book.id &&
       audio.src &&

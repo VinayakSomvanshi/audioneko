@@ -1,3 +1,4 @@
+import { createHlc, type BookProgressRecord } from "@audioneko/shared";
 import { and, asc, desc, eq, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
@@ -583,7 +584,43 @@ app.get("/api/sync/state", requireAuth, async (c) => {
   const stub = c.env.SYNC_ROOM.get(doId);
 
   const res = await stub.fetch(new Request("https://sync/state"));
-  return c.newResponse(res.body, res.status as 200, Object.fromEntries(res.headers.entries()));
+  const doData = (await res.json().catch(() => ({ books: [] }))) as {
+    books?: BookProgressRecord[];
+  };
+
+  // Reconcile with D1 progress table to ensure all mobile/ABS and external sessions are included
+  const db = createDb(c.env.DB);
+  const d1Rows = await db.query.progress.findMany({
+    where: eq(schema.progress.userId, user.id),
+  });
+
+  const mergedMap = new Map<string, BookProgressRecord>();
+  for (const b of doData.books || []) {
+    mergedMap.set(b.bookId, b);
+  }
+
+  for (const row of d1Rows) {
+    const existing = mergedMap.get(row.bookId);
+    const rowUpdatedAtMs = (row.updatedAt || 0) * 1000;
+    if (!existing || rowUpdatedAtMs > (existing.updatedAt || 0)) {
+      mergedMap.set(row.bookId, {
+        bookId: row.bookId,
+        currentTime: row.currentTimeSeconds || 0,
+        duration: row.durationSeconds || existing?.duration || 0,
+        playbackRate: existing?.playbackRate || 1.0,
+        isPlaying: false,
+        hlc: existing?.hlc || createHlc("mobile_abs", rowUpdatedAtMs),
+        deviceId: existing?.deviceId || "mobile_abs",
+        deviceName: existing?.deviceName || "Mobile / Audiobookshelf",
+        updatedAt: rowUpdatedAtMs,
+      });
+    }
+  }
+
+  const books = Array.from(mergedMap.values()).sort(
+    (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0),
+  );
+  return c.json({ books });
 });
 
 // REST endpoint to delete / reset progress for a book

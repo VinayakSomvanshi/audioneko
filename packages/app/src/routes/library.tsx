@@ -5,7 +5,7 @@ import {
   isPlaybackCompleted,
   isPlaybackInProgress,
 } from "@audioneko/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowUpDown,
@@ -36,6 +36,7 @@ export type LibrarySortOption =
   | "year-asc";
 
 export function LibraryPage() {
+  const queryClient = useQueryClient();
   const { playBook, prewarmBook, pause, resume, currentBook, isPlaying, currentTime, duration } =
     useAudio();
   const [activeFilter, setActiveFilter] = useState<"all" | "in-progress" | "downloaded">("all");
@@ -55,12 +56,15 @@ export function LibraryPage() {
     }
   };
 
-  // Re-render when local progress changes
+  // Re-render and refetch when local or remote progress changes
   useEffect(() => {
-    const handleProgressChange = () => setProgressTick((t) => t + 1);
+    const handleProgressChange = () => {
+      setProgressTick((t) => t + 1);
+      queryClient.invalidateQueries({ queryKey: ["syncState"] });
+    };
     window.addEventListener(PROGRESS_CHANGE_EVENT, handleProgressChange);
     return () => window.removeEventListener(PROGRESS_CHANGE_EVENT, handleProgressChange);
-  }, []);
+  }, [queryClient]);
 
   const { data: booksData, isLoading } = useQuery({
     queryKey: ["books"],
@@ -83,7 +87,9 @@ export function LibraryPage() {
         return { books: [] as BookProgressRecord[] };
       }
     },
-    staleTime: 10_000,
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
+    refetchInterval: 15_000,
   });
 
   const { data: downloadedBooks = [] } = useQuery({
@@ -139,12 +145,14 @@ export function LibraryPage() {
       }
     }
 
-    // 3. Live active playback state in player (only override if actively playing or currentTime > 0)
+    // 3. Live active playback state in player
     if (currentBook) {
       const existing = map.get(currentBook.id);
       const effectiveTime = currentTime > 0 ? currentTime : (existing?.currentTime ?? 0);
       const effectiveDur = duration || existing?.duration || currentBook.durationSeconds || 0;
-      const effectiveUpdated = currentTime > 0 ? Date.now() : (existing?.updatedAt ?? Date.now());
+      // CRITICAL: Only set updatedAt to Date.now() if actively playing!
+      // If paused, keep existing updatedAt so we don't clobber newer listening on other devices!
+      const effectiveUpdated = isPlaying ? Date.now() : (existing?.updatedAt ?? 0);
 
       map.set(currentBook.id, {
         currentTime: effectiveTime,
@@ -154,7 +162,7 @@ export function LibraryPage() {
     }
 
     return map;
-  }, [syncData?.books, currentBook, currentTime, duration]);
+  }, [syncData?.books, currentBook, currentTime, duration, isPlaying]);
 
   // In-progress book IDs: started (currentTime > 0) and not completed (with 30s / 98% credit headroom)
   const inProgressIds = useMemo(() => {
@@ -169,24 +177,33 @@ export function LibraryPage() {
 
   // Continue listening hero: the last audiobook the user started playing that is not yet completed
   const continueBook = useMemo(() => {
-    // 1. If current loaded book is active/playing and not completed:
-    if (currentBook) {
-      const activeEntry = bookProgressMap.get(currentBook.id);
-      const curT = activeEntry?.currentTime ?? currentTime;
-      const curDur = activeEntry?.duration ?? duration ?? currentBook.durationSeconds;
-      if (isPlaybackInProgress(curT, curDur) || isPlaying) {
-        return currentBook;
-      }
+    // 1. If actively playing right now, that is the continue book:
+    if (currentBook && isPlaying) {
+      return currentBook;
     }
 
-    // 2. Otherwise find the uncompleted started book with the latest updatedAt timestamp:
+    // 2. Otherwise find the uncompleted started book with the latest updatedAt timestamp across all devices:
     const candidates = Array.from(bookProgressMap.entries())
       .filter(([_, entry]) => isPlaybackInProgress(entry.currentTime, entry.duration))
       .sort((a, b) => b[1].updatedAt - a[1].updatedAt);
 
     const latestId = candidates[0]?.[0];
-    if (!latestId) return null;
-    return booksList.find((b) => b.id === latestId) ?? null;
+    if (latestId) {
+      const match = booksList.find((b) => b.id === latestId);
+      if (match) return match;
+    }
+
+    // 3. Fallback to loaded currentBook if in progress
+    if (currentBook) {
+      const activeEntry = bookProgressMap.get(currentBook.id);
+      const curT = activeEntry?.currentTime ?? currentTime;
+      const curDur = activeEntry?.duration ?? duration ?? currentBook.durationSeconds;
+      if (isPlaybackInProgress(curT, curDur)) {
+        return currentBook;
+      }
+    }
+
+    return null;
   }, [currentBook, currentTime, duration, isPlaying, bookProgressMap, booksList]);
 
   // Distinct narrators present in the library
@@ -558,9 +575,6 @@ export function LibraryPage() {
                 key={book.id}
                 to="/book/$id"
                 params={{ id: book.id }}
-                onMouseEnter={() => prewarmBook(book, inProgress ? pos : 0)}
-                onTouchStart={() => prewarmBook(book, inProgress ? pos : 0)}
-                onFocus={() => prewarmBook(book, inProgress ? pos : 0)}
                 className="group surface-card overflow-hidden flex flex-col transition-all hover:border-text-subtle cursor-pointer block select-none"
               >
                 <div className="aspect-square bg-surface relative flex items-center justify-center border-b border-border overflow-hidden">

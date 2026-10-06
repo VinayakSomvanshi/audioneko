@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { BookProgressRecord, SyncClientMessage, SyncServerMessage } from "@audioneko/shared";
-import { packHlc, resolveProgressConflict, unpackHlc } from "@audioneko/shared";
+import { createHlc, packHlc, resolveProgressConflict, tickHlc, unpackHlc } from "@audioneko/shared";
 import type { Env } from "../types";
 
 interface ProgressRow extends Record<string, SqlStorageValue> {
@@ -19,7 +19,7 @@ interface ProgressRow extends Record<string, SqlStorageValue> {
  * SyncRoom Durable Object
  *
  * Provides single-user, multi-device real-time playback synchronization.
- * Backed by SQLite on Cloudflare Durable Objects (zero-credit-card permanent free tier).
+ * Backed by SQLite on Cloudflare Durable Objects.
  * Implements hibernatable WebSockets for sub-10ms state sync across phone, tablet, and desktop.
  */
 export class SyncRoom extends DurableObject<Env> {
@@ -185,10 +185,56 @@ export class SyncRoom extends DurableObject<Env> {
     }
 
     if (url.pathname.startsWith("/progress/")) {
-      const bookId = url.pathname.slice("/progress/".length);
+      const bookId = decodeURIComponent(url.pathname.slice("/progress/".length));
       if (request.method === "DELETE") {
         this.deleteProgress(bookId);
         return Response.json({ success: true, deleted: bookId });
+      }
+      if (request.method === "POST" || request.method === "PUT") {
+        const body = (await request.json().catch(() => ({}))) as {
+          currentTime?: number;
+          duration?: number;
+          playbackRate?: number;
+          isPlaying?: boolean;
+          deviceId?: string;
+          deviceName?: string;
+          updatedAt?: number;
+        };
+
+        const existing = this.getProgress(bookId);
+        const currentTime = typeof body.currentTime === "number" ? body.currentTime : 0;
+        const duration =
+          typeof body.duration === "number" ? body.duration : (existing?.duration ?? 0);
+        const updatedAt =
+          typeof body.updatedAt === "number" && body.updatedAt > 0 ? body.updatedAt : Date.now();
+
+        const record: BookProgressRecord = {
+          bookId,
+          currentTime,
+          duration,
+          playbackRate: body.playbackRate ?? 1.0,
+          isPlaying: Boolean(body.isPlaying),
+          hlc: tickHlc(existing?.hlc ?? createHlc("server_sync")),
+          deviceId: body.deviceId ?? "mobile_abs",
+          deviceName: body.deviceName ?? "Audiobookshelf / Mobile",
+          updatedAt,
+        };
+
+        this.saveProgress(record);
+
+        // Broadcast progress update to all active WebSockets
+        const broadcastMsg: SyncServerMessage = {
+          type: "PROGRESS_BROADCAST",
+          ...record,
+        };
+        const broadcastPayload = JSON.stringify(broadcastMsg);
+        for (const socket of this.ctx.getWebSockets()) {
+          try {
+            socket.send(broadcastPayload);
+          } catch {}
+        }
+
+        return Response.json({ success: true, record });
       }
       const record = this.getProgress(bookId);
       return Response.json({ record });

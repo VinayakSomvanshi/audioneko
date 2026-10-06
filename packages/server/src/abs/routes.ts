@@ -600,6 +600,7 @@ async function handleUpdateProgress(
     typeof body.progress === "number" ? body.progress : duration > 0 ? currentTime / duration : 0;
 
   const isFinished = body.isFinished ?? existing?.isFinished ?? false;
+  const finalId = existing ? existing.id : `prog_${crypto.randomUUID()}`;
 
   if (existing) {
     await db
@@ -612,9 +613,10 @@ async function handleUpdateProgress(
         updatedAt: now,
       })
       .where(eq(progress.id, existing.id));
-
-    return mapProgressToAbs({
-      id: existing.id,
+  } else {
+    await db.insert(progress).values({
+      id: finalId,
+      userId,
       bookId,
       currentTimeSeconds: currentTime,
       durationSeconds: duration,
@@ -624,20 +626,31 @@ async function handleUpdateProgress(
     });
   }
 
-  const newId = `prog_${crypto.randomUUID()}`;
-  await db.insert(progress).values({
-    id: newId,
-    userId,
-    bookId,
-    currentTimeSeconds: currentTime,
-    durationSeconds: duration,
-    progressFraction,
-    isFinished,
-    updatedAt: now,
-  });
+  // Cross-device synchronization: push progress into SyncRoom Durable Object
+  if (env.SYNC_ROOM) {
+    try {
+      const doId = env.SYNC_ROOM.idFromName(userId);
+      const stub = env.SYNC_ROOM.get(doId);
+      await stub.fetch(
+        new Request(`https://sync/progress/${encodeURIComponent(bookId)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            currentTime,
+            duration,
+            updatedAt: now * 1000,
+            deviceName: "Mobile / Audiobookshelf Client",
+            deviceId: "mobile_abs",
+          }),
+        }),
+      );
+    } catch (err) {
+      console.error("[abs] Failed to notify SyncRoom of progress update:", err);
+    }
+  }
 
   return mapProgressToAbs({
-    id: newId,
+    id: finalId,
     bookId,
     currentTimeSeconds: currentTime,
     durationSeconds: duration,

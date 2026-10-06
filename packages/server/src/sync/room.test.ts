@@ -270,4 +270,37 @@ describe("SyncRoom Durable Object with SQLite & Hibernatable WebSockets", () => 
     expect(current?.currentTime).toBe(3000);
     expect(current?.isPlaying).toBe(false); // Playing state correctly updated to false
   });
+
+  it("handles external REST POST /progress/:bookId and broadcasts to active WebSockets", async () => {
+    const ws = new MockWebSocket();
+    mockCtx.acceptWebSocket(ws as unknown as WebSocket);
+
+    const postReq = new Request("https://sync/progress/book-rest-sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        currentTime: 2450,
+        duration: 9000,
+        updatedAt: 1234567890,
+        deviceName: "Mobile Phone",
+        deviceId: "mobile-id",
+      }),
+    });
+
+    const res = await room.fetch(postReq);
+    expect(res.status).toBe(200);
+
+    const record = room.getProgress("book-rest-sync");
+    expect(record?.currentTime).toBe(2450);
+    expect(record?.duration).toBe(9000);
+    expect(record?.deviceName).toBe("Mobile Phone");
+
+    // WebSocket received broadcast
+    const broadcast = ws.getLastJson<SyncServerMessage>();
+    expect(broadcast?.type).toBe("PROGRESS_BROADCAST");
+    if (broadcast && broadcast.type === "PROGRESS_BROADCAST") {
+      expect(broadcast.bookId).toBe("book-rest-sync");
+      expect(broadcast.currentTime).toBe(2450);
+    }
+  });
 });

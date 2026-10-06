@@ -56,9 +56,19 @@ export function getProgress(bookId: string): ProgressEntry | null {
 }
 
 /** Persists the current playback position for a book. */
-export function setProgress(bookId: string, position: number, duration: number): void {
+export function setProgress(
+  bookId: string,
+  position: number,
+  duration: number,
+  updatedAt?: number,
+): void {
   const map = load();
-  map[bookId] = { bookId, position, duration, updatedAt: Date.now() };
+  map[bookId] = {
+    bookId,
+    position,
+    duration,
+    updatedAt: typeof updatedAt === "number" && updatedAt > 0 ? updatedAt : Date.now(),
+  };
 
   // Prune oldest entries if over limit
   const entries = Object.values(map).sort((a, b) => b.updatedAt - a.updatedAt);
