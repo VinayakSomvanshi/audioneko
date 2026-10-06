@@ -13,12 +13,12 @@ describe("Audio Stream Engine & Range Proxy", () => {
     expect(midRange).toEqual({ start: 5000000, end: 5001023 });
   });
 
-  it("caps open-ended ranges to 2 MB streaming chunk boundaries", () => {
+  it("streams open-ended ranges to end of file per RFC 7233 without buffer fragmentation", () => {
     const range = parseRangeHeader("bytes=0-", TOTAL_SIZE);
-    expect(range).toEqual({ start: 0, end: CHUNK_SIZE - 1 });
+    expect(range).toEqual({ start: 0, end: TOTAL_SIZE - 1 });
 
     const midOpenRange = parseRangeHeader("bytes=2097152-", TOTAL_SIZE);
-    expect(midOpenRange).toEqual({ start: 2097152, end: 2097152 + CHUNK_SIZE - 1 });
+    expect(midOpenRange).toEqual({ start: 2097152, end: TOTAL_SIZE - 1 });
   });
 
   it("handles suffix ranges (bytes=-X)", () => {
@@ -26,12 +26,12 @@ describe("Audio Stream Engine & Range Proxy", () => {
     expect(suffix).toEqual({ start: TOTAL_SIZE - 1000, end: TOTAL_SIZE - 1 });
   });
 
-  it("falls back to initial 2 MB chunk when Range header is missing or non-range", () => {
+  it("falls back to full file stream when Range header is missing or non-range", () => {
     const noHeader = parseRangeHeader(null, TOTAL_SIZE);
-    expect(noHeader).toEqual({ start: 0, end: CHUNK_SIZE - 1 });
+    expect(noHeader).toEqual({ start: 0, end: TOTAL_SIZE - 1 });
 
     const invalidHeader = parseRangeHeader("invalid-range", TOTAL_SIZE);
-    expect(invalidHeader).toEqual({ start: 0, end: CHUNK_SIZE - 1 });
+    expect(invalidHeader).toEqual({ start: 0, end: TOTAL_SIZE - 1 });
   });
 
   it("returns null for unsatisfiable or inverted ranges per RFC 7233", () => {
@@ -171,9 +171,8 @@ describe("Audio Stream Engine & Range Proxy", () => {
     expect(response.headers.get("Accept-Ranges")).toBe("bytes");
   });
 
-  it("clamps open-ended stream requests to 2 MB chunk boundary with exact Content-Range and Content-Length", async () => {
-    const mockChunkBytes = new Uint8Array(2 * 1024 * 1024);
-    mockChunkBytes.fill(42);
+  it("streams directly from Google Drive API with piped stream and zero-latency headers", async () => {
+    const mockAudioBytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
 
     const mockEnv = {
       GOOGLE_SA_KEY: JSON.stringify({ client_email: "test@sa.com", private_key: "dummy" }),
@@ -193,15 +192,26 @@ describe("Audio Stream Engine & Range Proxy", () => {
     } as unknown as Env;
 
     const mockFetch = vi.fn().mockResolvedValue(
-      new Response(mockChunkBytes.buffer, {
-        status: 206,
-        headers: { "Content-Range": `bytes 0-${CHUNK_SIZE - 1}/${50 * 1024 * 1024}` },
-      }),
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(mockAudioBytes);
+            controller.close();
+          },
+        }),
+        {
+          status: 206,
+          headers: {
+            "Content-Range": `bytes 0-7/${50 * 1024 * 1024}`,
+            "Content-Length": "8",
+          },
+        },
+      ),
     );
 
     const request = new Request("https://audioneko.app/api/stream/file_123", {
       method: "GET",
-      headers: { Range: "bytes=0-10000000" }, // Request 10 MB
+      headers: { Range: "bytes=0-7" },
     });
 
     const response = await handleAudioStreamRequest(
@@ -212,12 +222,10 @@ describe("Audio Stream Engine & Range Proxy", () => {
     );
 
     expect(response.status).toBe(206);
-    // Must be clamped to the 2 MB chunk boundary (2097151)
-    expect(response.headers.get("Content-Range")).toBe(
-      `bytes 0-${CHUNK_SIZE - 1}/${50 * 1024 * 1024}`,
-    );
-    expect(response.headers.get("Content-Length")).toBe(CHUNK_SIZE.toString());
-    const body = await response.arrayBuffer();
-    expect(body.byteLength).toBe(CHUNK_SIZE);
+    expect(response.headers.get("Content-Range")).toBe(`bytes 0-7/${50 * 1024 * 1024}`);
+    expect(response.headers.get("Content-Length")).toBe("8");
+    expect(response.headers.get("X-Audioneko-Tier")).toBe("Google-Drive-Direct-Stream");
+    const body = new Uint8Array(await response.arrayBuffer());
+    expect(body).toEqual(mockAudioBytes);
   });
 });

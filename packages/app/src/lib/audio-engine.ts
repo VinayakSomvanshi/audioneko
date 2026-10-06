@@ -55,10 +55,10 @@ export class AudioEngine {
       this.sourceNode = this.ctx.createMediaElementSource(audioElement);
 
       // 1. Voice Boost EQ Stage
-      // Band A: 85 Hz Highpass Filter (kills mic plosives & low-frequency desk rumble)
+      // Band A: 85 Hz Highpass Filter (kills mic plosives & low-frequency desk rumble when voice boost is on)
       this.highpassFilter = this.ctx.createBiquadFilter();
       this.highpassFilter.type = "highpass";
-      this.highpassFilter.frequency.value = 85;
+      this.highpassFilter.frequency.value = this.settings.voiceBoost ? 85 : 10;
       this.highpassFilter.Q.value = Math.SQRT1_2;
 
       // Band B: 2.2 kHz Peaking Filter (lift speech presence & intelligibility)
@@ -75,7 +75,7 @@ export class AudioEngine {
       this.sibilanceFilter.Q.value = 1.0;
       this.sibilanceFilter.gain.value = this.settings.voiceBoost ? -2.5 : 0;
 
-      // 2. Loudness Normalization Dynamics Compressor Stage (-16 LUFS target)
+      // 2. Loudness Normalization Dynamics Compressor Stage
       this.compressorNode = this.ctx.createDynamicsCompressor();
       this.applyCompressorSettings();
 
@@ -136,10 +136,18 @@ export class AudioEngine {
       const now = this.ctx.currentTime;
       this.gainNode.gain.cancelScheduledValues(now);
       this.gainNode.gain.setValueAtTime(0.001, now);
-      this.gainNode.gain.linearRampToValueAtTime(this.currentVolume, now + 0.04);
     }
 
-    await audioElement.play();
+    try {
+      await audioElement.play();
+    } finally {
+      if (this.gainNode && this.ctx) {
+        const now = this.ctx.currentTime;
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(0.001, now);
+        this.gainNode.gain.linearRampToValueAtTime(this.currentVolume, now + 0.04);
+      }
+    }
   }
 
   /**
@@ -180,8 +188,9 @@ export class AudioEngine {
    */
   public setVoiceBoost(enabled: boolean): void {
     this.settings.voiceBoost = enabled;
-    if (this.voiceBoostFilter && this.sibilanceFilter && this.ctx) {
+    if (this.voiceBoostFilter && this.sibilanceFilter && this.highpassFilter && this.ctx) {
       const now = this.ctx.currentTime;
+      this.highpassFilter.frequency.linearRampToValueAtTime(enabled ? 85 : 10, now + 0.02);
       this.voiceBoostFilter.gain.linearRampToValueAtTime(enabled ? 3.5 : 0, now + 0.02);
       this.sibilanceFilter.gain.linearRampToValueAtTime(enabled ? -2.5 : 0, now + 0.02);
     }
@@ -236,13 +245,13 @@ export class AudioEngine {
     const now = this.ctx.currentTime;
 
     if (this.settings.loudnessNormalization) {
-      this.compressorNode.threshold.linearRampToValueAtTime(-24, now + 0.02);
+      this.compressorNode.threshold.linearRampToValueAtTime(-18, now + 0.02);
       this.compressorNode.knee.linearRampToValueAtTime(12, now + 0.02);
-      this.compressorNode.ratio.linearRampToValueAtTime(4, now + 0.02);
-      this.compressorNode.attack.linearRampToValueAtTime(0.003, now + 0.02);
-      this.compressorNode.release.linearRampToValueAtTime(0.25, now + 0.02);
+      this.compressorNode.ratio.linearRampToValueAtTime(3, now + 0.02);
+      this.compressorNode.attack.linearRampToValueAtTime(0.02, now + 0.02);
+      this.compressorNode.release.linearRampToValueAtTime(0.3, now + 0.02);
     } else {
-      // Bypass compression
+      // Bypass compression - linear passthrough
       this.compressorNode.threshold.linearRampToValueAtTime(0, now + 0.02);
       this.compressorNode.ratio.linearRampToValueAtTime(1, now + 0.02);
     }
