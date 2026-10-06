@@ -4,7 +4,6 @@ import {
   Check,
   Copy,
   FolderSync,
-  HardDrive,
   KeyRound,
   Library,
   Loader2,
@@ -44,10 +43,6 @@ interface AdminStats {
   seriesCount: number;
   usersCount: number;
   invitesCount: number;
-  activeShelf?: {
-    totalActiveBooks?: number;
-    totalSizeBytes?: number;
-  } | null;
 }
 
 interface ScanResult {
@@ -59,7 +54,7 @@ interface ScanResult {
 
 export function AdminDashboardPage() {
   const { user, isAdmin, isLoading: authLoading } = useCurrentUser();
-  const [activeTab, setActiveTab] = useState<"scanner" | "invites" | "users" | "system">("scanner");
+  const [activeTab, setActiveTab] = useState<"scanner" | "invites" | "users">("scanner");
 
   // Stats state
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -86,10 +81,6 @@ export function AdminDashboardPage() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
-
-  // Eviction state
-  const [evicting, setEvicting] = useState(false);
-  const [evictMessage, setEvictMessage] = useState<string | null>(null);
 
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
@@ -245,24 +236,6 @@ export function AdminDashboardPage() {
       console.error("Failed to update user role:", err);
     } finally {
       setUpdatingUserId(null);
-    }
-  };
-
-  // Handle manual shelf cache eviction
-  const handleEvictShelf = async () => {
-    setEvicting(true);
-    setEvictMessage(null);
-    try {
-      const res = await fetch("/api/admin/shelf/evict", { method: "POST" });
-      const data = (await res.json()) as { success: boolean; evictedCount?: number };
-      if (data.success) {
-        setEvictMessage(`Evicted ${data.evictedCount ?? 0} least-recently-used books from shelf.`);
-        fetchStats();
-      }
-    } catch (err) {
-      setEvictMessage(`Eviction failed: ${String(err)}`);
-    } finally {
-      setEvicting(false);
     }
   };
 
@@ -422,19 +395,6 @@ export function AdminDashboardPage() {
         >
           <Users className="w-4 h-4" />
           <span>User Management</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("system")}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-mono border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === "system"
-              ? "border-accent text-accent font-semibold bg-accent-bg/20"
-              : "border-transparent text-muted hover:text-text hover:border-border"
-          }`}
-        >
-          <HardDrive className="w-4 h-4" />
-          <span>Shelf Cache & Maintenance</span>
         </button>
       </div>
 
@@ -826,71 +786,6 @@ export function AdminDashboardPage() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: SYSTEM & SHELF */}
-      {activeTab === "system" && (
-        <div className="space-y-6">
-          <div className="surface-card p-6 border border-border space-y-4">
-            <h3 className="text-sm font-semibold text-text flex items-center gap-2">
-              <HardDrive className="w-4 h-4 text-accent" />
-              <span>3-Tier Streaming & Active Shelf Invariants</span>
-            </h3>
-            <p className="text-xs font-mono text-muted">
-              Audiobooks streamed by listeners are promoted into the Tier 2 Active Shelf KV & Memory
-              cache. Automatic LRU eviction maintains zero egress costs.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div className="surface-card p-4 border border-border">
-                <span className="text-[11px] font-mono text-muted block">
-                  Books on Active Shelf
-                </span>
-                <span className="text-xl font-bold font-mono text-text">
-                  {stats?.activeShelf ? stats.activeShelf.totalActiveBooks : "0"}
-                </span>
-              </div>
-
-              <div className="surface-card p-4 border border-border">
-                <span className="text-[11px] font-mono text-muted block">LRU Cron Maintenance</span>
-                <span className="text-xs font-mono text-emerald-400 block mt-1 font-semibold">
-                  Scheduled every 6 hours (0 */6 * * *)
-                </span>
-              </div>
-            </div>
-
-            <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-border mt-4">
-              <div>
-                <span className="text-xs font-mono text-text font-medium block">
-                  Manual Cache Maintenance
-                </span>
-                <span className="text-[11px] font-mono text-muted block">
-                  Force clean stale chunks and least-recently-used books.
-                </span>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleEvictShelf}
-                disabled={evicting}
-                className="px-4 py-2 surface-card border border-border hover:border-text-subtle text-xs font-mono text-text flex items-center gap-2 rounded transition-colors cursor-pointer"
-              >
-                {evicting ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Trash2 className="w-3.5 h-3.5 text-accent" />
-                )}
-                <span>{evicting ? "Evicting LRU..." : "Run Cache Eviction"}</span>
-              </button>
-            </div>
-
-            {evictMessage && (
-              <div className="p-3 text-xs font-mono rounded border border-accent/40 bg-accent-bg/10 text-accent">
-                {evictMessage}
               </div>
             )}
           </div>

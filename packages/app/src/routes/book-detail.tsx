@@ -255,11 +255,6 @@ export function BookDetailPage() {
                 <span>{book.publishedYear}</span>
               </div>
             )}
-            {book.isActiveShelf && (
-              <span className="text-accent border border-accent/30 px-2 py-0.5 rounded text-[10px]">
-                Active Shelf Cached
-              </span>
-            )}
           </div>
 
           {/* ── Progress bar + Resume UI ── */}
