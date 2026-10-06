@@ -1,11 +1,10 @@
 /**
  * audioneko: Cloudflare R2 "Active Shelf" LRU Cache & Pre-Caching Engine
  *
- * Zero-Cost Architecture:
- * - R2 free tier provides 10 GB storage with zero egress fees.
+ * Edge Shelf Architecture:
  * - Active Shelf holds top active audiobooks up to an 8.5 GB high-water mark.
- * - Strictly optional: If env.R2 is undefined (user on 100% free plan without credit card),
- *   all operations cleanly no-op and audio is streamed directly from Google Drive.
+ * - Strictly optional: If env.R2 is undefined, all operations cleanly no-op
+ *   and audio is streamed directly from Google Drive.
  */
 
 import { eq, sql } from "drizzle-orm";
@@ -357,7 +356,7 @@ export interface WaitUntilContext {
 
 /**
  * Dispatches an Active Shelf pre-cache or eviction task via Cloudflare Queue
- * or falls back to background execution (ctx.waitUntil) for zero-cost operation.
+ * or falls back to background execution (ctx.waitUntil).
  */
 export async function dispatchShelfTask(
   env: Env,

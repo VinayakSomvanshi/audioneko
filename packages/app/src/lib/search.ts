@@ -1,7 +1,7 @@
 /**
  * audioneko: Instant Client-Side Search Engine
  * Powered by MiniSearch for sub-5ms prefix, fuzzy, and multi-field queries
- * with zero network latency and zero recurring server costs.
+ * with zero network latency and pure client-side evaluation.
  */
 
 import MiniSearch, { type SearchResult as MiniSearchResult } from "minisearch";

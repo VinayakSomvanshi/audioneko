@@ -12,7 +12,7 @@ import {
 } from "./active-shelf";
 
 describe("Cloudflare R2 Active Shelf LRU Cache Engine", () => {
-  it("cleanly handles R2 disabled environment (Zero-Cost Invariant)", async () => {
+  it("cleanly handles R2 disabled environment", async () => {
     const mockEnvWithoutR2 = {
       DB: {} as unknown as D1Database,
       KV: {} as unknown as KVNamespace,
@@ -417,7 +417,7 @@ describe("Cloudflare R2 Active Shelf LRU Cache Engine", () => {
     expect(qResult.method).toBe("queue");
     expect(queueSent).toHaveLength(1);
 
-    // Case 2: Zero-cost mode with ctx.waitUntil
+    // Case 2: Background mode with ctx.waitUntil
     const mockEnvWithoutQueue = {} as Env;
     const mockCtx = {
       waitUntil: vi.fn().mockImplementation((p: Promise<unknown>) => {

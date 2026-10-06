@@ -2,7 +2,7 @@
 name: audioneko
 description: >-
   Comprehensive architectural handbook, workflow runbook, design system rules,
-  and zero-cost invariants for the audioneko private audiobook streaming platform.
+  and implementation standards for the audioneko private audiobook streaming platform.
   Activate when developing, debugging, refactoring, or testing any component across
   audioneko (Cloudflare Workers, D1, Durable Objects, Google Drive API, Web Audio DSP,
   TanStack app, and sober-thoughts design system).
@@ -10,7 +10,7 @@ description: >-
 
 # audioneko Project Guide & Architectural Runbook
 
-> **audioneko** is a private, bleeding-edge, zero-recurring-cost ($0.00/mo) audiobook streaming platform for a curator and 3–10 friends. It bridges personal Google Drive storage ("Cold Vault") with the Cloudflare Edge network (Workers, D1, Durable Objects, KV) and a high-contrast obsidian PWA client.
+> **audioneko** is a private, bleeding-edge audiobook streaming platform for a curator and 3–10 friends. It bridges personal Google Drive storage ("Cold Vault") with the Cloudflare Edge network (Workers, D1, Durable Objects, KV) and a high-contrast obsidian PWA client.
 
 ---
 
@@ -18,11 +18,10 @@ description: >-
 
 Every change to this codebase must adhere strictly to these core rules:
 
-### A. Strict $0.00 / Zero Credit Card Requirement
-- **No Mandatory Payment Methods**: The app must run 100% within the permanent free tiers of Cloudflare and Google Cloud without requiring a credit card on file.
-- **R2 is Completely Optional**: Enabling Cloudflare R2 requires a credit card on file (even though the first 10 GB is free). Therefore, **R2 must never be a hard dependency**. All streaming code in [`packages/server/src/drive/stream.ts`](file:///home/vinayak/Documents/audioneko/packages/server/src/drive/stream.ts) must check `if (env.R2)` and seamlessly fall back to streaming directly from Google Drive.
-- **Cover Art Storage**: Thumbnails are stored in Cloudflare KV or D1 (both require no credit card), never solely in R2.
-- **Offline Bandwidth Protection**: Heavy offline caching is offloaded to the client device using the **Origin Private File System (OPFS)**, which uses the listener's local phone/laptop disk for free.
+### A. Lean Serverless Edge Architecture
+- **Simplified Storage**: All streaming code in [`packages/server/src/drive/stream.ts`](file:///home/vinayak/Documents/audioneko/packages/server/src/drive/stream.ts) defaults to the 3-tier streaming pipeline (OPFS -> Edge Cache API -> Google Drive Streaming Proxy).
+- **Cover Art Storage**: Thumbnails are stored in Cloudflare KV or D1 cache, avoiding external bucket dependencies.
+- **Offline Bandwidth Protection**: Heavy offline caching is offloaded to the client device using the **Origin Private File System (OPFS)** on the listener's local device disk.
 
 ### B. No Active AI / LLM Dependencies
 - **Deferred to Future Backlog**: Cloudflare Workers AI (Whisper, Llama 3.3 70B, Vectorize embeddings) are strictly deferred to future backlog. Do not add AI bindings or LLM inference dependencies to the active code.
@@ -80,7 +79,7 @@ audioneko/
 - **Auth**: Better Auth configured with email/password and D1 session adapter ([`src/auth/index.ts`](file:///home/vinayak/Documents/audioneko/packages/server/src/auth/index.ts)).
 - **Invite Engine**: 256-bit entropy cryptographic invites with SHA-256 storage ([`src/auth/invites.ts`](file:///home/vinayak/Documents/audioneko/packages/server/src/auth/invites.ts)).
 - **Google Token Minter**: Zero-dependency Web Crypto RSA-SHA256 JWT minter with KV caching ([`src/drive/token.ts`](file:///home/vinayak/Documents/audioneko/packages/server/src/drive/token.ts)).
-- **4-Tier Streaming Proxy**: Range parser, 2 MB chunk alignment, optional R2, Edge Cache API, and Google Drive range streaming ([`src/drive/stream.ts`](file:///home/vinayak/Documents/audioneko/packages/server/src/drive/stream.ts)).
+- **3-Tier Streaming Proxy**: Range parser, 2 MB chunk alignment, Edge Cache API, and Google Drive range streaming ([`src/drive/stream.ts`](file:///home/vinayak/Documents/audioneko/packages/server/src/drive/stream.ts)).
 - **Metadata Parser**: ISO-BMFF and ID3 binary tag extraction for M4B and MP3 chapters/covers ([`src/drive/metadata.ts`](file:///home/vinayak/Documents/audioneko/packages/server/src/drive/metadata.ts)).
 - **Real-Time Sync Room**: Cloudflare Durable Object (`SyncRoom`) with SQLite backend for multi-device progress sync.
 
@@ -124,19 +123,19 @@ When editing or extending the audio playback pipeline:
 
 ---
 
-## 4. Free Tier Quotas & Safety Margins (3–10 Users)
+## 4. Quotas & Capacity Margins (3–10 Users)
 
-| Service | Free Tier Allocation | Estimated 3–10 Friends Usage | Safety Headroom | Credit Card Required? |
-| :--- | :--- | :--- | :--- | :---: |
-| **Cloudflare Workers** | 100,000 requests / day | ~500 req / day | **99.5% Headroom** | **NO** |
-| **Cloudflare D1** | 5,000,000 row reads / day | ~5,000 reads / day | **99.9% Headroom** | **NO** |
-| **Cloudflare D1** | 100,000 row writes / day | ~500 writes / day | **99.5% Headroom** | **NO** |
-| **Cloudflare D1** | 5 GB storage | < 25 MB (metadata only) | **99.5% Headroom** | **NO** |
-| **Cloudflare KV** | 100,000 reads / day | ~200 reads / day | **99.8% Headroom** | **NO** |
-| **Cloudflare KV** | 1,000 writes / day | ~50 writes / day | **95.0% Headroom** | **NO** |
-| **Cloudflare Durable Objects** | 1,000,000 requests / month | ~15,000 req / month | **98.5% Headroom** | **NO** |
-| **Google Drive API** | 10,000 requests / 100s | < 1 request / 100s | **99.9% Headroom** | **NO** |
-| **Browser OPFS** | Hundreds of GBs (client disk) | Unlimited per user device | **100% Free** | **NO** |
+| Service | Platform Allocation | Estimated 3–10 Friends Usage | Safety Headroom |
+| :--- | :--- | :--- | :--- |
+| **Cloudflare Workers** | 100,000 requests / day | ~500 req / day | **99.5% Headroom** |
+| **Cloudflare D1** | 5,000,000 row reads / day | ~5,000 reads / day | **99.9% Headroom** |
+| **Cloudflare D1** | 100,000 row writes / day | ~500 writes / day | **99.5% Headroom** |
+| **Cloudflare D1** | 5 GB storage | < 25 MB (metadata only) | **99.5% Headroom** |
+| **Cloudflare KV** | 100,000 reads / day | ~200 reads / day | **99.8% Headroom** |
+| **Cloudflare KV** | 1,000 writes / day | ~50 writes / day | **95.0% Headroom** |
+| **Cloudflare Durable Objects** | 1,000,000 requests / month | ~15,000 req / month | **98.5% Headroom** |
+| **Google Drive API** | 10,000 requests / 100s | < 1 request / 100s | **99.9% Headroom** |
+| **Browser OPFS** | Hundreds of GBs (client disk) | Unlimited per user device | **High Capacity** |
 
 ---
 

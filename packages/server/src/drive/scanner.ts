@@ -1,7 +1,7 @@
 /**
  * audioneko: Google Drive Library Scanner & Metadata Ingest Engine
  * Discovers audiobooks, series, tracks, and artwork from Google Drive.
- * Upserts them into Cloudflare D1 with zero-cost and atomic transactions.
+ * Upserts them into Cloudflare D1 with atomic transactions.
  */
 
 import { eq } from "drizzle-orm";

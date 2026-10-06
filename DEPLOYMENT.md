@@ -1,12 +1,12 @@
-# audioneko: Production Deployment Runbook ($0.00/mo Cloudflare Edge)
+# audioneko: Production Deployment Runbook
 
-> **Zero-Recurring-Cost Private Audiobook Platform**: Complete guide to deploying **audioneko** to Cloudflare's Anycast edge network at $0.00/mo without requiring a credit card or paid domain registrar.
+Guide to deploying **audioneko** to Cloudflare Workers with Google Drive as the authoritative media storage engine.
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
-```
+```text
 Google Drive (Cold Vault)
        │  (Encrypted Chunk Stream via Service Account)
        ▼
@@ -22,9 +22,9 @@ Clients: Browser PWA / Plappa / ShelfPlayer
 
 ---
 
-## 📋 Prerequisites
+## Prerequisites
 
-1. **Free Cloudflare Account**: Sign up at [cloudflare.com](https://dash.cloudflare.com) (no credit card required).
+1. **Cloudflare Account**: Sign up at [cloudflare.com](https://dash.cloudflare.com).
 2. **Node.js 22+ & pnpm**:
    ```bash
    export PATH="$HOME/.local/bin:$PATH"
@@ -35,13 +35,13 @@ Clients: Browser PWA / Plappa / ShelfPlayer
    pnpm --filter @audioneko/server wrangler login
    ```
 4. **Google Cloud Service Account**:
-   - Create a Google Cloud project (free tier).
+   - Create a Google Cloud project.
    - Enable the **Google Drive API**.
    - Create a Service Account, generate a JSON Key, and share your Audiobook Vault folder with the service account email (Viewer permissions).
 
 ---
 
-## 🚀 Step-by-Step Deployment
+## Step-by-Step Deployment
 
 ### 1. Provision Cloudflare D1 SQLite Database
 
@@ -128,7 +128,7 @@ Your server will be live immediately at `https://audioneko.<subdomain>.workers.d
 
 ---
 
-## 🔑 Initial Setup: Curator Admin Onboarding
+## Initial Setup: Curator Admin Onboarding
 
 1. Generate your initial admin registration invite token locally or via D1 command:
    ```bash
@@ -141,7 +141,7 @@ Your server will be live immediately at `https://audioneko.<subdomain>.workers.d
 
 ---
 
-## 📱 Connecting Third-Party Audiobookshelf Apps
+## Connecting Third-Party Audiobookshelf Apps
 
 **audioneko** includes a native Audiobookshelf (ABS) API compatibility layer:
 
@@ -151,9 +151,9 @@ Your server will be live immediately at `https://audioneko.<subdomain>.workers.d
 
 ---
 
-## 🛡️ Free Tier Quota Safety Runbook
+## Operational Quota & Headroom Capacity
 
-| Service | Free Tier Allocation | Estimated 3–10 Friends Usage | Safety Headroom |
+| Service | Platform Allocation | Estimated 3–10 Friends Usage | Safety Headroom |
 | :--- | :--- | :--- | :--- |
 | **Workers Requests** | 100,000 / day | ~500 / day | **99.5%** |
 | **D1 Row Reads** | 5,000,000 / day | ~5,000 / day | **99.9%** |
@@ -161,6 +161,4 @@ Your server will be live immediately at `https://audioneko.<subdomain>.workers.d
 | **KV Reads** | 100,000 / day | ~200 / day | **99.8%** |
 | **Durable Objects** | 1,000,000 req / month | ~15,000 req / month | **98.5%** |
 | **Drive API** | 10,000 req / 100s | < 1 req / 100s | **99.9%** |
-| **Browser OPFS** | Unlimited (Client Disk) | Hundreds of GBs local | **100% Free** |
-
-**Zero Credit Card Guarantee**: All services operate strictly within permanent $0.00/mo allocations.
+| **Browser OPFS** | Local Client Disk | Hundreds of GBs local | **High Throughput** |

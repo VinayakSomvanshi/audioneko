@@ -4,19 +4,19 @@
 
 ---
 
-## 📊 High-Level Status Dashboard
+## High-Level Status Dashboard
 
 | Metric | Status | Details |
 | :--- | :--- | :--- |
 | **Current Phase** | **Phase 4: Polish, Compatibility & Production Deployment** | All 4 Phases Complete (100%) |
 | **Active Step** | **Step 4.4: 1:1 High-Resolution Square Audiobook Artwork & Fit Presentation** | Completed; Authentic 1:1 covers across all 18 titles; zero-cutoff ambient blur presentation active |
 | **Total Milestones** | **4 Phases / 18 Core Steps** | 18 of 18 steps completed (100% Monorepo Completion) |
-| **Free-Tier Safety** | **Verified & Compliant (100%)** | All services within $0.00/mo envelope (zero credit card required) |
+| **Platform Quota Safety** | **Verified & Compliant (100%)** | All services operate with high headroom margin |
 | **Git Repository** | **Connected to GitHub** | `main` branch synced with `origin` |
 
 ---
 
-## 🗂️ Phased Implementation Checklist
+## Phased Implementation Checklist
 
 ### Phase 1: Foundation, Workspace & Core Data Engine (100% Complete)
 - [x] **Step 1.1: Root Monorepo Architecture & Tooling**
@@ -104,9 +104,9 @@
   - [x] Zero server cost guarantee verified: audio cached directly to user's local disk; 83 Vitest tests passing across monorepo
 - [x] **Step 3.3: Cloudflare R2 Active Shelf LRU Cache Queue**
   - [x] Cloudflare Queue & `ctx.waitUntil` background worker pre-caching active books from Google Drive to R2 (`precacheBookToR2`)
-  - [x] 8.5 GB high-water mark automatic LRU eviction policy (`evictLruBooks`) preserving free tier headroom
+  - [x] 8.5 GB high-water mark automatic LRU eviction policy (`evictLruBooks`)
   - [x] REST endpoints `/api/shelf/status`, `/api/shelf/precache/:bookId`, `/api/shelf/evict`, `/api/shelf/:bookId` and 6-hour cron maintenance
-  - [x] Zero-cost invariant strictly enforced: `if (env.R2)` safeguards allow 100% free operation with no payment methods; 93 Vitest tests passing across monorepo
+  - [x] Flexible storage design: `if (env.R2)` safeguards allow operation with or without R2; 93 Vitest tests passing across monorepo
 - [x] **Step 3.4: Listening Analytics, Streaks & Social Presence**
   - [x] Daily listening streak counter & GitHub-style 365-day activity contribution heatmap (`ActivityHeatmap.tsx`, `analytics.ts`)
   - [x] Edge presence tracking for friends listening activity with live pulsing indicators (`FriendActivityBar.tsx`, `presence.ts`)
@@ -121,18 +121,18 @@
   - [x] Full support for Plappa (iOS), ShelfPlayer, and native ABS clients with Bearer, x-token, and ?token authentication
   - [x] 11 new Vitest unit and HTTP integration tests passing (116 total passing across monorepo)
 - [x] **Step 4.2: Instant Client-Side Search Engine (MiniSearch)**
-  - [x] Sub-5ms title, author, narrator, series, and description indexing with zero network latency and zero recurring server costs
+  - [x] Sub-5ms title, author, narrator, series, and description indexing with zero network latency and pure client-side evaluation
   - [x] Fuzzy keyword matching, prefix search, and weighted field boosting (`packages/app/src/lib/search.ts`)
   - [x] Tactile obsidian `SearchPaletteModal` with `Cmd+K` / `Ctrl+K` global keyboard palette navigation and latency tracker
   - [x] 6 new Vitest unit tests passing (122 total passing across monorepo)
 - [x] **Step 4.3: Automated CI/CD & Production Wrangler Deploy**
   - [x] GitHub Actions automated workflow (`.github/workflows/ci.yml`) for Biome format/lint, TypeScript typecheck, Vitest, and production Vite build
   - [x] Production deployment configuration in `packages/server/wrangler.jsonc` with Durable Objects, assets binding, and 6-hour cron triggers
-  - [x] Comprehensive zero-cost deployment runbook (`DEPLOYMENT.md`) covering D1, KV, Google Service Account secrets, and client connections
+  - [x] Comprehensive deployment runbook (`DEPLOYMENT.md`) covering D1, KV, Google Service Account secrets, and client connections
 
 ---
 
-### 🔮 Future Scope & Backlog (Deferred per User Request)
+### Future Scope & Backlog (Deferred per User Request)
 - **Passkeys / WebAuthn**: Passwordless hardware/biometric authentication (FIDO2)
 - **Workers AI Whisper Transcription**: On-demand clip transcription and quote bookmarking
 - **Workers AI Narrative Recaps**: Llama 3.3 70B story recap generation when resuming after inactivity
@@ -140,7 +140,7 @@
 
 ---
 
-## 📝 Activity Log
+## Activity Log
 
 | Date / Time | Step Completed | Changes Made |
 | :--- | :--- | :--- |
@@ -159,11 +159,11 @@
 | **2026-10-05 00:15** | **Step 2.5: Media Session & Scrubber** | Built lock-screen controls, decelerated vertical-drag scrubber, smart sleep timer with fade & accelerometer shake-to-extend, PiP visualizer, and FullPlayerModal; 55 Vitest tests passing. Phase 2 Complete! |
 | **2026-10-05 11:12** | **Step 3.1: Durable Objects Real-Time Sync** | Implemented `SyncRoom` Durable Object with SQLite backend and hibernatable WebSockets, HLC + Monotonic Progress Vector conflict resolution, client `SyncClient` with exponential backoff, and tactile obsidian `ResumeBanner`; 78 Vitest tests passing. |
 | **2026-10-05 11:22** | **Step 3.2: OPFS Download Manager** | Implemented Origin Private File System (OPFS) background streaming chunk downloader, Service Worker range-interception (`/api/stream/:fileId`) with 206 streaming, storage quota estimator and manager, and offline UI; 83 Vitest tests passing. |
-| **2026-10-05 11:30** | **Step 3.3: R2 Active Shelf LRU** | Built optional Cloudflare R2 Active Shelf pre-caching engine, 8.5 GB high-water mark LRU eviction algorithm, queue consumer, scheduled cron maintenance, and management endpoints with zero-cost fallback; 93 Vitest tests passing. |
+| **2026-10-05 11:30** | **Step 3.3: R2 Active Shelf LRU** | Built optional Cloudflare R2 Active Shelf pre-caching engine, 8.5 GB high-water mark LRU eviction algorithm, queue consumer, scheduled cron maintenance, and management endpoints with direct drive streaming; 93 Vitest tests passing. |
 | **2026-10-05 11:39** | **Step 3.4: Analytics, Streaks & Social** | Built daily streak tracker, GitHub-style 365-day contribution heatmap, real-time edge friend presence with pulsing indicators, and ListenAlongRoom Durable Object with audio clock slewing; 105 Vitest tests passing. Phase 3 Complete! |
 | **2026-10-05 11:47** | **Step 4.1: Audiobookshelf (ABS) API** | Implemented Audiobookshelf API emulation routes (`/login`, `/api/v1/libraries`, `/api/v1/items/:id`, `/api/v1/me/progress`, SVG cover fallback) for Plappa, ShelfPlayer, and native ABS clients; 116 Vitest tests passing. |
 | **2026-10-05 11:51** | **Step 4.2: Instant MiniSearch Engine** | Built sub-5ms client-side search indexing engine, tactile obsidian `SearchPaletteModal` with `Cmd+K` / `Ctrl+K` keybindings, and fuzzy prefix search; 122 Vitest tests passing. |
-| **2026-10-05 11:54** | **Step 4.3: CI/CD & Production Deploy** | Configured GitHub Actions CI pipeline (`.github/workflows/ci.yml`), production `wrangler.jsonc` Durable Objects & cron triggers, and zero-cost `DEPLOYMENT.md` runbook. Phase 4 Complete! 100% Monorepo Completion. |
+| **2026-10-05 11:54** | **Step 4.3: CI/CD & Production Deploy** | Configured GitHub Actions CI pipeline (`.github/workflows/ci.yml`), production `wrangler.jsonc` Durable Objects & cron triggers, and `DEPLOYMENT.md` runbook. Phase 4 Complete! 100% Monorepo Completion. |
 | **2026-10-05 12:20** | **Comprehensive Codebase Audit & Hardening** | RFC 7233 byte-range clamping & 416 status handling; Hono CORS allowed & exposed headers for audio players; HEAD request routing for ABS; OPFS multi-chunk sequential downloader; React render-phase cleanups; Vite vendor chunk splitting. 126 Vitest tests passing (100%). |
 | **2026-10-05 16:25** | **Open Library & Google Books Metadata Enrichment & Subrequest Optimization** | Connected `enrichBookMetadata` in scanner for books with missing metadata/covers; added cascading multi-strategy Open Library searches with leading-article stripping and multi-doc candidate ranking; eliminated redundant 128KB drive probe subrequests and cached existing metadata to stay strictly within Cloudflare Workers 50 subrequest limit; 100% of 18 library audiobooks now enriched with official authors and high-res cover art. |
 | **2026-10-05 23:30** | **Strict Audio Streaming Authentication & RBAC Enforcement** | Enforced `requireAuth` on `/api/stream/:fileId` (GET and HEAD), `/api/books`, `/api/series`, `/api/authors`, `/api/shelves`; locked down `/api/library/scan` to `requireAuth, requireAdmin`; unified session cookie and token verification via `authenticateRequest`; guarded client `playBook` and added global `RootLayout` auth gate redirecting unauthenticated visitors to `/login`. 122 Vitest tests passing (100%). |

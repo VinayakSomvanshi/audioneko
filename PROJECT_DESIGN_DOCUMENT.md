@@ -1,6 +1,6 @@
 # audioneko: Project Design Document (PDD)
 **The Definitive Architecture, Engineering & Product Specification**  
-*A Private, Bleeding-Edge, Zero-Recurring-Cost Audiobook Streaming Platform*  
+*A Private, Bleeding-Edge Audiobook Streaming Platform*  
 *Target Environment: Cloudflare Edge Platform & Google Drive Cold Vault*
 
 ---
@@ -11,7 +11,7 @@
 * **Author / Architect**: Pair Programming Engineering Specification
 * **Target Audience**: Core Maintainer / Developer (Solo Execution)
 * **Classification**: Technical Project Design Document & Implementation Standard
-* **Operating Budget**: **$0.00 / month permanently** (Strict Free-Tier Envelope)
+* **Architecture Model**: **Serverless Edge & Cloud Storage Pipeline**
 * **Target Scale**: 3–10 Active Listeners (Private Trusted Circle)
 * **Production Deployment**: `https://audioneko.greatmidoriya.workers.dev`
 * **Automated Test Coverage**: 126 Vitest Tests Across 23 Suites (100% Pass Rate)
@@ -25,7 +25,7 @@
 4. [Authentication, Security & Threat Model](#4-authentication-security--threat-model)
 5. [System Architecture & Data Modeling](#5-system-architecture--data-modeling)
 6. [Bleeding-Edge Tech Stack Selection](#6-bleeding-edge-tech-stack-selection)
-7. [Deployment, Infrastructure & Free-Tier Budget](#7-deployment-infrastructure--free-tier-budget)
+7. [Deployment, Infrastructure & Resource Capacity](#7-deployment-infrastructure--resource-capacity)
 8. [UX, Motion & Design System](#8-ux-motion--design-system)
 9. [Non-Functional Requirements & Performance Budgets](#9-non-functional-requirements--performance-budgets)
 10. [Testing, Quality & Verification Strategy](#10-testing-quality--verification-strategy)
@@ -41,7 +41,7 @@
 ### 1.1 Vision & Core Objectives
 **audioneko** is an uncompromising, private, self-hosted audiobook streaming web application crafted for an individual curator and a private group of 3–10 trusted friends. It treats an existing Google Drive directory structure as the authoritative single source of truth for audio files, while providing a listening experience that rivals or surpasses premium commercial platforms like Audible, Apple Books, and Prologue.
 
-The application eliminates recurring subscription costs, server maintenance overhead, and brittle container orchestration. Every layer—from client-side signal processing to edge-proxied byte-range caching—operates strictly within the perpetual free allocations of Cloudflare and Google Cloud Platform.
+The application eliminates server maintenance overhead and brittle container orchestration. Every layer—from client-side signal processing to edge-proxied byte-range caching—is engineered for maximum performance across Cloudflare and Google Cloud Platform.
 
 ```
                            +-------------------------------------------------------------+
@@ -66,7 +66,7 @@ The application eliminates recurring subscription costs, server maintenance over
 |       |    DURABLE OBJECTS (SQLite)        |  |     CLOUDFLARE D1 (SQL)    |  |     CLOUDFLARE WORKERS KV        |    |
 |       |  - Hibernatable WebSockets         |  |  - Relational Schema       |  |  - Google OAuth Bearer Token     |    |
 |       |  - Real-time Listen-Along Rooms    |  |  - Progress & History Log  |  |  - Cover Art & Extracted JSON    |    |
-|       |  - Vector Clock Conflict Resolv.   |  |  - D1 FTS5 Lexical Search  |  |  - Zero Credit Card Required     |    |
+|       |  - Vector Clock Conflict Resolv.   |  |  - D1 FTS5 Lexical Search  |  |  - Edge Range Cache & OPFS       |    |
 |       +------------------------------------+  +----------------------------+  +----------------------------------+    |
 |                          |                                  |                                  |                      |
 |                          | Cron / Webhooks                  v Queues Engine (10k ops/day)      | Range Fetch Fallback |
@@ -93,7 +93,7 @@ The application eliminates recurring subscription costs, server maintenance over
     *   **Sub-100ms Time-to-First-Audio (TTFA)**: Instantaneous audio startup via speculative background pre-warming on library interactions, multi-tier D1 file metadata caching, and non-blocking Web Audio gain ramping.
     *   **Guaranteed Position Preservation**: Playback state survives browser crashes, network dropouts, background killing on iOS Safari/Android Chrome, and cross-device handoffs.
     *   **Hands-Off Synchronization**: Automatic change ingestion from Google Drive without manual file copying or database seeding.
-    *   **Definitive $0.00 Running Cost**: Zero credit card billing, zero surprise overages, and 100% adherence to documented platform quotas.
+    *   **High Headroom & Quota Adherence**: Predictable resource consumption and 100% adherence to documented platform quotas.
 *   **Non-Goals**:
     *   Public multi-tenancy (no public self-registration; closed circle of $\le 10$ users).
     *   Server-side on-the-fly heavy audio transcoding (e.g., CPU-bound live FFmpeg at the edge).
@@ -110,7 +110,7 @@ The application eliminates recurring subscription costs, server maintenance over
     *   **TTFA**: $< 100\text{ ms}$ on warm cache/OPFS/pre-warmed stream; $< 400\text{ ms}$ on cold Drive fetch.
     *   **Seek Latency**: $< 100\text{ ms}$ anywhere within a multi-gigabyte file.
     *   **Sync Accuracy**: 100% position parity across devices within $\pm 1$ second without data collisions.
-    *   **Resource Headroom**: $> 90\%$ free-tier margin across Cloudflare and Google Cloud under peak group usage.
+    *   **Resource Headroom**: $> 90\%$ operational headroom margin across Cloudflare and Google Cloud under peak group usage.
 
 ### 1.4 Core Design Principles
 1.  **Instant Playback Over Everything**: Prefetch audio chunks speculatively on pointer down/hover. Never make a user wait for catalog queries before audio buffers start filling.
@@ -237,7 +237,7 @@ Google Drive serves as the authoritative, permanent "Cold Vault". Because Google
 
 ### 3.1 Authentication Architecture Comparison
 
-| Auth Strategy | Latency & Token Overhead | Security & Expiration Risk | Operational Complexity | Free Tier Fit |
+| Auth Strategy | Latency & Token Overhead | Security & Expiration Risk | Operational Complexity | Reliability & Fit |
 | :--- | :--- | :--- | :--- | :--- |
 | **Google Service Account (Targeted Folder Share)** | **$\approx 0\text{ms}$ token overhead (Cached in KV)** | **Zero user expiration risk; signed via Web Crypto RSA-SHA256** | **Low (Single private key stored in Workers Secrets)** | **CLEAR WINNER (100% automated)** |
 | **OAuth 2.0 with Admin Refresh Token** | 200–400ms on refresh token round-trip | Refresh tokens can expire after 6 months inactivity | Medium (Consent flow, refresh handler) | Fragile for unattended background sync |
@@ -264,18 +264,18 @@ Cloudflare Workers mint Google OAuth2 tokens without NPM dependencies using nati
 
 ---
 
-### 3.2 Media Streaming Strategy Comparison Under Hard Free Limits
+### 3.2 Media Streaming Strategy Comparison
 
 Streaming high-bitrate audio from Google Drive to multiple concurrent listeners risks two hard failure modes:
-1.  **Strict Zero-Card Invariant**: Enabling Cloudflare R2 requires a credit card on file (even within its 10 GB free tier). To guarantee a 100% friction-free zero-cost deployment with zero payment methods required, Cloudflare R2 is omitted.
+1.  **Simplified Edge Storage Invariant**: Cloudflare R2 is omitted to maintain a lean, zero-external-storage architecture, relying directly on Workers Edge Cache API and client OPFS storage.
 2.  **Google Drive 403 `downloadQuotaExceeded` Prevention**: Imposed when un-chunked full file downloads exceed internal rolling bandwidth limits. Prevented by uniform byte-range slicing and edge caching.
-3.  **Cloudflare Free Worker 10ms CPU / 50 Subrequest Limits**: Workers abort if execution consumes $> 10\text{ms}$ active CPU time or issues $> 50$ subrequests per client invocation. (Note: Network I/O streaming does not count toward CPU time).
+3.  **Cloudflare Worker 10ms CPU / 50 Subrequest Limits**: Workers abort if execution consumes $> 10\text{ms}$ active CPU time or issues $> 50$ subrequests per client invocation. (Note: Network I/O streaming does not count toward CPU time).
 
-| Streaming Strategy | Seek Latency | Subrequest Consumption | Drive Quota Risk | Card Requirement | Recommendation |
+| Streaming Strategy | Seek Latency | Subrequest Consumption | Drive Quota Risk | Architecture Profile | Recommendation |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **(a) Pure Range Proxying** | Moderate (300–600ms) | 1 subrequest per chunk | High if files re-read often | $0.00$ (No Card) | Fragile |
-| **(b) Full Mirroring to R2** | Instant (20–40ms) | Zero to Drive on hit | Zero | **Requires Credit Card** | Rejected (Violates zero-card invariant) |
-| **(c) 3-Tier Zero-Card Architecture (OPFS + Edge Cache API + Drive Proxy)** | **Sub-100ms (< 40ms on hit)** | **Near Zero on steady state** | **Zero (< 0.5% quota)** | **100% Free (Zero Credit Card Required)** | **PRODUCTION STANDARD (WINNER)** |
+| **(a) Pure Range Proxying** | Moderate (300–600ms) | 1 subrequest per chunk | High if files re-read often | Single Tier | Fragile |
+| **(b) Full Mirroring to External Object Store** | Instant (20–40ms) | Zero to Drive on hit | Zero | Heavy External Duplication | Rejected (Adds bucket dependency) |
+| **(c) 3-Tier Streaming Architecture (OPFS + Edge Cache API + Drive Proxy)** | **Sub-100ms (< 40ms on hit)** | **Near Zero on steady state** | **Zero (< 0.5% quota)** | **Optimized Edge Performance** | **PRODUCTION STANDARD (WINNER)** |
 
 ```
                               AUDIO STREAMING DECISION TREE
@@ -309,7 +309,7 @@ Streaming high-bitrate audio from Google Drive to multiple concurrent listeners 
             (Cache-Control: s-maxage=604800)           (HTTP 206 Partial Content)
 ```
 
-#### The 3-Tier Zero-Card Streaming Specification
+#### The 3-Tier Streaming Specification
 1.  **Tier 1: Client OPFS Pre-cache & Offline Storage**: The browser requests and caches audio into the listener's local Origin Private File System. Offline downloaded audiobooks and active playback buffers reside directly on user hardware disk, costing zero bandwidth and zero server storage.
 2.  **Tier 2: Cloudflare Edge Cache API (2 MB Range Slicing)**: The Worker intercepts `Range: bytes=start-end` requests from the player. It rounds requests to uniform **2 MB block boundaries** and queries the Edge Cache API using a custom cache key (`https://cache.audioneko.internal/drive-chunks/:fileId/:chunkIndex`). Cache hits return sub-50ms partial content responses directly from the Cloudflare point of presence with zero outbound requests to Google Drive.
 3.  **Tier 3: Google Drive Cold Vault with Range Proxying**: The original audiobook files remain safely housed in Google Drive. Cache misses fetch slices via authenticated Google Drive API `alt=media` streaming using in-memory cached service account Bearer tokens and pre-loaded D1 file metadata, eliminating duplicate API calls.
@@ -318,7 +318,7 @@ Streaming high-bitrate audio from Google Drive to multiple concurrent listeners 
 
 ### 3.3 Change Detection & Incremental Sync
 
-To respect Google Drive's free API quota (20,000 queries per 100 seconds) while capturing library updates:
+To respect Google Drive API quotas (20,000 queries per 100 seconds) while capturing library updates:
 1.  **Primary: Google Drive Push Notifications (`files.watch`)**:
     *   A Worker cron job registers a webhook channel via `POST https://www.googleapis.com/drive/v3/changes/watch`.
     *   Google sends push POST notifications to `https://api.audioneko.app/webhooks/drive` whenever files are added, renamed, or moved.
@@ -333,9 +333,9 @@ To respect Google Drive's free API quota (20,000 queries per 100 seconds) while 
 
 ---
 
-### 3.4 Format Handling, Streaming Metadata & Free Transcoding Strategy
+### 3.4 Format Handling, Streaming Metadata & Transcoding Strategy
 
-| Container & Codec | Native Browser Support | Embedded Chapter Parsing Strategy | Transcoding Fit on Free Tier |
+| Container & Codec | Native Browser Support | Embedded Chapter Parsing Strategy | Transcoding Feasibility |
 | :--- | :--- | :--- | :--- |
 | **M4B (AAC / ALAC)** | **Universal (100% Mobile & Desktop)** | **ISO-BMFF Box Traversal (`moov.trak.mdia.minf.stbl`)** | **Direct Passthrough (No transcoding needed)** |
 | **M4A / AAC** | Universal | MP4 `chpl` Box Parser via Range Request | Direct Passthrough |
@@ -344,8 +344,8 @@ To respect Google Drive's free API quota (20,000 queries per 100 seconds) while 
 | **OPUS (Ogg / WebM)**| Chrome, Firefox, Edge, Safari 15+ | Ogg Chapter extension tags | Direct Passthrough |
 
 > **Transcoding Decision**: **No Server-Side Transcoding. Zero CPU Waste.**  
-> **Justification**: Modern browsers natively decode AAC, MP3, FLAC, and OPUS without plugins. 99% of digital audiobooks are distributed in M4B or MP3. Transcoding audio at the edge on Cloudflare Free violates the 10ms CPU limit.  
-> **Free Client-Side Fallback**: For unusual legacy formats (e.g., WMA), client-side decoding runs in an in-browser WebAssembly worker using `@ffmpeg/ffmpeg` or `libav.js`, rendering decoded PCM straight into Web Audio buffers at zero server cost.
+> **Justification**: Modern browsers natively decode AAC, MP3, FLAC, and OPUS without plugins. 99% of digital audiobooks are distributed in M4B or MP3. Server-side transcoding would introduce unnecessary latency and CPU overhead.  
+> **Client-Side Fallback**: For unusual legacy formats (e.g., WMA), client-side decoding runs in an in-browser WebAssembly worker using `@ffmpeg/ffmpeg` or `libav.js`, rendering decoded PCM straight into Web Audio buffers without server burden.
 
 #### Streaming Zero-Download Metadata Extraction
 The Worker extracts chapter markers and cover art from 1 GB+ M4B files in **under 80ms** without downloading the file:
@@ -409,9 +409,9 @@ The Worker extracts chapter markers and cover art from 1 GB+ M4B files in **unde
     *   Audio endpoints are never exposed via static URLs. To fetch chunks, the client requests a stream ticket:
         $$\text{Stream Token} = \text{HMAC-SHA256}_{K_{\text{secret}}}(\text{userId} \parallel \text{fileId} \parallel \text{expiry})$$
     *   Stream tokens expire after 30 minutes. Prevents external bandwidth theft or public audio leaking.
-*   **Cloudflare Zero-Cost Edge Hardening**:
-    *   **Cloudflare Turnstile (Free)**: Embedded on invite redemption and login to prevent automated credential stuffing.
-    *   **Rate Limiting via Cloudflare WAF**: Free-tier rate limiting rule: max 300 requests per 1-minute window per IP for API routes.
+*   **Cloudflare Edge Hardening**:
+    *   **Cloudflare Turnstile**: Embedded on invite redemption and login to prevent automated credential stuffing.
+    *   **Rate Limiting via Cloudflare WAF**: Rate limiting rule: max 300 requests per 1-minute window per IP for API routes.
 *   **Security Headers & Content Security Policy (CSP)**:
     ```http
     Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; media-src 'self' blob:; img-src 'self' data: blob: https://covers.openlibrary.org; connect-src 'self' wss://audioneko.app; frame-ancestors 'none';
@@ -438,9 +438,9 @@ The Worker extracts chapter markers and cover art from 1 GB+ M4B files in **unde
 
 ### 5.1 Monolith vs. Micro-Workers Architecture Comparison
 
-| Architectural Pattern | Cold Start Latency | Subrequest Overhead | Deployment Complexity | Free Tier Fit |
+| Architectural Pattern | Cold Start Latency | Subrequest Overhead | Deployment Complexity | Resource Efficiency |
 | :--- | :--- | :--- | :--- | :--- |
-| **Edge Monolith (Workers + Static Assets)** | **Near Zero (Shared V8 Isolates)** | **0 Subrequests between modules** | **Single Wrangler config & single CI pipeline** | **CLEAR WINNER (100k reqs shared)** |
+| **Edge Monolith (Workers + Static Assets)** | **Near Zero (Shared V8 Isolates)** | **0 Subrequests between modules** | **Single Wrangler config & single CI pipeline** | **CLEAR WINNER (Shared isolates & state)** |
 | **Split Micro-Workers (API, Auth, Stream)** | High (Cascading cold starts across Workers) | Heavy (Consumes 1-2 subrequests per request) | Complex monorepo orchestration & multi-Wrangler | Fragile (Risk of hitting 50 subreq limit) |
 
 > **Decision**: **Edge-Native Monolith on Cloudflare Workers with Static Assets**.  
@@ -643,13 +643,13 @@ sequenceDiagram
 
 ---
 
-### 5.4 Search Architecture Comparison Under Free Limits
+### 5.4 Search Architecture Comparison
 
 | Contender | Query Latency | Storage / Resource Impact | Fuzzy / Typo Tolerance | Recommendation |
 | :--- | :--- | :--- | :--- | :--- |
 | **Client-Side MiniSearch / Orama** | **$< 5\text{ms}$ (In-Memory Browser)** | **$< 250\text{ KB}$ gzipped JSON in browser** | **Exceptional (Levenshtein distance)** | **PRIMARY WINNER (Instant UI)** |
 | **Cloudflare D1 FTS5** | 20–50ms (Database roundtrip) | Contained within D1 500MB DB limit | Moderate (Prefix match, trigram) | Secondary (Search inside synopsis/chapters) |
-| **Workers AI + Vectorize** | 150–300ms | 30k free query ops/month | Semantic (Natural language matching) | Feature Winner (AI Search: "Find book with space station") |
+| **Workers AI + Vectorize** | 150–300ms | 30k query ops/month | Semantic (Natural language matching) | Feature Winner (AI Search: "Find book with space station") |
 
 > **Search Strategy Decision**: **Two-Tier Engine: Client-Side MiniSearch + Edge Vectorize AI Search**.  
 > **One-Line Reason**: For library browsing ($< 2,000$ titles), a pre-built static client index guarantees instantaneous 0ms keystroke search, while Workers AI embeddings handle rich conversational discovery.
@@ -682,14 +682,14 @@ sequenceDiagram
 *   **Database**: **Cloudflare D1 (Serverless SQLite)** configured with WAL mode and compiled prepared statements.
 *   **ORM**: **Drizzle ORM**. Zero runtime overhead, schema-as-code, type inference, and native D1 migrations (`wrangler d1 migrations apply`).
 *   **Realtime**: **Cloudflare Durable Objects with SQLite backend** for stateful WebSocket connections and synchronized listening rooms.
-*   **Storage**: **Google Drive Cold Vault + Client OPFS + Edge Cache API** in a 3-tier zero-card pipeline, omitting R2 to preserve the strict zero-card free-tier invariant.
+*   **Storage**: **Google Drive Cold Vault + Client OPFS + Edge Cache API** in a 3-tier streaming pipeline.
 
 ---
 
-### 6.3 Edge AI Layer (Free Allocations)
-*   **Transcription Model**: `@cf/openai/whisper-large-v3-turbo` running on **Workers AI** (10,000 free neurons/day).
+### 6.3 Edge AI Layer
+*   **Transcription Model**: `@cf/openai/whisper-large-v3-turbo` running on **Workers AI** (10,000 neurons/day).
 *   **Summarization & Context**: `@cf/meta/llama-3.3-70b-instruct` or `@cf/meta/llama-3.1-8b-instruct`.
-*   **Vector Embeddings**: `@cf/baai/bge-base-en-v1.5` storing 768-dimensional book embeddings in **Cloudflare Vectorize** (free tier: 30,000 queries/month, 5,000,000 stored dimensions).
+*   **Vector Embeddings**: `@cf/baai/bge-base-en-v1.5` storing 768-dimensional book embeddings in **Cloudflare Vectorize** (30,000 queries/month, 5,000,000 stored dimensions).
 
 ---
 
@@ -701,13 +701,13 @@ sequenceDiagram
 
 ---
 
-## 7. Deployment, Infrastructure & Free-Tier Budget
+## 7. Deployment, Infrastructure & Resource Capacity
 
-### 7.1 Verified Free-Tier Budget & Headroom Analysis (3–10 Listeners)
+### 7.1 Verified Resource Budget & Headroom Analysis (3–10 Listeners)
 
 The table below demonstrates that standard usage for 3–10 listeners operates with massive headroom across every metric:
 
-| Service / Resource | Free Tier Quota Limit | Projected Monthly Usage (10 Users) | Safety Headroom | Potential Break Point & Free Workaround |
+| Service / Resource | Platform Quota Limit | Projected Monthly Usage (10 Users) | Safety Headroom | Potential Break Point & Workaround |
 | :--- | :--- | :--- | :--- | :--- |
 | **Cloudflare Workers Requests** | **100,000 requests / day** | $\approx 2,400\text{ reqs/day}$ (10 users $\times$ 240 API/chunk hits) | **97.6% Headroom** | *Risk*: High-frequency progress polling. *Fix*: Batch sync in client; debounced 10s WebSocket tick. |
 | **Cloudflare Workers CPU Time** | **10 ms CPU / request** | $\approx 1.2\text{ ms}$ avg active CPU time (Web Crypto / JSON) | **88.0% Headroom** | *Risk*: Audio transcoding. *Fix*: Zero server transcoding; stream I/O does not consume CPU. |
@@ -715,12 +715,12 @@ The table below demonstrates that standard usage for 3–10 listeners operates w
 | **Cloudflare D1 Row Reads** | **5,000,000 reads / day** | $\approx 35,000\text{ reads / day}$ | **99.3% Headroom** | *Risk*: Polling D1 for sync. *Fix*: Cache library catalog in KV / in-memory DO. |
 | **Cloudflare D1 Row Writes** | **100,000 writes / day** | $\approx 1,200\text{ writes / day}$ (Debounced sync events) | **98.8% Headroom** | *Risk*: Writing every second. *Fix*: Flush progress only every 30s or on pause/seek. |
 | **Cloudflare D1 Storage** | **5 GB total (500 MB / DB)** | $\approx 32\text{ MB}$ (10k books, chapters, 10 users) | **93.6% Headroom** | Zero risk. Rich metadata with normalized tables. |
-| **Cloudflare Workers KV** | **100k reads / day, 1k writes / day** | $\approx 200\text{ reads / day, } 10\text{ writes / day}$ | **99.8% Headroom** | Zero risk. Tokens cached 55m. Zero credit card needed. |
+| **Cloudflare Workers KV** | **100k reads / day, 1k writes / day** | $\approx 200\text{ reads / day, } 10\text{ writes / day}$ | **99.8% Headroom** | Zero risk. Tokens cached 55m in memory. |
 | **Cloudflare Durable Objects** | **100k requests / day, 13k GB-s** | $\approx 1,800\text{ reqs/day, } 400\text{ GB-s}$ | **96.9% Headroom** | *Risk*: Leaving WebSockets open. *Fix*: Auto-hibernate inactive WebSockets after 60s idle. |
 | **Cloudflare Queues** | **10,000 operations / day** | $\approx 150\text{ operations / day}$ (Drive sync batches) | **98.5% Headroom** | *Risk*: Queue looping on sync error. *Fix*: Max 3 retries with dead-letter queue. |
 | **Google Drive API Queries** | **20,000 queries / 100 seconds** | Max peak: $\approx 15\text{ reqs / 100 sec}$ during rescan | **99.9% Headroom** | *Risk*: Uncontrolled tree scan. *Fix*: Incremental `changes.list` with pageToken. |
 | **Google Drive Download Bandwidth**| **$\approx 750\text{ GB / day}$ (Per-account limit)** | $\approx 1.8\text{ GB / day}$ (10 users $\times$ 3h $\times$ 60 MB/h) | **99.7% Headroom** | *Risk*: Excessive streaming. *Fix*: Edge Cache API and client OPFS pre-caching. |
-| **GitHub Actions CI/CD** | **2,000 free minutes / month** | $\approx 45\text{ minutes / month}$ (3-min builds on PR) | **97.7% Headroom** | *Risk*: Run CI on every commit. *Fix*: Filter on path changes (`src/**`). |
+| **GitHub Actions CI/CD** | **2,000 minutes / month** | $\approx 45\text{ minutes / month}$ (3-min builds on PR) | **97.7% Headroom** | *Risk*: Run CI on every commit. *Fix*: Filter on path changes (`src/**`). |
 
 ---
 
@@ -842,7 +842,7 @@ graph TD
 *   **Zero Vendor Lock-in**:
     *   The database is standard SQLite. Migrating away from Cloudflare D1 requires only running `.dump` and importing into Turso, Neon, or self-hosted PostgreSQL.
     *   Hono is runtime-agnostic. The entire backend runs unchanged on Node.js, Bun, Deno, AWS Lambda, or Docker via `@hono/node-server`.
-    *   Audio storage remains permanently in Google Drive. If Cloudflare ever alters free tiers, the entire app can be redeployed to a $0 free-tier fly.io or VPS instance within hours.
+    *   Audio storage remains permanently in Google Drive. If cloud infrastructure requirements ever change, the entire app can be redeployed to any containerized environment or VPS within hours.
 
 ---
 
@@ -950,7 +950,7 @@ audioneko/
 | **ORM** | **Drizzle ORM** | Prisma | Zero runtime overhead and native compilation to D1 prepared statements. |
 | **Realtime Sync** | **Cloudflare Durable Objects (SQLite)** | SSE over KV | Stateful hibernatable WebSockets with zero database polling overhead. |
 | **Authentication** | **Better Auth (Email/Password + Invites)** | Clerk / Auth.js | Zero third-party redirects; PBKDF2 hashed credentials in D1 gated by single-use invites. |
-| **Audio Storage** | **Google Drive (Cold) + Edge Cache API + OPFS**| Direct Drive Only | Eliminates Drive 403 quota exhaustion with zero credit card required. |
+| **Audio Storage** | **Google Drive (Cold) + Edge Cache API + OPFS**| Direct Drive Only | Eliminates Drive 403 quota exhaustion via edge range caching. |
 | **Client Audio Cache**| **Origin Private File System (OPFS)** | IndexedDB Blobs | High-throughput, multi-gigabyte binary file storage immune to browser eviction. |
 | **Search Engine** | **Client MiniSearch + D1 FTS5** | Algolia / Meilisearch | Instantaneous 0ms client-side search combined with edge full-text queries. |
 | **Developer Tooling** | **Biome + pnpm + Turborepo** | ESLint + Prettier | Formats, lints, and validates monorepo code in $< 50\text{ms}$. |

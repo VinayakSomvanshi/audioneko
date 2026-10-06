@@ -595,7 +595,7 @@ app.post("/api/shelf/precache/:bookId", requireAuth, async (c) => {
     return c.json(
       {
         error:
-          "R2 Active Shelf is currently in Zero-Cost Direct Google Drive Mode. Cloudflare R2 is not enabled on this deployment. Audiobooks stream directly from Google Drive. To activate edge caching (<50ms start time), enable R2 in your Cloudflare dashboard (free 10 GB/month) and bind an R2 bucket in wrangler.jsonc.",
+          "Active Shelf is currently in Direct Google Drive Mode. Cloudflare R2 is not configured on this deployment. Audiobooks stream directly via Edge Cache and Google Drive.",
         code: "r2_disabled",
         isR2Enabled: false,
       },

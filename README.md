@@ -1,12 +1,12 @@
 # audioneko
 
-A private, zero-recurring-cost audiobook streaming platform for personal libraries and small groups of friends, powered by Google Drive and the Cloudflare Edge platform.
+A private, high-performance audiobook streaming platform for personal libraries and small groups of friends, powered by Google Drive and the Cloudflare Edge platform.
 
 ---
 
 ## Architecture and Design Blueprint
 
-The complete technical architecture, data model, free-tier budget, security threat model, and delivery plan are documented in:
+The complete technical architecture, data model, performance budget, security threat model, and delivery plan are documented in:
 
 * [PROJECT_DESIGN_DOCUMENT.md](./PROJECT_DESIGN_DOCUMENT.md)
 * [PROGRESS.md](./PROGRESS.md)
@@ -15,10 +15,10 @@ The complete technical architecture, data model, free-tier budget, security thre
 
 ## Core Highlights
 
-* **Zero-Cost Invariant ($0.00 / month forever, Zero Credit Card Required)**: Operates entirely within the permanent free tiers of Cloudflare (Workers with Static Assets, D1, Durable Objects, KV) and Google Cloud Platform without requiring a credit card on file.
+* **Serverless Edge Architecture**: Operates on Cloudflare (Workers with Static Assets, D1, Durable Objects, KV) and Google Cloud Platform with minimal operational overhead.
 * **Instant Zero-Latency Playback**: Sub-100ms audio startup via speculative background pre-warming, multi-tier metadata caching, non-blocking audio pipelines, and RFC 7233 range-streaming.
-* **Google Drive as Single Source of Truth**: Original audiobook files remain securely stored in Google Drive ("Cold Vault"). The edge indexes, enriches, and caches active streams without redundant storage costs.
-* **3-Tier Zero-Card Streaming Pipeline**: Client OPFS (offline pre-cache on listener device) -> Cloudflare Edge Cache API (2 MB sliced audio ranges) -> Authenticated Google Drive Streaming Proxy with open-ended RFC 7233 range requests.
+* **Google Drive as Single Source of Truth**: Original audiobook files remain securely stored in Google Drive ("Cold Vault"). The edge indexes, enriches, and caches active streams without redundant storage duplication.
+* **3-Tier Streaming Pipeline**: Client OPFS (offline pre-cache on listener device) -> Cloudflare Edge Cache API (2 MB sliced audio ranges) -> Authenticated Google Drive Streaming Proxy with open-ended RFC 7233 range requests.
 * **Client-Side Web Audio DSP**: Custom audio engine featuring Smart Speed (dynamic silence trimming), Voice Boost EQ (85 Hz high-pass cut, 2.2 kHz dialogue lift, sibilance taming), and loudness normalization.
 * **Full-Featured Player Experience**: Dynamic waveform scrubber with 4-tier decelerated fine-scrubbing (1x, 0.5x, 0.25x, 0.1x), desktop keyboard shortcuts, dual buffered/played progress tracks, sleep timer with audio fade-out, bookmarks, and notes.
 * **Cross-Device Sync and Social Presence**: Cloudflare Durable Objects with hibernatable WebSockets for sub-second playback sync across tabs and devices, real-time friend activity presence, and synchronized listen-along rooms.
@@ -71,7 +71,7 @@ audioneko/
 │   │   │   ├── auth/        # Better Auth setup, invites, middleware
 │   │   │   ├── db/          # D1 schema and database clients
 │   │   │   ├── drive/       # Google Drive token manager, scanner, and stream proxy
-│   │   │   ├── shelf/       # R2 active shelf queue and LRU maintenance
+│   │   │   ├── shelf/       # Edge active shelf queue and LRU maintenance
 │   │   │   ├── social/      # Listening analytics, presence, and listen-along rooms
 │   │   │   ├── sync/        # Real-time multi-device playback synchronization
 │   │   │   └── index.ts     # Edge router, cron handler, and asset fallback

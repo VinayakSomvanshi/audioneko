@@ -1,7 +1,7 @@
 /**
  * audioneko: External Metadata Enrichment Engine
  * The "TMDB of Books": Integrates Open Library & Google Books APIs
- * Zero-cost, free-tier, open endpoints for covers, synopses, and series data.
+ * Open endpoints for covers, synopses, and series data.
  */
 
 export interface EnrichedBookMetadata {

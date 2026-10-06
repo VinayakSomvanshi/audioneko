@@ -1,7 +1,7 @@
 {
   "name": "audioneko",
   "short_name": "audioneko",
-  "description": "Private zero-recurring-cost audiobook streaming web app",
+  "description": "Private audiobook streaming web app",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#080505",
