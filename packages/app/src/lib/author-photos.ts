@@ -13,7 +13,7 @@ const KNOWN_AUTHOR_PHOTOS: Record<string, string> = {
     "https://static.wixstatic.com/media/bf6fdf_9e881b463379418d95688c942acfbf95~mv2.jpg/v1/fill/w_488,h_524,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/Krista%20and%20Becca%20-%20Author%20Photo%202%20-%20Square.jpg",
   "lana ferguson": "https://freshfiction.com/images/authors/48886.jpeg",
   "liz tomforde": "https://covers.openlibrary.org/a/olid/OL10324088A-M.jpg",
-  "meghan quinn": "https://freshfiction.com/images/authors/37754.jpeg",
+  "meghan quinn": "https://images.gr-assets.com/authors/1778858370p8/7360513.jpg",
   "rebecca yarros": "https://covers.openlibrary.org/a/olid/OL7825177A-M.jpg",
   "rebecca yaros": "https://covers.openlibrary.org/a/olid/OL7825177A-M.jpg",
   "rosie danan":
