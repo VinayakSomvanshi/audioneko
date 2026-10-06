@@ -4,7 +4,39 @@ import { Link } from "@tanstack/react-router";
 import { ArrowLeft, BookOpen, ChevronRight, Play, Search, User, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAudio } from "../context/audio-context";
+import { getAuthorPhotoUrl } from "../lib/author-photos";
 import { getBookCoverUrl } from "../lib/covers";
+
+function AuthorAvatar({
+  name,
+  className = "w-14 h-14",
+  textSize = "text-base",
+}: {
+  name: string;
+  className?: string;
+  textSize?: string;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const photoUrl = getAuthorPhotoUrl(name);
+
+  return (
+    <div
+      className={`${className} rounded-full bg-surface border border-border group-hover:border-accent flex items-center justify-center text-accent font-bold font-mono ${textSize} shrink-0 overflow-hidden relative transition-colors shadow-inner`}
+    >
+      {photoUrl && !imgError ? (
+        <img
+          src={photoUrl}
+          alt={name}
+          onError={() => setImgError(true)}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <span>{name.charAt(0)}</span>
+      )}
+    </div>
+  );
+}
 
 interface AuthorItem {
   name: string;
@@ -169,9 +201,11 @@ export function AuthorsPage() {
         {/* Author Header Banner */}
         <div className="surface-card p-4 sm:p-6 md:p-8 border border-border flex items-center justify-between">
           <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
-            <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-accent-bg border border-accent/20 flex items-center justify-center text-accent shrink-0 font-bold text-base sm:text-lg font-mono">
-              {activeAuthor.name.charAt(0)}
-            </div>
+            <AuthorAvatar
+              name={activeAuthor.name}
+              className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16"
+              textSize="text-base sm:text-lg"
+            />
             <div className="space-y-1 min-w-0 flex-1">
               <div className="text-[10px] sm:text-[11px] font-mono text-accent uppercase tracking-wider">
                 Author Catalog
@@ -337,10 +371,8 @@ export function AuthorsPage() {
                 className="group surface-card border border-border hover:border-accent/60 transition-all rounded-lg p-5 cursor-pointer flex flex-col justify-between space-y-4 hover:shadow-md text-left w-full"
               >
                 <div className="flex items-start gap-4">
-                  {/* Avatar / Covers stack */}
-                  <div className="w-14 h-14 rounded-full bg-surface border border-border flex items-center justify-center text-accent font-bold font-mono text-base shrink-0 group-hover:border-accent transition-colors">
-                    {author.name.charAt(0)}
-                  </div>
+                  {/* Avatar / Portrait */}
+                  <AuthorAvatar name={author.name} />
 
                   <div className="space-y-1 flex-1 min-w-0">
                     <h2 className="text-base font-bold text-text group-hover:text-accent transition-colors line-clamp-1">

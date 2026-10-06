@@ -222,7 +222,13 @@ export function BookDetailPage() {
               {book.title}
             </h1>
             <p className="text-sm font-mono text-muted">
-              By <span className="text-text font-medium">{book.author}</span>
+              By{" "}
+              <a
+                href={`/authors?author=${encodeURIComponent(book.author)}`}
+                className="text-text font-medium hover:text-accent hover:underline transition-colors"
+              >
+                {book.author}
+              </a>
             </p>
             {Boolean(book.series) && (
               <p className="text-xs font-mono text-accent/80">
