@@ -77,23 +77,25 @@ export function AdminInvitesPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-32">
-      <div className="flex items-center justify-between border-b border-border pb-4">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-4 gap-2">
+        <div className="min-w-0">
           <div className="flex items-center gap-2 text-accent text-xs font-mono">
-            <ShieldCheck className="w-4 h-4" />
+            <ShieldCheck className="w-4 h-4 shrink-0" />
             <span>CURATOR CONTROL PLANE</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-text">Invite Management</h1>
-          <p className="text-xs font-mono text-muted">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text break-words">
+            Invite Management
+          </h1>
+          <p className="text-xs font-mono text-muted break-words">
             Issue 256-bit entropy cryptographic invite links to onboard listeners.
           </p>
         </div>
       </div>
 
       {/* Generator Form */}
-      <div className="surface-card p-6 border border-border space-y-4">
+      <div className="surface-card p-4 sm:p-6 border border-border space-y-4">
         <h3 className="text-sm font-semibold text-text flex items-center gap-2">
-          <KeyRound className="w-4 h-4 text-accent" />
+          <KeyRound className="w-4 h-4 text-accent shrink-0" />
           <span>Mint New Cryptographic Invite Link</span>
         </h3>
 
@@ -170,18 +172,18 @@ export function AdminInvitesPage() {
             <span className="text-[11px] font-mono text-accent uppercase tracking-wider font-semibold">
               Invite Link Ready (Single Use)
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <input
                 type="text"
                 readOnly
                 value={newInviteUrl}
                 aria-label="Invite link URL"
-                className="w-full text-xs font-mono px-3 py-1.5 bg-bg border border-border text-text outline-none rounded select-all"
+                className="w-full text-xs font-mono px-3 py-1.5 bg-bg border border-border text-text outline-none rounded select-all min-w-0"
               />
               <button
                 type="button"
                 onClick={() => copyToClipboard(newInviteUrl)}
-                className="px-3 py-1.5 rounded surface-card hover:border-accent text-xs font-mono flex items-center gap-1.5 cursor-pointer shrink-0"
+                className="px-3 py-1.5 rounded surface-card hover:border-accent text-xs font-mono flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
               >
                 {copied ? (
                   <>

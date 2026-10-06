@@ -30,7 +30,7 @@ export function BottomNav({ onSearchClick }: BottomNavProps) {
   }
 
   return (
-    <nav className="md:hidden shrink-0 z-30 h-14 bg-bg border-t border-border flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
+    <nav className="md:hidden shrink-0 z-30 min-h-14 h-auto bg-bg border-t border-border flex items-center justify-around px-2 py-1 pb-[calc(0.35rem+env(safe-area-inset-bottom,0px))]">
       {navItems.map((item) => {
         const isActive = location.pathname === item.href;
         const Icon = item.icon;
@@ -39,12 +39,12 @@ export function BottomNav({ onSearchClick }: BottomNavProps) {
           <Link
             key={item.href}
             to={item.href}
-            className={`flex flex-col items-center justify-center gap-1 w-14 py-1 text-[10px] font-mono transition-colors ${
-              isActive ? "text-accent" : "text-muted hover:text-text"
+            className={`flex flex-col items-center justify-center gap-1 min-w-12 py-1 text-[10px] font-mono transition-colors ${
+              isActive ? "text-accent font-medium" : "text-muted hover:text-text"
             }`}
           >
             <Icon className="w-4 h-4" />
-            <span>{item.label}</span>
+            <span className="truncate">{item.label}</span>
           </Link>
         );
       })}
@@ -52,10 +52,10 @@ export function BottomNav({ onSearchClick }: BottomNavProps) {
       <button
         type="button"
         onClick={onSearchClick}
-        className="flex flex-col items-center justify-center gap-1 w-14 py-1 text-[10px] font-mono text-muted hover:text-accent cursor-pointer transition-colors"
+        className="flex flex-col items-center justify-center gap-1 min-w-12 py-1 text-[10px] font-mono text-muted hover:text-accent cursor-pointer transition-colors"
       >
         <Search className="w-4 h-4" />
-        <span>Search</span>
+        <span className="truncate">Search</span>
       </button>
     </nav>
   );

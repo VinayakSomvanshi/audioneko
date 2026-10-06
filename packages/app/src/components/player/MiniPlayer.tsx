@@ -56,9 +56,9 @@ export function MiniPlayer() {
     <>
       <FullPlayerModal />
 
-      <div className="shrink-0 z-40 border-t border-border bg-surface px-4 py-2.5 transition-all">
+      <div className="shrink-0 z-40 border-t border-border bg-surface px-3 sm:px-4 py-2 sm:py-2.5 transition-all">
         {/* Interactive top progress scrubber bar */}
-        <div className="relative group w-full -mt-2.5 mb-2">
+        <div className="relative group w-full -mt-2 sm:-mt-2.5 mb-1.5 sm:mb-2">
           <input
             type="range"
             min="0"
@@ -71,15 +71,15 @@ export function MiniPlayer() {
           />
         </div>
 
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2.5 sm:gap-4">
           {/* Left: Book Meta & Dynamic Wave Visualizer (Tap to expand) */}
           <button
             type="button"
             onClick={() => setIsFullPlayerOpen(true)}
-            className="flex items-center gap-3 min-w-0 flex-1 text-left cursor-pointer group"
+            className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 text-left cursor-pointer group"
             title="Expand Full Player"
           >
-            <div className="w-10 h-10 rounded border border-border bg-surface shrink-0 overflow-hidden flex items-center justify-center relative group-hover:border-accent transition-colors">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded border border-border bg-surface shrink-0 overflow-hidden flex items-center justify-center relative group-hover:border-accent transition-colors">
               {currentBook.coverR2Key ? (
                 <>
                   <img
@@ -112,18 +112,20 @@ export function MiniPlayer() {
               <h4 className="text-xs font-medium text-text truncate group-hover:text-accent transition-colors">
                 {currentBook.title}
               </h4>
-              <p className="text-[11px] font-mono text-muted truncate">{currentBook.author}</p>
+              <p className="text-[10px] sm:text-[11px] font-mono text-muted truncate">
+                {currentBook.author}
+              </p>
             </div>
 
-            <ChevronUp className="w-4 h-4 text-muted group-hover:text-text shrink-0 hidden sm:block opacity-60 group-hover:opacity-100 transition-opacity" />
+            <ChevronUp className="w-4 h-4 text-muted group-hover:text-text shrink-0 hidden md:block opacity-60 group-hover:opacity-100 transition-opacity" />
           </button>
 
           {/* Center: Playback Controls */}
-          <div className="flex items-center gap-2 md:gap-3">
+          <div className="flex items-center gap-1 sm:gap-2 md:gap-3 shrink-0">
             <button
               type="button"
               onClick={() => skipBy(-15)}
-              className="p-1.5 text-muted hover:text-text transition-colors cursor-pointer"
+              className="p-1 sm:p-1.5 text-muted hover:text-text transition-colors cursor-pointer"
               aria-label="Skip back 15 seconds"
               title="Skip back 15s"
             >
@@ -146,7 +148,7 @@ export function MiniPlayer() {
             <button
               type="button"
               onClick={() => skipBy(30)}
-              className="p-1.5 text-muted hover:text-text transition-colors cursor-pointer"
+              className="p-1 sm:p-1.5 text-muted hover:text-text transition-colors cursor-pointer"
               aria-label="Skip forward 30 seconds"
               title="Skip forward 30s"
             >
@@ -155,7 +157,7 @@ export function MiniPlayer() {
           </div>
 
           {/* Right: Time Display, Sleep Badge & DSP Toggles */}
-          <div className="flex items-center gap-2 md:gap-3 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
             {/* Sleep timer indicator if active */}
             {sleepTimerState.isActive && (
               <button
@@ -165,7 +167,9 @@ export function MiniPlayer() {
                 title="Sleep Timer Active (click to view)"
               >
                 <Moon className="w-3 h-3" />
-                <span>{formatScrubberTime(sleepTimerState.remainingSeconds)}</span>
+                <span className="hidden xs:inline">
+                  {formatScrubberTime(sleepTimerState.remainingSeconds)}
+                </span>
               </button>
             )}
 
@@ -175,11 +179,11 @@ export function MiniPlayer() {
               <span>{formatTime(duration)}</span>
             </div>
 
-            {/* Voice Boost toggle */}
+            {/* Voice Boost toggle - shown on sm+ */}
             <button
               type="button"
               onClick={toggleVoiceBoost}
-              className={`px-2 py-1 text-[10px] font-mono rounded surface-card transition-colors cursor-pointer flex items-center gap-1 ${
+              className={`hidden sm:flex px-2 py-1 text-[10px] font-mono rounded surface-card transition-colors cursor-pointer items-center gap-1 ${
                 voiceBoost
                   ? "border-accent text-accent bg-accent-bg font-medium"
                   : "text-subtle hover:text-text"
@@ -189,11 +193,11 @@ export function MiniPlayer() {
               <span>EQ</span>
             </button>
 
-            {/* Smart Speed toggle */}
+            {/* Smart Speed toggle - shown on md+ */}
             <button
               type="button"
               onClick={toggleSmartSpeed}
-              className={`px-2 py-1 text-[10px] font-mono rounded surface-card transition-colors cursor-pointer flex items-center gap-1 ${
+              className={`hidden md:flex px-2 py-1 text-[10px] font-mono rounded surface-card transition-colors cursor-pointer items-center gap-1 ${
                 smartSpeed
                   ? "border-accent text-accent bg-accent-bg font-medium"
                   : "text-subtle hover:text-text"
@@ -201,14 +205,14 @@ export function MiniPlayer() {
               title="Smart Speed (Trim silent pauses dynamically)"
             >
               <Zap className="w-3 h-3" />
-              <span className="hidden sm:inline">SMART</span>
+              <span>SMART</span>
             </button>
 
             {/* Playback speed toggle */}
             <button
               type="button"
               onClick={cycleRate}
-              className="px-2 py-1 text-[11px] font-mono surface-card text-muted hover:text-accent hover:border-accent transition-colors cursor-pointer"
+              className="px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-[11px] font-mono surface-card text-muted hover:text-accent hover:border-accent transition-colors cursor-pointer"
               title="Playback Speed"
             >
               {playbackRate}x

@@ -97,14 +97,14 @@ export const StorageManagerModal: React.FC<StorageManagerModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="storage-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-none animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-none animate-in fade-in duration-150"
     >
       <div className="w-full max-w-2xl bg-surface border border-border rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-2.5 h-2.5 rounded-full bg-accent" />
-            <h2 id="storage-modal-title" className="text-lg font-semibold text-text">
+            <h2 id="storage-modal-title" className="text-base sm:text-lg font-semibold text-text">
               Offline Storage Manager
             </h2>
           </div>
@@ -134,7 +134,7 @@ export const StorageManagerModal: React.FC<StorageManagerModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-5 sm:space-y-6 flex-1">
           {!supported ? (
             <div className="p-4 rounded-lg border border-border bg-elevated text-sm text-text-muted">
               Origin Private File System (OPFS) is not supported in this browser. Please use Chrome,
@@ -200,9 +200,9 @@ export const StorageManagerModal: React.FC<StorageManagerModalProps> = ({
                     {downloadedBooks.map((book) => (
                       <div
                         key={book.bookId}
-                        className="p-3.5 flex items-center justify-between gap-4 hover:bg-surface/50 transition-colors"
+                        className="p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-surface/50 transition-colors"
                       >
-                        <div className="min-w-0 flex items-center gap-3">
+                        <div className="min-w-0 flex items-center gap-3 flex-1">
                           <div className="w-10 h-14 bg-elevated border border-border rounded shrink-0 overflow-hidden flex items-center justify-center text-xs font-mono text-text-subtle">
                             {book.coverR2Key ? (
                               <img
@@ -224,7 +224,7 @@ export const StorageManagerModal: React.FC<StorageManagerModalProps> = ({
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                           {onPlayBook && (
                             <button
                               type="button"

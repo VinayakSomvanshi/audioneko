@@ -159,11 +159,11 @@ export function SeriesPage() {
         </div>
 
         {/* Series Header Hero */}
-        <div className="surface-card p-6 md:p-8 border border-border relative overflow-hidden">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6 justify-between">
-            <div className="flex items-center gap-5">
+        <div className="surface-card p-4 sm:p-6 md:p-8 border border-border relative overflow-hidden">
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4 sm:gap-6 justify-between">
+            <div className="flex items-center gap-3.5 sm:gap-5 min-w-0 w-full md:w-auto flex-1">
               {/* First Book Cover as Series Hero Artwork */}
-              <div className="w-24 h-24 md:w-32 md:h-32 rounded border border-border bg-surface shrink-0 flex items-center justify-center font-mono text-muted overflow-hidden relative shadow-lg">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 rounded border border-border bg-surface shrink-0 flex items-center justify-center font-mono text-muted overflow-hidden relative shadow-lg">
                 {firstBook?.coverR2Key ? (
                   <>
                     <img
@@ -183,26 +183,24 @@ export function SeriesPage() {
                 )}
               </div>
 
-              <div className="space-y-1.5">
-                <div className="flex items-center gap-2 text-accent text-[11px] font-mono tracking-wider uppercase">
+              <div className="space-y-1 sm:space-y-1.5 min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-accent text-[10px] sm:text-[11px] font-mono tracking-wider uppercase">
                   <Layers className="w-3.5 h-3.5" />
                   <span>Series Saga</span>
                 </div>
-                <h1 className="text-2xl md:text-3xl font-bold text-text tracking-tight">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-text tracking-tight line-clamp-2 break-words">
                   {activeSeries.name}
                 </h1>
-                <p className="text-xs font-mono text-muted">
+                <p className="text-xs font-mono text-muted truncate">
                   Written by{" "}
                   <span className="text-text font-medium">{activeSeries.primaryAuthor}</span>
                 </p>
-                <div className="flex items-center gap-3 pt-1 text-xs font-mono text-subtle">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-0.5 sm:pt-1 text-[11px] sm:text-xs font-mono text-subtle">
                   <span className="text-accent font-medium">
                     {activeSeries.books.length} Audiobooks
                   </span>
                   <span>•</span>
-                  <span>
-                    {formatDuration(activeSeries.totalDurationSeconds)} Total Listening Time
-                  </span>
+                  <span>{formatDuration(activeSeries.totalDurationSeconds)} Listening Time</span>
                 </div>
               </div>
             </div>
@@ -342,14 +340,16 @@ export function SeriesPage() {
       </div>
 
       {/* Header Banner */}
-      <div className="surface-card p-6 md:p-8 border border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-accent-bg border border-accent/20 flex items-center justify-center text-accent">
-            <BookOpen className="w-6 h-6" />
+      <div className="surface-card p-4 sm:p-6 md:p-8 border border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-bg border border-accent/20 flex items-center justify-center text-accent shrink-0">
+            <BookOpen className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-text">Series Catalog</h1>
-            <p className="text-xs font-mono text-muted mt-0.5">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-text truncate">
+              Series Catalog
+            </h1>
+            <p className="text-xs font-mono text-muted mt-0.5 line-clamp-1">
               Explore audiobook sagas and sequential universes in chronological order
             </p>
           </div>

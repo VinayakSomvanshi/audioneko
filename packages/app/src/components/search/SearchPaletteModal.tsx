@@ -123,7 +123,7 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 md:pt-24 px-4 bg-black/75">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[calc(1.5rem+env(safe-area-inset-top,0px))] md:pt-24 px-3 sm:px-4 bg-black/75">
       {/* Click outside backdrop */}
       <button
         type="button"
@@ -134,7 +134,7 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
       />
 
       {/* Obsidian Tactile Command Palette */}
-      <div className="relative w-full max-w-2xl bg-[#101012] border border-border shadow-2xl rounded-lg overflow-hidden flex flex-col max-h-[80vh] z-10 antialiased">
+      <div className="relative w-full max-w-2xl bg-[#101012] border border-border shadow-2xl rounded-lg overflow-hidden flex flex-col max-h-[85vh] z-10 antialiased">
         {/* Top search input bar */}
         <div className="flex items-center px-4 py-3.5 border-b border-border bg-[#141416] gap-3">
           <Search className="w-4 h-4 text-accent shrink-0" />
@@ -220,7 +220,7 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
                     isSelected ? "bg-surface border-l-2 border-l-accent" : "hover:bg-surface/50"
                   }`}
                 >
-                  <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
                     {/* Thumbnail / Book Icon */}
                     <div className="w-11 h-11 rounded border border-border bg-[#18181b] flex items-center justify-center shrink-0 overflow-hidden">
                       {book.coverUrl ? (

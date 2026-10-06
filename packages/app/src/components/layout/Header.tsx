@@ -44,7 +44,7 @@ export function Header({ onSearchClick }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-40 h-14 border-b border-border bg-bg/95 backdrop-blur-sm px-4 md:px-6 flex items-center justify-between transition-colors">
+    <header className="sticky top-0 z-40 min-h-14 h-auto pt-[env(safe-area-inset-top,0px)] border-b border-border bg-bg/95 backdrop-blur-sm px-3.5 sm:px-4 md:px-6 flex items-center justify-between transition-colors">
       {/* Brand logo */}
       <Link
         to="/"

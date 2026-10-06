@@ -167,19 +167,19 @@ export function AuthorsPage() {
         </div>
 
         {/* Author Header Banner */}
-        <div className="surface-card p-6 md:p-8 border border-border flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 md:w-16 md:h-16 rounded-full bg-accent-bg border border-accent/20 flex items-center justify-center text-accent shrink-0 font-bold text-lg font-mono">
+        <div className="surface-card p-4 sm:p-6 md:p-8 border border-border flex items-center justify-between">
+          <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-full bg-accent-bg border border-accent/20 flex items-center justify-center text-accent shrink-0 font-bold text-base sm:text-lg font-mono">
               {activeAuthor.name.charAt(0)}
             </div>
-            <div className="space-y-1">
-              <div className="text-[11px] font-mono text-accent uppercase tracking-wider">
+            <div className="space-y-1 min-w-0 flex-1">
+              <div className="text-[10px] sm:text-[11px] font-mono text-accent uppercase tracking-wider">
                 Author Catalog
               </div>
-              <h1 className="text-2xl md:text-3xl font-bold text-text tracking-tight">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-text tracking-tight break-words">
                 {activeAuthor.name}
               </h1>
-              <div className="flex items-center gap-3 pt-1 text-xs font-mono text-subtle">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-0.5 sm:pt-1 text-xs font-mono text-subtle">
                 <span className="text-accent font-medium">
                   {activeAuthor.books.length} Audiobooks
                 </span>
@@ -202,8 +202,8 @@ export function AuthorsPage() {
 
           return (
             <div key={seriesName} className="space-y-4">
-              <div className="flex items-center justify-between border-b border-border pb-2">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-2 gap-1.5">
+                <div className="flex flex-wrap items-center gap-2 min-w-0">
                   <span className="logo-dot" />
                   <h2 className="text-sm font-bold text-text font-mono uppercase tracking-wide">
                     {seriesName} Series
@@ -287,14 +287,16 @@ export function AuthorsPage() {
       </div>
 
       {/* Header Banner */}
-      <div className="surface-card p-6 md:p-8 border border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-accent-bg border border-accent/20 flex items-center justify-center text-accent">
-            <Users className="w-6 h-6" />
+      <div className="surface-card p-4 sm:p-6 md:p-8 border border-border flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-bg border border-accent/20 flex items-center justify-center text-accent shrink-0">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-text">Authors Catalog</h1>
-            <p className="text-xs font-mono text-muted mt-0.5">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-text truncate">
+              Authors Catalog
+            </h1>
+            <p className="text-xs font-mono text-muted mt-0.5 line-clamp-1">
               Discover audiobooks by your favorite authors and series
             </p>
           </div>

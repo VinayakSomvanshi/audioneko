@@ -113,14 +113,16 @@ export function OfflinePage() {
       </div>
 
       {/* Header banner */}
-      <div className="surface-card p-6 md:p-8 border border-border space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-accent-bg border border-accent/20 flex items-center justify-center text-accent">
+      <div className="surface-card p-4 sm:p-6 md:p-8 border border-border space-y-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-lg bg-accent-bg border border-accent/20 flex items-center justify-center text-accent shrink-0">
             <HardDriveDownload className="w-5 h-5" />
           </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-text">Offline Storage (OPFS)</h1>
-            <p className="text-xs font-mono text-muted mt-0.5">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-text truncate">
+              Offline Storage (OPFS)
+            </h1>
+            <p className="text-xs font-mono text-muted mt-0.5 line-clamp-1">
               Client-side private filesystem storage • Zero server bandwidth costs
             </p>
           </div>
@@ -179,7 +181,7 @@ export function OfflinePage() {
               Loading offline storage...
             </div>
           ) : downloadedBooks.length === 0 ? (
-            <div className="surface-card p-12 text-center border border-dashed border-border rounded-lg space-y-2">
+            <div className="surface-card p-8 sm:p-12 text-center border border-dashed border-border rounded-lg space-y-2">
               <p className="text-sm font-medium text-text">No audiobooks downloaded yet</p>
               <p className="text-xs text-muted max-w-sm mx-auto">
                 Navigate to any audiobook in your library and click "Download" to store it locally
@@ -191,9 +193,9 @@ export function OfflinePage() {
               {downloadedBooks.map((book) => (
                 <div
                   key={book.bookId}
-                  className="p-4 flex items-center justify-between gap-4 hover:bg-surface/50 transition-colors"
+                  className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface/50 transition-colors"
                 >
-                  <div className="min-w-0 flex items-center gap-3">
+                  <div className="min-w-0 flex items-center gap-3 flex-1">
                     <div className="w-10 h-14 bg-elevated border border-border rounded shrink-0 overflow-hidden flex items-center justify-center text-[10px] font-mono text-subtle">
                       {book.coverR2Key ? (
                         <img
@@ -205,17 +207,17 @@ export function OfflinePage() {
                         "AUDIO"
                       )}
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-text truncate">{book.title}</p>
                       <p className="text-xs text-muted truncate mt-0.5">{book.author}</p>
-                      <p className="text-[11px] font-mono text-subtle mt-1">
+                      <p className="text-[11px] font-mono text-subtle mt-1 truncate">
                         {formatBytes(book.fileSizeBytes)} • Downloaded{" "}
                         {formatDate(book.downloadedAt)}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0 border-border/40">
                     <button
                       type="button"
                       onClick={() => handlePlayDownloaded(book)}

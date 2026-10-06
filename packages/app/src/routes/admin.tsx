@@ -298,25 +298,27 @@ export function AdminDashboardPage() {
     <div className="max-w-5xl mx-auto space-y-8 pb-32">
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-border pb-4 gap-4">
-        <div>
+        <div className="min-w-0">
           <div className="flex items-center gap-2 text-accent text-xs font-mono font-medium">
-            <ShieldCheck className="w-4 h-4" />
+            <ShieldCheck className="w-4 h-4 shrink-0" />
             <span>CURATOR CONTROL PLANE</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-text">Admin Management</h1>
-          <p className="text-xs font-mono text-muted">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-text break-words">
+            Admin Management
+          </h1>
+          <p className="text-xs font-mono text-muted break-words">
             Google Drive automated sync, cryptographic invites, user access, and active shelf
             maintenance.
           </p>
         </div>
 
         {/* Global Quick Action: Re-scan */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => handleTriggerScan()}
             disabled={scanning}
-            className="px-4 py-2 rounded bg-accent text-bg text-xs font-mono font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity cursor-pointer shadow-sm"
+            className="w-full sm:w-auto justify-center px-4 py-2 rounded bg-accent text-bg text-xs font-mono font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity cursor-pointer shadow-sm"
           >
             {scanning ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -610,17 +612,17 @@ export function AdminDashboardPage() {
                 <span className="text-[11px] font-mono text-accent font-semibold block">
                   New Invite Created (Share with your listener):
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <input
                     type="text"
                     readOnly
                     value={newInviteUrl}
-                    className="flex-1 px-3 py-1.5 text-xs font-mono bg-bg border border-border rounded text-text select-all"
+                    className="flex-1 px-3 py-1.5 text-xs font-mono bg-bg border border-border rounded text-text select-all min-w-0"
                   />
                   <button
                     type="button"
                     onClick={() => copyToClipboard(newInviteUrl, "new-link")}
-                    className="px-3 py-1.5 bg-accent text-bg text-xs font-mono font-medium rounded flex items-center gap-1.5 hover:opacity-90 cursor-pointer"
+                    className="px-3 py-1.5 bg-accent text-bg text-xs font-mono font-medium rounded flex items-center justify-center gap-1.5 hover:opacity-90 cursor-pointer shrink-0"
                   >
                     {copiedId === "new-link" ? (
                       <Check className="w-3.5 h-3.5" />

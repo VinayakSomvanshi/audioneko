@@ -146,15 +146,17 @@ export function ShelvesPage() {
       </div>
 
       {/* Header Banner */}
-      <div className="surface-card p-6 md:p-8 border border-border space-y-4">
+      <div className="surface-card p-4 sm:p-6 md:p-8 border border-border space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-accent-bg border border-accent/20 flex items-center justify-center text-accent">
-              <Bookmark className="w-6 h-6" />
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-accent-bg border border-accent/20 flex items-center justify-center text-accent shrink-0">
+              <Bookmark className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold text-text">Bookshelves</h1>
-              <p className="text-xs font-mono text-muted mt-0.5">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-text truncate">
+                Bookshelves
+              </h1>
+              <p className="text-xs font-mono text-muted mt-0.5 line-clamp-1">
                 Organize and curate your personal audiobook reading lists
               </p>
             </div>
@@ -165,7 +167,7 @@ export function ShelvesPage() {
             <button
               type="button"
               onClick={() => setIsCreatingShelf(true)}
-              className="px-4 py-2 rounded bg-accent text-bg text-xs font-mono font-medium flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer self-start md:self-auto"
+              className="px-4 py-2 rounded bg-accent text-bg text-xs font-mono font-medium flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer self-start md:self-auto shrink-0 shadow-sm"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Create New Shelf</span>
@@ -268,7 +270,7 @@ export function ShelvesPage() {
               return (
                 <div
                   key={shelf.id}
-                  className="surface-card p-5 md:p-6 border border-border space-y-4"
+                  className="surface-card p-4 sm:p-5 md:p-6 border border-border space-y-4"
                 >
                   {/* Shelf Header */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">

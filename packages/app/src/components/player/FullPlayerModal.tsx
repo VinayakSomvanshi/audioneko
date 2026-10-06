@@ -83,18 +83,18 @@ export function FullPlayerModal() {
   return (
     <div className="fixed inset-0 z-50 bg-bg text-text flex flex-col justify-between overflow-y-auto animate-in fade-in duration-200">
       {/* 1. Header Bar */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface shrink-0">
+      <header className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] border-b border-border bg-surface shrink-0">
         <button
           type="button"
           onClick={() => setIsFullPlayerOpen(false)}
-          className="p-2 -ml-2 rounded text-muted hover:text-text hover:bg-elevated transition-colors cursor-pointer"
+          className="p-1.5 sm:p-2 -ml-1 sm:-ml-2 rounded text-muted hover:text-text hover:bg-elevated transition-colors cursor-pointer"
           aria-label="Minimize full player"
           title="Minimize"
         >
           <ChevronDown className="w-5 h-5" />
         </button>
 
-        <div className="text-center min-w-0 px-2">
+        <div className="text-center min-w-0 px-2 flex-1">
           <span className="text-[10px] font-mono tracking-widest text-muted uppercase">
             NOW PLAYING
           </span>
@@ -105,12 +105,12 @@ export function FullPlayerModal() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {/* PiP button */}
           <button
             type="button"
             onClick={togglePiP}
-            className={`p-2 rounded transition-colors cursor-pointer ${
+            className={`p-1.5 sm:p-2 rounded transition-colors cursor-pointer ${
               isPiPActive
                 ? "bg-accent/20 text-accent border border-accent/40"
                 : "text-muted hover:text-text hover:bg-elevated"
@@ -125,7 +125,7 @@ export function FullPlayerModal() {
           <button
             type="button"
             onClick={() => setShowSleepModal(true)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-mono transition-colors cursor-pointer ${
+            className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 sm:py-1.5 rounded text-xs font-mono transition-colors cursor-pointer ${
               sleepTimerState.isActive
                 ? "bg-accent text-bg font-bold shadow-sm"
                 : "text-muted hover:text-text hover:bg-elevated"
@@ -142,9 +142,9 @@ export function FullPlayerModal() {
       </header>
 
       {/* 2. Main Player Body */}
-      <main className="flex-1 max-w-xl w-full mx-auto px-6 py-6 flex flex-col justify-center gap-6">
+      <main className="flex-1 max-w-xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] flex flex-col justify-center gap-4 sm:gap-6">
         {/* Large Cover Art with Crisp Border & Obsidian Shadow */}
-        <div className="relative aspect-square w-full max-w-[340px] mx-auto rounded-lg border border-border bg-surface overflow-hidden shadow-2xl flex items-center justify-center group">
+        <div className="relative aspect-square w-full max-w-[240px] sm:max-w-[300px] md:max-w-[340px] mx-auto rounded-lg border border-border bg-surface overflow-hidden shadow-2xl flex items-center justify-center group">
           {currentBook.coverR2Key ? (
             <>
               <img
@@ -184,20 +184,20 @@ export function FullPlayerModal() {
         </div>
 
         {/* Title, Author & Chapter Badge */}
-        <div className="text-center space-y-1">
-          <h2 className="text-lg md:text-xl font-bold text-text tracking-tight truncate">
+        <div className="text-center space-y-1 px-2">
+          <h2 className="text-base sm:text-lg md:text-xl font-bold text-text tracking-tight truncate">
             {currentBook.title}
           </h2>
-          <p className="text-sm font-mono text-muted truncate">{currentBook.author}</p>
+          <p className="text-xs sm:text-sm font-mono text-muted truncate">{currentBook.author}</p>
           {currentChapter && (
             <button
               type="button"
               onClick={() => setShowChapterList(true)}
-              className="inline-flex items-center gap-1.5 text-xs font-mono text-accent hover:underline pt-1 cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs font-mono text-accent hover:underline pt-1 cursor-pointer max-w-full"
             >
-              <span>{currentChapter.title}</span>
-              <span className="text-subtle">
-                ({currentChapter.chapterIndex + 1} of {chapters.length})
+              <span className="truncate">{currentChapter.title}</span>
+              <span className="text-subtle shrink-0">
+                ({currentChapter.chapterIndex + 1}/{chapters.length})
               </span>
             </button>
           )}
@@ -214,11 +214,11 @@ export function FullPlayerModal() {
         </div>
 
         {/* Primary Playback Transport Bar */}
-        <div className="flex items-center justify-center gap-4 md:gap-6">
+        <div className="flex items-center justify-center gap-2.5 sm:gap-4 md:gap-6">
           <button
             type="button"
             onClick={previousChapter}
-            className="p-2.5 text-muted hover:text-text transition-colors cursor-pointer"
+            className="p-2 sm:p-2.5 text-muted hover:text-text transition-colors cursor-pointer"
             aria-label="Previous Chapter"
             title="Previous Chapter"
           >
@@ -228,42 +228,42 @@ export function FullPlayerModal() {
           <button
             type="button"
             onClick={() => skipBy(-15)}
-            className="p-3 text-muted hover:text-text transition-colors cursor-pointer relative"
+            className="p-2.5 sm:p-3 text-muted hover:text-text transition-colors cursor-pointer relative"
             aria-label="Skip back 15 seconds"
             title="Rewind 15s"
           >
-            <Rewind className="w-6 h-6" />
+            <Rewind className="w-5 sm:w-6 h-5 sm:h-6" />
             <span className="absolute text-[9px] font-mono font-bold bottom-1 text-muted">15</span>
           </button>
 
           <button
             type="button"
             onClick={togglePlay}
-            className="w-16 h-16 rounded-full bg-accent text-bg flex items-center justify-center hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-lg"
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-accent text-bg flex items-center justify-center hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-lg"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
             {isPlaying ? (
-              <Pause className="w-7 h-7" />
+              <Pause className="w-6 sm:w-7 h-6 sm:h-7" />
             ) : (
-              <Play className="w-7 h-7 translate-x-0.5" />
+              <Play className="w-6 sm:w-7 h-6 sm:h-7 translate-x-0.5" />
             )}
           </button>
 
           <button
             type="button"
             onClick={() => skipBy(30)}
-            className="p-3 text-muted hover:text-text transition-colors cursor-pointer relative"
+            className="p-2.5 sm:p-3 text-muted hover:text-text transition-colors cursor-pointer relative"
             aria-label="Skip forward 30 seconds"
             title="Forward 30s"
           >
-            <FastForward className="w-6 h-6" />
+            <FastForward className="w-5 sm:w-6 h-5 sm:h-6" />
             <span className="absolute text-[9px] font-mono font-bold bottom-1 text-muted">30</span>
           </button>
 
           <button
             type="button"
             onClick={nextChapter}
-            className="p-2.5 text-muted hover:text-text transition-colors cursor-pointer"
+            className="p-2 sm:p-2.5 text-muted hover:text-text transition-colors cursor-pointer"
             aria-label="Next Chapter"
             title="Next Chapter"
           >
@@ -272,7 +272,7 @@ export function FullPlayerModal() {
         </div>
 
         {/* Secondary DSP & Playback Tools */}
-        <div className="flex items-center justify-between border-t border-border pt-4 px-2">
+        <div className="flex flex-wrap items-center justify-between border-t border-border pt-3 sm:pt-4 px-1 sm:px-2 gap-2">
           {/* Speed Selector Button */}
           <div className="relative">
             <button
@@ -361,7 +361,7 @@ export function FullPlayerModal() {
       {/* 3. Chapter Selection Drawer / Modal */}
       {showChapterList && (
         <div className="fixed inset-0 z-60 bg-bg/80 backdrop-blur-sm flex justify-end">
-          <div className="w-full max-w-md bg-surface border-l border-border h-full flex flex-col p-6 shadow-2xl animate-in slide-in-from-right duration-200">
+          <div className="w-full max-w-md bg-surface border-l border-border h-full flex flex-col p-4 sm:p-6 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] shadow-2xl animate-in slide-in-from-right duration-200">
             <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
               <h3 className="font-bold text-sm tracking-tight text-text">CHAPTERS</h3>
               <button

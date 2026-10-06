@@ -83,7 +83,7 @@ export function RootLayout() {
       <div className="flex-1 flex overflow-hidden min-h-0">
         <Sidebar />
 
-        <main className="flex-1 overflow-y-auto min-h-0 p-4 md:p-8">
+        <main className="flex-1 overflow-y-auto min-h-0 p-3.5 sm:p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
             <Outlet />
           </div>

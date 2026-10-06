@@ -21,11 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
 import { getDownloadedBooks } from "../lib/opfs";
-import {
-  PROGRESS_CHANGE_EVENT,
-  getAllProgress,
-  getProgress,
-} from "../lib/progress-store";
+import { PROGRESS_CHANGE_EVENT, getAllProgress, getProgress } from "../lib/progress-store";
 import { updateSearchIndex } from "../lib/search";
 
 export type LibrarySortOption =
@@ -312,10 +308,10 @@ export function LibraryPage() {
     <div className="space-y-8 pb-24">
       {/* Hero: Continue Listening (only renders when a book has actual progress) */}
       {continueBook && (
-        <section className="surface-card p-5 md:p-6 relative overflow-hidden border border-border">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="w-20 h-20 md:w-24 md:h-24 rounded border border-border bg-surface shrink-0 flex items-center justify-center font-mono text-muted text-lg font-bold overflow-hidden relative">
+        <section className="surface-card p-4 sm:p-5 md:p-6 relative overflow-hidden border border-border">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sm:gap-6">
+            <div className="flex items-center gap-3.5 sm:gap-4 min-w-0 w-full md:w-auto flex-1">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded border border-border bg-surface shrink-0 flex items-center justify-center font-mono text-muted text-base sm:text-lg font-bold overflow-hidden relative">
                 {continueBook.coverR2Key ? (
                   <>
                     <img
@@ -338,16 +334,16 @@ export function LibraryPage() {
                 )}
               </div>
 
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-accent text-xs font-mono">
+              <div className="space-y-1 min-w-0 flex-1">
+                <div className="flex items-center gap-2 text-accent text-[11px] sm:text-xs font-mono">
                   <span className="logo-dot" />
                   <span>CONTINUE LISTENING</span>
                 </div>
-                <h2 className="text-xl md:text-2xl font-semibold text-text tracking-tight">
+                <h2 className="text-base sm:text-xl md:text-2xl font-semibold text-text tracking-tight line-clamp-2 break-words">
                   {continueBook.title}
                 </h2>
-                <p className="text-xs font-mono text-muted">{continueBook.author}</p>
-                <div className="flex items-center gap-3 pt-1 text-[11px] font-mono text-subtle">
+                <p className="text-xs font-mono text-muted truncate">{continueBook.author}</p>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 pt-0.5 sm:pt-1 text-[10px] sm:text-[11px] font-mono text-subtle">
                   <span>{formatDuration(continueBook.durationSeconds)}</span>
                   <span>•</span>
                   <span className="text-accent">{continueBook.format.toUpperCase()} STREAM</span>
@@ -411,7 +407,7 @@ export function LibraryPage() {
           ))}
         </div>
 
-        <div className="flex items-center gap-3 self-end sm:self-auto">
+        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
           {/* Sort Selector */}
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-mono text-muted flex items-center gap-1">

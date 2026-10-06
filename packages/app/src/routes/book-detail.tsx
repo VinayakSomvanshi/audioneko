@@ -186,9 +186,9 @@ export function BookDetailPage() {
       </div>
 
       {/* Main Book Card */}
-      <div className="surface-card p-6 md:p-8 flex flex-col md:flex-row gap-8 items-start border border-border">
+      <div className="surface-card p-4 sm:p-6 md:p-8 flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start border border-border">
         {/* Cover */}
-        <div className="w-48 h-48 md:w-56 md:h-56 rounded border border-border bg-surface shrink-0 flex items-center justify-center font-mono text-muted text-xl font-bold shadow-sm overflow-hidden relative">
+        <div className="w-44 h-44 sm:w-48 sm:h-48 md:w-56 md:h-56 rounded border border-border bg-surface shrink-0 flex items-center justify-center font-mono text-muted text-xl font-bold shadow-sm overflow-hidden relative mx-auto md:mx-0">
           {book.coverR2Key ? (
             <>
               <img
@@ -212,13 +212,13 @@ export function BookDetailPage() {
         </div>
 
         {/* Metadata */}
-        <div className="flex-1 space-y-4">
+        <div className="flex-1 space-y-4 min-w-0 w-full">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs font-mono text-accent">
               <span className="logo-dot" />
               <span>{book.format.toUpperCase()} AUDIOBOOK</span>
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-text">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-text break-words">
               {book.title}
             </h1>
             <p className="text-sm font-mono text-muted">
@@ -337,14 +337,14 @@ export function BookDetailPage() {
           )}
 
           {/* Action buttons */}
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-2">
             {hasProgress ? (
               <>
                 {/* Primary: Resume */}
                 <button
                   type="button"
                   onClick={handleResume}
-                  className="px-6 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                  className="px-5 sm:px-6 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
                 >
                   <Play className="w-4 h-4 fill-current" />
                   <span>{isCurrentlyPlaying ? "NOW PLAYING" : "RESUME"}</span>
@@ -354,7 +354,7 @@ export function BookDetailPage() {
                 <button
                   type="button"
                   onClick={handleStartOverClick}
-                  className="px-4 py-2.5 rounded border border-border bg-surface text-muted font-mono text-xs flex items-center gap-2 hover:bg-elevated hover:text-text transition-colors cursor-pointer"
+                  className="px-3.5 sm:px-4 py-2.5 rounded border border-border bg-surface text-muted font-mono text-xs flex items-center gap-2 hover:bg-elevated hover:text-text transition-colors cursor-pointer"
                   title="Start from Beginning (resets progress)"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
@@ -367,7 +367,7 @@ export function BookDetailPage() {
                 <button
                   type="button"
                   onClick={handleStartOverClick}
-                  className="px-6 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                  className="px-5 sm:px-6 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span>START OVER</span>
@@ -377,7 +377,7 @@ export function BookDetailPage() {
               <button
                 type="button"
                 onClick={handlePlayFromStart}
-                className="px-6 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                className="px-5 sm:px-6 py-2.5 rounded bg-accent text-bg font-mono font-medium text-xs flex items-center gap-2 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
               >
                 <Play className="w-4 h-4 fill-current" />
                 <span>{isCurrentlyPlaying ? "NOW PLAYING" : "LISTEN NOW"}</span>
@@ -437,28 +437,28 @@ export function BookDetailPage() {
                       seekTo(chapter.startTime);
                     }
                   }}
-                  className={`w-full p-3.5 flex items-center justify-between text-left hover:bg-elevated transition-colors cursor-pointer ${
+                  className={`w-full p-3 sm:p-3.5 flex items-center justify-between text-left hover:bg-elevated transition-colors cursor-pointer gap-2 ${
                     isCurrentChapter ? "bg-accent/10 border-l-2 border-l-accent" : ""
                   }`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1 pr-2">
                     <span
-                      className={`text-xs font-mono w-6 ${isListened ? "text-accent" : "text-subtle"}`}
+                      className={`text-xs font-mono w-6 shrink-0 ${isListened ? "text-accent" : "text-subtle"}`}
                     >
                       {chapter.chapterIndex.toString().padStart(2, "0")}
                     </span>
                     <span
-                      className={`text-xs font-medium ${isCurrentChapter ? "text-accent" : isListened ? "text-text/70" : "text-text"}`}
+                      className={`text-xs font-medium truncate ${isCurrentChapter ? "text-accent" : isListened ? "text-text/70" : "text-text"}`}
                     >
                       {chapter.title}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 text-xs font-mono text-subtle">
+                  <div className="flex items-center gap-2 sm:gap-4 text-xs font-mono text-subtle shrink-0">
                     {isListened && !isCurrentChapter && (
                       <span className="text-accent/60 text-[10px]">✓</span>
                     )}
                     <span>{formatSeconds(chapter.startTime)}</span>
-                    <span className="text-[10px] text-muted">
+                    <span className="text-[10px] text-muted hidden xs:inline">
                       ({formatSeconds(chapter.duration)})
                     </span>
                   </div>

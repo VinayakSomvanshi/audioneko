@@ -40,16 +40,16 @@ export function AnalyticsPage() {
       </div>
 
       {/* Header Banner */}
-      <div className="surface-card p-6 md:p-8 border border-border flex items-center justify-between">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-accent-bg border border-accent/20 flex items-center justify-center text-accent">
+      <div className="surface-card p-4 sm:p-6 md:p-8 border border-border flex items-center justify-between">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="w-12 h-12 rounded-xl bg-accent-bg border border-accent/20 flex items-center justify-center text-accent shrink-0">
             <Activity className="w-6 h-6" />
           </div>
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-text">
+          <div className="min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold text-text break-words">
               Listening Analytics & Social
             </h1>
-            <p className="text-xs font-mono text-muted mt-0.5">
+            <p className="text-xs font-mono text-muted mt-0.5 break-words">
               Daily listening streaks, contribution heatmap, and small-group friend activity
             </p>
           </div>

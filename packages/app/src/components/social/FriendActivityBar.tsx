@@ -122,7 +122,7 @@ export function FriendActivityBar({ onJoinListenAlong }: FriendActivityBarProps)
               key={friend.userId}
               className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface/50 transition-colors"
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
                 {/* Avatar with live pulsating dot */}
                 <div className="relative shrink-0">
                   <div className="w-9 h-9 rounded-full bg-elevated border border-border flex items-center justify-center font-mono text-xs font-medium text-text overflow-hidden">

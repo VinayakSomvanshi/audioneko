@@ -51,65 +51,65 @@ export function ActivityHeatmap({ analytics }: ActivityHeatmapProps) {
   return (
     <div className="space-y-6">
       {/* 1. Metric Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {/* Current Streak */}
-        <div className="surface-card p-4 border border-border flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-lg bg-accent-bg border border-accent/20 flex items-center justify-center text-accent">
-            <Flame className="w-5 h-5 fill-accent/20" />
+        <div className="surface-card p-3 sm:p-4 border border-border flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-accent-bg border border-accent/20 flex items-center justify-center text-accent shrink-0">
+            <Flame className="w-4 h-4 sm:w-5 sm:h-5 fill-accent/20" />
           </div>
-          <div>
-            <div className="text-xl font-bold font-mono text-text">
+          <div className="min-w-0">
+            <div className="text-lg sm:text-xl font-bold font-mono text-text truncate">
               {analytics.currentStreakDays}{" "}
-              <span className="text-xs font-normal text-muted">days</span>
+              <span className="text-[10px] sm:text-xs font-normal text-muted">days</span>
             </div>
-            <div className="text-[11px] font-mono text-subtle uppercase tracking-wider">
+            <div className="text-[10px] sm:text-[11px] font-mono text-subtle uppercase tracking-wider truncate">
               Current Streak
             </div>
           </div>
         </div>
 
         {/* Longest Streak */}
-        <div className="surface-card p-4 border border-border flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-lg bg-elevated border border-border flex items-center justify-center text-muted">
-            <Trophy className="w-5 h-5" />
+        <div className="surface-card p-3 sm:p-4 border border-border flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-elevated border border-border flex items-center justify-center text-muted shrink-0">
+            <Trophy className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <div className="text-xl font-bold font-mono text-text">
+          <div className="min-w-0">
+            <div className="text-lg sm:text-xl font-bold font-mono text-text truncate">
               {analytics.longestStreakDays}{" "}
-              <span className="text-xs font-normal text-muted">days</span>
+              <span className="text-[10px] sm:text-xs font-normal text-muted">days</span>
             </div>
-            <div className="text-[11px] font-mono text-subtle uppercase tracking-wider">
+            <div className="text-[10px] sm:text-[11px] font-mono text-subtle uppercase tracking-wider truncate">
               Longest Streak
             </div>
           </div>
         </div>
 
         {/* Total Time Listened */}
-        <div className="surface-card p-4 border border-border flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-lg bg-elevated border border-border flex items-center justify-center text-muted">
-            <Clock className="w-5 h-5" />
+        <div className="surface-card p-3 sm:p-4 border border-border flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-elevated border border-border flex items-center justify-center text-muted shrink-0">
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <div className="text-xl font-bold font-mono text-text">
+          <div className="min-w-0">
+            <div className="text-lg sm:text-xl font-bold font-mono text-text truncate">
               {formatDuration(analytics.totalListenedSeconds)}
             </div>
-            <div className="text-[11px] font-mono text-subtle uppercase tracking-wider">
+            <div className="text-[10px] sm:text-[11px] font-mono text-subtle uppercase tracking-wider truncate">
               Total Listened
             </div>
           </div>
         </div>
 
         {/* Books Finished */}
-        <div className="surface-card p-4 border border-border flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-lg bg-elevated border border-border flex items-center justify-center text-muted">
-            <BookCheck className="w-5 h-5" />
+        <div className="surface-card p-3 sm:p-4 border border-border flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-elevated border border-border flex items-center justify-center text-muted shrink-0">
+            <BookCheck className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
-          <div>
-            <div className="text-xl font-bold font-mono text-text">
+          <div className="min-w-0">
+            <div className="text-lg sm:text-xl font-bold font-mono text-text truncate">
               {analytics.totalBooksCompleted}{" "}
-              <span className="text-xs font-normal text-muted">books</span>
+              <span className="text-[10px] sm:text-xs font-normal text-muted">books</span>
             </div>
-            <div className="text-[11px] font-mono text-subtle uppercase tracking-wider">
+            <div className="text-[10px] sm:text-[11px] font-mono text-subtle uppercase tracking-wider truncate">
               Completed
             </div>
           </div>
@@ -117,11 +117,11 @@ export function ActivityHeatmap({ analytics }: ActivityHeatmapProps) {
       </div>
 
       {/* 2. GitHub-Style 365-Day Contribution Heatmap */}
-      <div className="surface-card p-6 border border-border space-y-4">
-        <div className="flex items-center justify-between">
+      <div className="surface-card p-4 sm:p-6 border border-border space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-accent" />
-            <h3 className="text-sm font-semibold font-mono text-text uppercase tracking-wider">
+            <Calendar className="w-4 h-4 text-accent shrink-0" />
+            <h3 className="text-xs sm:text-sm font-semibold font-mono text-text uppercase tracking-wider">
               Listening Activity (Past Year)
             </h3>
           </div>
