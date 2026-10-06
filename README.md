@@ -15,10 +15,10 @@ The complete technical architecture, data model, free-tier budget, security thre
 
 ## Core Highlights
 
-* **Zero-Cost Invariant ($0.00 / month forever)**: Operates entirely within the permanent free tiers of Cloudflare (Workers with Static Assets, D1, R2, Durable Objects, KV) and Google Cloud Platform.
+* **Zero-Cost Invariant ($0.00 / month forever, Zero Credit Card Required)**: Operates entirely within the permanent free tiers of Cloudflare (Workers with Static Assets, D1, Durable Objects, KV) and Google Cloud Platform without requiring a credit card on file.
 * **Instant Zero-Latency Playback**: Sub-100ms audio startup via speculative background pre-warming, multi-tier metadata caching, non-blocking audio pipelines, and RFC 7233 range-streaming.
 * **Google Drive as Single Source of Truth**: Original audiobook files remain securely stored in Google Drive ("Cold Vault"). The edge indexes, enriches, and caches active streams without redundant storage costs.
-* **4-Tier Streaming Pipeline**: Client OPFS -> Cloudflare R2 Active Shelf (LRU cache managed by background cron) -> Edge Cache API -> Google Drive Streaming Proxy.
+* **3-Tier Zero-Card Streaming Pipeline**: Client OPFS (offline pre-cache on listener device) -> Cloudflare Edge Cache API (2 MB sliced audio ranges) -> Authenticated Google Drive Streaming Proxy with open-ended RFC 7233 range requests.
 * **Client-Side Web Audio DSP**: Custom audio engine featuring Smart Speed (dynamic silence trimming), Voice Boost EQ (85 Hz high-pass cut, 2.2 kHz dialogue lift, sibilance taming), and loudness normalization.
 * **Full-Featured Player Experience**: Dynamic waveform scrubber with 4-tier decelerated fine-scrubbing (1x, 0.5x, 0.25x, 0.1x), desktop keyboard shortcuts, dual buffered/played progress tracks, sleep timer with audio fade-out, bookmarks, and notes.
 * **Cross-Device Sync and Social Presence**: Cloudflare Durable Objects with hibernatable WebSockets for sub-second playback sync across tabs and devices, real-time friend activity presence, and synchronized listen-along rooms.
@@ -44,8 +44,7 @@ The complete technical architecture, data model, free-tier budget, security thre
 * **Database**: Cloudflare D1 (Serverless SQLite) with Drizzle ORM
 * **State and WebSockets**: Cloudflare Durable Objects (`SyncRoom`, `ListenAlongRoom`)
 * **Key-Value Cache**: Cloudflare Workers KV
-* **Storage**: Cloudflare R2 (Active Shelf storage)
-* **Background Tasks**: Cloudflare Queues and Scheduled Worker Crons (`0 */6 * * *`)
+* **Background Tasks**: Scheduled Worker Crons (`0 */6 * * *`)
 * **Authentication**: Better Auth with D1 adapter
 
 ### Shared Library (`packages/shared`)

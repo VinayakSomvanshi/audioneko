@@ -838,7 +838,7 @@ export function AdminDashboardPage() {
           <div className="surface-card p-6 border border-border space-y-4">
             <h3 className="text-sm font-semibold text-text flex items-center gap-2">
               <HardDrive className="w-4 h-4 text-accent" />
-              <span>4-Tier Active Shelf Cache Invariants</span>
+              <span>3-Tier Streaming & Active Shelf Invariants</span>
             </h3>
             <p className="text-xs font-mono text-muted">
               Audiobooks streamed by listeners are promoted into the Tier 2 Active Shelf KV & Memory
