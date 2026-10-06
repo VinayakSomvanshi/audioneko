@@ -131,6 +131,9 @@ export interface ListeningAnalyticsResponse {
   todayListenedSeconds: number;
   averageDailySeconds: number;
   dailyHistory: DailyListeningData[]; // Recent 365 days
+  averagePlaybackRate?: number;
+  weeklyVelocityMinutes?: number;
+  peakListeningHour?: number;
 }
 
 export interface RecordListeningEventRequest {

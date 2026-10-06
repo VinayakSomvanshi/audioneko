@@ -1,5 +1,5 @@
 import type { DailyListeningData, ListeningAnalyticsResponse } from "@audioneko/shared";
-import { BookCheck, Calendar, Clock, Flame, Trophy } from "lucide-react";
+import { BookCheck, Calendar, Clock, Flame, Gauge, Sun, Trophy, Zap } from "lucide-react";
 import { useState } from "react";
 
 interface ActivityHeatmapProps {
@@ -12,6 +12,13 @@ function formatDuration(seconds: number): string {
   if (minutes < 60) return `${minutes}m`;
   const hours = (seconds / 3600).toFixed(1);
   return `${hours}h`;
+}
+
+function formatPeakHour(hour?: number): string {
+  if (hour === undefined || hour === null) return "Evening";
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h = hour % 12 || 12;
+  return `${h}:00 ${ampm}`;
 }
 
 export function ActivityHeatmap({ analytics }: ActivityHeatmapProps) {
@@ -111,6 +118,53 @@ export function ActivityHeatmap({ analytics }: ActivityHeatmapProps) {
             </div>
             <div className="text-[10px] sm:text-[11px] font-mono text-subtle uppercase tracking-wider truncate">
               Completed
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Reading Velocity & Habit Insights */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="surface-card p-3 sm:p-4 border border-border flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-accent shrink-0">
+            <Zap className="w-4 h-4 text-accent" />
+          </div>
+          <div>
+            <div className="text-sm sm:text-base font-bold font-mono text-text">
+              {analytics.weeklyVelocityMinutes
+                ? `${(analytics.weeklyVelocityMinutes / 60).toFixed(1)} hrs`
+                : "0 hrs"}
+            </div>
+            <div className="text-[10px] sm:text-[11px] font-mono text-subtle uppercase tracking-wider">
+              Past 7 Days Velocity
+            </div>
+          </div>
+        </div>
+
+        <div className="surface-card p-3 sm:p-4 border border-border flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-accent shrink-0">
+            <Gauge className="w-4 h-4 text-accent" />
+          </div>
+          <div>
+            <div className="text-sm sm:text-base font-bold font-mono text-text">
+              {analytics.averagePlaybackRate ? `${analytics.averagePlaybackRate}x` : "1.00x"}
+            </div>
+            <div className="text-[10px] sm:text-[11px] font-mono text-subtle uppercase tracking-wider">
+              Average Playback Speed
+            </div>
+          </div>
+        </div>
+
+        <div className="surface-card p-3 sm:p-4 border border-border flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-surface border border-border flex items-center justify-center text-accent shrink-0">
+            <Sun className="w-4 h-4 text-accent" />
+          </div>
+          <div>
+            <div className="text-sm sm:text-base font-bold font-mono text-text">
+              {formatPeakHour(analytics.peakListeningHour)}
+            </div>
+            <div className="text-[10px] sm:text-[11px] font-mono text-subtle uppercase tracking-wider">
+              Peak Listening Hour
             </div>
           </div>
         </div>

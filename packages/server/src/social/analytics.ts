@@ -133,6 +133,7 @@ export async function getUserListeningAnalytics(
     .select({
       duration: listeningEvents.durationListenedSeconds,
       timestamp: listeningEvents.timestamp,
+      playbackRate: listeningEvents.playbackRate,
     })
     .from(listeningEvents)
     .where(
@@ -149,19 +150,47 @@ export async function getUserListeningAnalytics(
 
   const totalBooksCompleted = completedBooks[0]?.count || 0;
 
-  // 3. Aggregate daily listening totals
+  // 3. Aggregate daily listening totals and listening velocity
   const dailyMap = new Map<string, { seconds: number; count: number }>();
   let totalListenedSeconds = 0;
+  let weightedRateSum = 0;
+  let totalDurationForRate = 0;
+  const sevenDaysAgoTs = Math.floor(Date.now() / 1000) - 7 * 86400;
+  let weeklySeconds = 0;
+  const hourBuckets = new Array(24).fill(0);
 
   for (const ev of events) {
     const evDate = new Date(ev.timestamp * 1000);
     const dateKey = formatIsoDate(evDate);
     totalListenedSeconds += ev.duration;
 
+    if (ev.playbackRate && ev.duration > 0) {
+      weightedRateSum += ev.playbackRate * ev.duration;
+      totalDurationForRate += ev.duration;
+    }
+    if (ev.timestamp >= sevenDaysAgoTs) {
+      weeklySeconds += ev.duration;
+    }
+    const evHour = evDate.getUTCHours();
+    hourBuckets[evHour] = (hourBuckets[evHour] || 0) + ev.duration;
+
     const existing = dailyMap.get(dateKey) || { seconds: 0, count: 0 };
     existing.seconds += ev.duration;
     existing.count += 1;
     dailyMap.set(dateKey, existing);
+  }
+
+  const averagePlaybackRate =
+    totalDurationForRate > 0 ? Number((weightedRateSum / totalDurationForRate).toFixed(2)) : 1.0;
+  const weeklyVelocityMinutes = Math.round(weeklySeconds / 60);
+
+  let peakListeningHour = 20;
+  let maxHourSec = 0;
+  for (let h = 0; h < 24; h++) {
+    if (hourBuckets[h] > maxHourSec) {
+      maxHourSec = hourBuckets[h];
+      peakListeningHour = h;
+    }
   }
 
   // 4. Compute streak statistics
@@ -210,5 +239,8 @@ export async function getUserListeningAnalytics(
     todayListenedSeconds: Math.round(todaySeconds),
     averageDailySeconds,
     dailyHistory,
+    averagePlaybackRate,
+    weeklyVelocityMinutes,
+    peakListeningHour,
   };
 }

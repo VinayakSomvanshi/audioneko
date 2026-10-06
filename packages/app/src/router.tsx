@@ -3,6 +3,7 @@ import { AdminDashboardPage } from "./routes/admin";
 import { AnalyticsPage } from "./routes/analytics";
 import { AuthorsPage } from "./routes/authors";
 import { BookDetailPage } from "./routes/book-detail";
+import { BookmarksPage } from "./routes/bookmarks";
 import { JoinPage } from "./routes/join";
 import { LibraryPage } from "./routes/library";
 import { LoginPage } from "./routes/login";
@@ -81,6 +82,18 @@ const shelvesRoute = createRoute({
   component: ShelvesPage,
 });
 
+const bookmarksRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/bookmarks",
+  component: BookmarksPage,
+});
+
+const notebookRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/notebook",
+  component: BookmarksPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   bookDetailRoute,
@@ -93,6 +106,8 @@ const routeTree = rootRoute.addChildren([
   seriesRoute,
   authorsRoute,
   shelvesRoute,
+  bookmarksRoute,
+  notebookRoute,
 ]);
 
 export const router = createRouter({

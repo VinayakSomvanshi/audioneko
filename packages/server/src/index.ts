@@ -1,4 +1,4 @@
-import { and, asc, eq, or } from "drizzle-orm";
+import { and, asc, desc, eq, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { absRoutes } from "./abs/routes";
@@ -13,6 +13,11 @@ import { extractChaptersFromM4b } from "./drive/metadata";
 import { scanDriveLibrary } from "./drive/scanner";
 import { handleAudioStreamRequest } from "./drive/stream";
 import { getGoogleAccessToken } from "./drive/token";
+import {
+  getActiveDriveWatchChannel,
+  handleDrivePushNotification,
+  registerDriveWatchChannel,
+} from "./drive/webhook";
 import {
   ACTIVE_SHELF_PREFIX,
   dispatchShelfTask,
@@ -793,6 +798,115 @@ app.delete("/api/shelves/:id/books/:bookId", requireAuth, async (c) => {
 // ==========================================
 // Bookmarks API Routes
 // ==========================================
+// Bookmarks, Clips & Shelves Routes
+// ==========================================
+
+// Get all bookmarks across all books for authenticated user
+app.get("/api/bookmarks", requireAuth, async (c) => {
+  try {
+    const user = c.get("user");
+    const db = createDb(c.env.DB);
+    const userBookmarks = await db
+      .select({
+        id: schema.bookmarks.id,
+        bookId: schema.bookmarks.bookId,
+        positionSeconds: schema.bookmarks.positionSeconds,
+        chapterTitle: schema.bookmarks.chapterTitle,
+        note: schema.bookmarks.note,
+        createdAt: schema.bookmarks.createdAt,
+        bookTitle: schema.books.title,
+        bookAuthor: schema.books.author,
+        coverR2Key: schema.books.coverR2Key,
+      })
+      .from(schema.bookmarks)
+      .leftJoin(schema.books, eq(schema.bookmarks.bookId, schema.books.id))
+      .where(eq(schema.bookmarks.userId, user.id))
+      .orderBy(desc(schema.bookmarks.createdAt));
+    return c.json({ bookmarks: userBookmarks });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to fetch bookmarks";
+    return c.json({ error: message, code: "BOOKMARKS_FETCH_FAILED" }, 500);
+  }
+});
+
+// Export all bookmarks to Markdown format
+app.get("/api/bookmarks/export/markdown", requireAuth, async (c) => {
+  try {
+    const user = c.get("user");
+    const db = createDb(c.env.DB);
+    const userBookmarks = await db
+      .select({
+        id: schema.bookmarks.id,
+        bookId: schema.bookmarks.bookId,
+        positionSeconds: schema.bookmarks.positionSeconds,
+        chapterTitle: schema.bookmarks.chapterTitle,
+        note: schema.bookmarks.note,
+        createdAt: schema.bookmarks.createdAt,
+        bookTitle: schema.books.title,
+        bookAuthor: schema.books.author,
+      })
+      .from(schema.bookmarks)
+      .leftJoin(schema.books, eq(schema.bookmarks.bookId, schema.books.id))
+      .where(eq(schema.bookmarks.userId, user.id))
+      .orderBy(asc(schema.books.title), asc(schema.bookmarks.positionSeconds));
+
+    const booksMap = new Map<string, typeof userBookmarks>();
+    for (const b of userBookmarks) {
+      const key = b.bookTitle || "Unknown Audiobook";
+      if (!booksMap.has(key)) {
+        booksMap.set(key, []);
+      }
+      booksMap.get(key)!.push(b);
+    }
+
+    const formatTimestamp = (sec: number) => {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    };
+
+    let md = "# audioneko: Audiobook Highlights & Annotations\n\n";
+    for (const [title, marks] of booksMap.entries()) {
+      const author = marks[0]?.bookAuthor || "Unknown Author";
+      md += `## ${title}\n*By ${author}*\n\n`;
+      for (const m of marks) {
+        const timeCode = formatTimestamp(m.positionSeconds);
+        const chapter = m.chapterTitle ? ` (${m.chapterTitle})` : "";
+        const note = m.note ? ` - "${m.note}"` : "";
+        md += `- **${timeCode}**${chapter}${note}\n`;
+      }
+      md += "\n";
+    }
+
+    c.header("Content-Type", "text/markdown; charset=utf-8");
+    c.header("Content-Disposition", 'attachment; filename="audioneko-highlights.md"');
+    return c.text(md);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to export markdown";
+    return c.json({ error: message, code: "BOOKMARKS_EXPORT_FAILED" }, 500);
+  }
+});
+
+// Update a bookmark note by ID
+app.patch("/api/bookmarks/:id", requireAuth, async (c) => {
+  try {
+    const user = c.get("user");
+    const bookmarkId = c.req.param("id");
+    const { note } = await c.req.json<{ note: string }>();
+    const db = createDb(c.env.DB);
+
+    await db
+      .update(schema.bookmarks)
+      .set({ note: note || null })
+      .where(and(eq(schema.bookmarks.id, bookmarkId), eq(schema.bookmarks.userId, user.id)));
+
+    return c.json({ success: true });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to update bookmark";
+    return c.json({ error: message, code: "BOOKMARK_UPDATE_FAILED" }, 500);
+  }
+});
 
 // Get all bookmarks for a specific book by authenticated user
 app.get("/api/bookmarks/:bookId", requireAuth, async (c) => {
@@ -896,6 +1010,40 @@ app.delete("/api/bookmarks/:id", requireAuth, async (c) => {
     const message = err instanceof Error ? err.message : "Failed to delete bookmark";
     return c.json({ error: message, code: "BOOKMARK_DELETE_FAILED" }, 500);
   }
+});
+
+// ==========================================
+// Google Drive Push Notification Webhooks
+// ==========================================
+
+// Google Drive Push Notification Webhook Receiver
+app.post("/api/webhooks/drive", async (c) => {
+  const headers = {
+    channelId: c.req.header("x-goog-channel-id"),
+    channelToken: c.req.header("x-goog-channel-token"),
+    resourceId: c.req.header("x-goog-resource-id"),
+    resourceState: c.req.header("x-goog-resource-state"),
+    channelExpiration: c.req.header("x-goog-channel-expiration"),
+    messageNumber: c.req.header("x-goog-message-number"),
+  };
+
+  const result = await handleDrivePushNotification(headers, c.env);
+  return c.json(result, 200);
+});
+
+// Admin: Check active Google Drive Watch Channel
+app.get("/api/admin/drive/watch", requireAdmin, async (c) => {
+  const channel = await getActiveDriveWatchChannel(c.env);
+  return c.json({ channel });
+});
+
+// Admin: Register or refresh Google Drive Watch Channel
+app.post("/api/admin/drive/watch", requireAdmin, async (c) => {
+  const result = await registerDriveWatchChannel(c.env, c.env.APP_URL);
+  if ("error" in result) {
+    return c.json(result, 500);
+  }
+  return c.json({ success: true, channel: result });
 });
 
 // ==========================================

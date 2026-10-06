@@ -22,6 +22,11 @@ import {
 import { pipManager } from "../lib/pip-visualizer";
 import { clearProgress, getProgress, progressTracker, setProgress } from "../lib/progress-store";
 import { SleepTimer, type SleepTimerPreset, type SleepTimerState } from "../lib/sleep-timer";
+import {
+  computeSmartRewind,
+  loadSmartRewindSettings,
+  saveSmartRewindSettings,
+} from "../lib/smart-rewind";
 import { SyncClient } from "../lib/sync-client";
 
 export interface AudioContextType {
@@ -38,6 +43,7 @@ export interface AudioContextType {
   voiceBoost: boolean;
   loudnessNormalization: boolean;
   smartSpeed: boolean;
+  smartRewind: boolean;
   isFullPlayerOpen: boolean;
   isPiPActive: boolean;
   sleepTimerState: SleepTimerState;
@@ -61,6 +67,7 @@ export interface AudioContextType {
   toggleVoiceBoost: () => void;
   toggleLoudnessNormalization: () => void;
   toggleSmartSpeed: () => void;
+  toggleSmartRewind: () => void;
   startSleepTimer: (preset: SleepTimerPreset) => void;
   extendSleepTimer: (minutes?: number) => void;
   cancelSleepTimer: () => void;
@@ -94,6 +101,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [voiceBoost, setVoiceBoostState] = useState(false);
   const [loudnessNormalization, setLoudnessNormState] = useState(true);
   const [smartSpeed, setSmartSpeedState] = useState(false);
+  const [smartRewind, setSmartRewindState] = useState(() => loadSmartRewindSettings().enabled);
+  const pausedAtMsRef = useRef<number | null>(null);
 
   const sleepTimerRef = useRef<SleepTimer | null>(null);
   const [sleepTimerState, setSleepTimerState] = useState<SleepTimerState>({
@@ -189,10 +198,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   );
 
   // Core controls - all use refs so they never go stale
-  // Flush to localStorage on explicit pause too
   const pause = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    pausedAtMsRef.current = Date.now();
     audioEngine.pauseWithRamp(audio);
     setMediaSessionPlaybackState("paused");
     const book = currentBookRef.current;
@@ -229,6 +238,23 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const resume = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    // Smart Resume Rewind evaluation
+    if (pausedAtMsRef.current && currentTimeRef.current > 0) {
+      const settings = loadSmartRewindSettings();
+      const rewindRes = computeSmartRewind(
+        pausedAtMsRef.current,
+        currentTimeRef.current,
+        Date.now(),
+        settings,
+      );
+      if (rewindRes.shouldRewind) {
+        currentTimeRef.current = rewindRes.targetPositionSeconds;
+        setCurrentTime(rewindRes.targetPositionSeconds);
+      }
+    }
+    pausedAtMsRef.current = null;
+
     const book = currentBookRef.current;
     if (
       book &&
@@ -858,6 +884,14 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
+  const toggleSmartRewind = useCallback(() => {
+    setSmartRewindState((prev) => {
+      const next = !prev;
+      saveSmartRewindSettings({ enabled: next });
+      return next;
+    });
+  }, []);
+
   const startSleepTimer = useCallback((preset: SleepTimerPreset) => {
     const chapterEnd = currentChapterRef.current?.endTime ?? durationRef.current;
     sleepTimerRef.current?.start(preset, {
@@ -1061,6 +1095,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         toggleVoiceBoost,
         toggleLoudnessNormalization,
         toggleSmartSpeed,
+        smartRewind,
+        toggleSmartRewind,
         startSleepTimer,
         extendSleepTimer,
         cancelSleepTimer,

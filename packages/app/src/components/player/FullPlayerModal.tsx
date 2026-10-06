@@ -11,6 +11,7 @@ import {
   Play,
   Plus,
   Rewind,
+  RotateCcw,
   SkipBack,
   SkipForward,
   Trash2,
@@ -49,6 +50,7 @@ export function FullPlayerModal() {
     isMuted,
     voiceBoost,
     smartSpeed,
+    smartRewind,
     isFullPlayerOpen,
     setIsFullPlayerOpen,
     togglePlay,
@@ -59,6 +61,7 @@ export function FullPlayerModal() {
     toggleMute,
     toggleVoiceBoost,
     toggleSmartSpeed,
+    toggleSmartRewind,
     sleepTimerState,
     startSleepTimer,
     extendSleepTimer,
@@ -429,6 +432,21 @@ export function FullPlayerModal() {
           >
             <Zap className="w-3.5 h-3.5" />
             <span>Smart Speed</span>
+          </button>
+
+          {/* Smart Resume Rewind Toggle */}
+          <button
+            type="button"
+            onClick={toggleSmartRewind}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono border transition-colors cursor-pointer ${
+              smartRewind
+                ? "border-accent bg-accent/15 text-accent font-semibold"
+                : "border-border bg-surface text-muted hover:text-text"
+            }`}
+            title="Smart Resume: Automatically rewinds 5-25s when resuming after interruptions"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Smart Rewind</span>
           </button>
 
           {/* Volume Control & Mute */}

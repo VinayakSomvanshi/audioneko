@@ -20,6 +20,7 @@ export function Sidebar() {
     { label: "Series", href: "/series", icon: BookOpen },
     { label: "Authors", href: "/authors", icon: Users },
     { label: "Shelves", href: "/shelves", icon: Bookmark },
+    { label: "Notebook & Quotes", href: "/notebook", icon: BookOpen },
     { label: "Offline OPFS", href: "/offline", icon: HardDriveDownload },
   ];
 
