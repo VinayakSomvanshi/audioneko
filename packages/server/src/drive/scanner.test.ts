@@ -72,4 +72,25 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(res.series).toBe("Addicted");
     expect(res.seriesIndex).toBe(1);
   });
+
+  it("parses The Empyrean series books (Fourth Wing, Iron Flame, Onyx Storm)", () => {
+    const b1 = parseBookInfo("01 - Fourth Wing.m4b");
+    expect(b1.title).toBe("Fourth Wing");
+    expect(b1.author).toBe("Rebecca Yarros");
+    expect(b1.series).toBe("The Empyrean");
+    expect(b1.seriesIndex).toBe(1);
+    expect(b1.narrator).toBe("Rebecca Soler, Teddy Hamilton");
+
+    const b2 = parseBookInfo("02 - Iron Flame.m4b");
+    expect(b2.title).toBe("Iron Flame");
+    expect(b2.author).toBe("Rebecca Yarros");
+    expect(b2.series).toBe("The Empyrean");
+    expect(b2.seriesIndex).toBe(2);
+
+    const b3 = parseBookInfo("03 - Onyx Storm.m4b");
+    expect(b3.title).toBe("Onyx Storm");
+    expect(b3.author).toBe("Rebecca Yarros");
+    expect(b3.series).toBe("The Empyrean");
+    expect(b3.seriesIndex).toBe(3);
+  });
 });

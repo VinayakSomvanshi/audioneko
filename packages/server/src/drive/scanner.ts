@@ -81,6 +81,13 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     } else if (parentFolderName.toLowerCase().includes("windy city")) {
       series = "Windy City";
       author = "Liz Tomforde";
+    } else if (
+      parentFolderName.toLowerCase().includes("empyrean") ||
+      parentFolderName.toLowerCase().includes("rebecca yarros") ||
+      parentFolderName.toLowerCase().includes("rebecca yaros")
+    ) {
+      series = "The Empyrean";
+      author = "Rebecca Yarros";
     }
   }
 
@@ -153,6 +160,35 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
       if (title.toLowerCase().includes("rewind it back")) {
         seriesIndex = 5;
       }
+    }
+  }
+
+  // Known series heuristics for Rebecca Yarros The Empyrean books
+  const lowerTitle = title.toLowerCase();
+  if (
+    lowerTitle.includes("fourth wing") ||
+    lowerTitle.includes("iron flame") ||
+    lowerTitle.includes("onyx storm") ||
+    author === "Rebecca Yarros" ||
+    author === "Rebecca Yaros"
+  ) {
+    if (!author || author === "Unknown Author" || author === "Rebecca Yaros") {
+      author = "Rebecca Yarros";
+    }
+    if (!series) {
+      series = "The Empyrean";
+    }
+    if (seriesIndex === undefined) {
+      if (lowerTitle.includes("fourth wing")) {
+        seriesIndex = 1;
+      } else if (lowerTitle.includes("iron flame")) {
+        seriesIndex = 2;
+      } else if (lowerTitle.includes("onyx storm")) {
+        seriesIndex = 3;
+      }
+    }
+    if (!narrator) {
+      narrator = "Rebecca Soler, Teddy Hamilton";
     }
   }
 
@@ -448,10 +484,12 @@ export async function scanDriveLibrary(
           : null;
 
     const needsEnrichment =
-      !coverKey &&
       !isLoveHypothesis &&
       !isCuratedLocalCover &&
-      (enrichedAuthor === "Unknown Author" || !hasSquareCover);
+      (enrichedAuthor === "Unknown Author" ||
+        !hasSquareCover ||
+        !prevBook?.description ||
+        prevBook?.description === `${parsed.title} by ${enrichedAuthor}.`);
 
     if (needsEnrichment) {
       try {
