@@ -1,4 +1,6 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Bookmark,
   ChevronDown,
   FastForward,
   ListMusic,
@@ -7,9 +9,11 @@ import {
   Moon,
   Pause,
   Play,
+  Plus,
   Rewind,
   SkipBack,
   SkipForward,
+  Trash2,
   Volume2,
   VolumeX,
   X,
@@ -21,6 +25,16 @@ import { getBookCoverUrl } from "../../lib/covers";
 import type { SleepTimerPreset } from "../../lib/sleep-timer";
 import { WaveformScrubber, formatScrubberTime } from "./WaveformScrubber";
 
+interface BookmarkItem {
+  id: string;
+  userId: string;
+  bookId: string;
+  positionSeconds: number;
+  chapterTitle?: string | null;
+  note?: string | null;
+  createdAt: string;
+}
+
 export function FullPlayerModal() {
   const {
     currentBook,
@@ -29,8 +43,10 @@ export function FullPlayerModal() {
     isPlaying,
     currentTime,
     duration,
+    bufferedTime,
     playbackRate,
     volume,
+    isMuted,
     voiceBoost,
     smartSpeed,
     isFullPlayerOpen,
@@ -40,6 +56,7 @@ export function FullPlayerModal() {
     skipBy,
     setRate,
     setVol,
+    toggleMute,
     toggleVoiceBoost,
     toggleSmartSpeed,
     sleepTimerState,
@@ -53,9 +70,62 @@ export function FullPlayerModal() {
     previousChapter,
   } = useAudio();
 
+  const queryClient = useQueryClient();
   const [showChapterList, setShowChapterList] = useState(false);
   const [showSleepModal, setShowSleepModal] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [showBookmarks, setShowBookmarks] = useState(false);
+  const [newBookmarkNote, setNewBookmarkNote] = useState("");
+  const [isAddingBookmark, setIsAddingBookmark] = useState(false);
+
+  const { data: bookmarksData, isLoading: isBookmarksLoading } = useQuery<{
+    bookmarks: BookmarkItem[];
+  }>({
+    queryKey: ["bookmarks", currentBook?.id],
+    queryFn: async () => {
+      if (!currentBook?.id) return { bookmarks: [] };
+      const res = await fetch(`/api/bookmarks/${currentBook.id}`);
+      if (!res.ok) throw new Error("Failed to load bookmarks");
+      return res.json();
+    },
+    enabled: !!currentBook?.id && (showBookmarks || isFullPlayerOpen),
+  });
+
+  const createBookmarkMutation = useMutation({
+    mutationFn: async ({ note }: { note?: string }) => {
+      if (!currentBook) return;
+      const res = await fetch("/api/bookmarks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookId: currentBook.id,
+          positionSeconds: currentTime,
+          chapterTitle: currentChapter?.title || undefined,
+          note: note?.trim() || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to create bookmark");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookmarks", currentBook?.id] });
+      setNewBookmarkNote("");
+      setIsAddingBookmark(false);
+    },
+  });
+
+  const deleteBookmarkMutation = useMutation({
+    mutationFn: async (bookmarkId: string) => {
+      const res = await fetch(`/api/bookmarks/${bookmarkId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete bookmark");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["bookmarks", currentBook?.id] });
+    },
+  });
 
   // Close modal on Escape key
   useEffect(() => {
@@ -64,6 +134,7 @@ export function FullPlayerModal() {
         if (showChapterList) setShowChapterList(false);
         else if (showSleepModal) setShowSleepModal(false);
         else if (showSpeedMenu) setShowSpeedMenu(false);
+        else if (showBookmarks) setShowBookmarks(false);
         else setIsFullPlayerOpen(false);
       }
     };
@@ -71,7 +142,14 @@ export function FullPlayerModal() {
       window.addEventListener("keydown", handleKeyDown);
     }
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isFullPlayerOpen, showChapterList, showSleepModal, showSpeedMenu, setIsFullPlayerOpen]);
+  }, [
+    isFullPlayerOpen,
+    showChapterList,
+    showSleepModal,
+    showSpeedMenu,
+    showBookmarks,
+    setIsFullPlayerOpen,
+  ]);
 
   if (!isFullPlayerOpen || !currentBook) {
     return null;
@@ -106,6 +184,24 @@ export function FullPlayerModal() {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Bookmarks drawer button */}
+          <button
+            type="button"
+            onClick={() => setShowBookmarks(true)}
+            className={`p-1.5 sm:p-2 rounded transition-colors cursor-pointer relative ${
+              showBookmarks
+                ? "bg-accent/20 text-accent border border-accent/40"
+                : "text-muted hover:text-text hover:bg-elevated"
+            }`}
+            aria-label="Bookmarks"
+            title="Bookmarks & Notes"
+          >
+            <Bookmark className="w-4 h-4" />
+            {bookmarksData?.bookmarks && bookmarksData.bookmarks.length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-accent" />
+            )}
+          </button>
+
           {/* PiP button */}
           <button
             type="button"
@@ -208,6 +304,7 @@ export function FullPlayerModal() {
           <WaveformScrubber
             currentTime={currentTime}
             duration={duration}
+            bufferedTime={bufferedTime}
             chapters={chapters}
             onSeek={seekTo}
           />
@@ -334,25 +431,30 @@ export function FullPlayerModal() {
             <span>Smart Speed</span>
           </button>
 
-          {/* Volume Control */}
-          <div className="hidden sm:flex items-center gap-2">
+          {/* Volume Control & Mute */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               type="button"
-              onClick={() => setVol(volume === 0 ? 1 : 0)}
-              className="text-muted hover:text-text p-1 cursor-pointer"
-              aria-label="Mute toggle"
+              onClick={toggleMute}
+              className="text-muted hover:text-text p-1 cursor-pointer transition-colors"
+              aria-label={isMuted ? "Unmute" : "Mute"}
+              title={isMuted ? "Unmute (M)" : "Mute (M)"}
             >
-              {volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              {isMuted || volume === 0 ? (
+                <VolumeX className="w-4 h-4 text-accent" />
+              ) : (
+                <Volume2 className="w-4 h-4" />
+              )}
             </button>
             <input
               type="range"
               min="0"
               max="1"
               step="0.05"
-              value={volume}
+              value={isMuted ? 0 : volume}
               onChange={(e) => setVol(Number.parseFloat(e.target.value))}
               aria-label="Volume slider"
-              className="w-16 h-1 bg-elevated appearance-none cursor-pointer accent-accent"
+              className="w-14 sm:w-20 h-1 bg-elevated appearance-none cursor-pointer accent-accent"
             />
           </div>
         </div>
@@ -398,6 +500,148 @@ export function FullPlayerModal() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bookmarks & Notes Drawer */}
+      {showBookmarks && (
+        <div className="fixed inset-0 z-60 bg-bg/80 backdrop-blur-sm flex justify-end">
+          <div className="w-full max-w-md bg-surface border-l border-border h-full flex flex-col p-4 sm:p-6 pt-[calc(1rem+env(safe-area-inset-top,0px))] pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] shadow-2xl animate-in slide-in-from-right duration-200">
+            <div className="flex items-center justify-between border-b border-border pb-4 mb-4">
+              <div className="flex items-center gap-2">
+                <Bookmark className="w-4 h-4 text-accent" />
+                <h3 className="font-bold text-sm tracking-tight text-text">BOOKMARKS & NOTES</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBookmarks(false);
+                  setIsAddingBookmark(false);
+                }}
+                className="p-1 rounded text-muted hover:text-text hover:bg-elevated cursor-pointer"
+                aria-label="Close bookmarks drawer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Quick Add Bookmark Section */}
+            <div className="mb-4 p-3 rounded-lg border border-border bg-elevated/40 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono text-muted">
+                  Position: <strong className="text-text">{formatScrubberTime(currentTime)}</strong>
+                </span>
+                {!isAddingBookmark && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAddingBookmark(true)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-accent text-bg font-bold text-xs font-mono hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Bookmark</span>
+                  </button>
+                )}
+              </div>
+
+              {isAddingBookmark && (
+                <div className="flex flex-col gap-2 pt-1 animate-in fade-in duration-150">
+                  <input
+                    type="text"
+                    value={newBookmarkNote}
+                    onChange={(e) => setNewBookmarkNote(e.target.value)}
+                    placeholder="Add an optional note..."
+                    className="w-full bg-surface border border-border rounded px-2.5 py-1.5 text-xs text-text placeholder:text-subtle focus:outline-none focus:border-accent"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        createBookmarkMutation.mutate({ note: newBookmarkNote });
+                      }
+                    }}
+                  />
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingBookmark(false);
+                        setNewBookmarkNote("");
+                      }}
+                      className="px-2.5 py-1 rounded text-xs font-mono text-muted hover:text-text cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={createBookmarkMutation.isPending}
+                      onClick={() => createBookmarkMutation.mutate({ note: newBookmarkNote })}
+                      className="px-3 py-1 rounded bg-accent text-bg font-bold text-xs font-mono hover:opacity-90 disabled:opacity-50 cursor-pointer shadow-sm"
+                    >
+                      {createBookmarkMutation.isPending ? "Saving..." : "Save Bookmark"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Bookmarks List */}
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {isBookmarksLoading ? (
+                <p className="text-xs font-mono text-muted text-center py-8">
+                  Loading bookmarks...
+                </p>
+              ) : !bookmarksData?.bookmarks || bookmarksData.bookmarks.length === 0 ? (
+                <div className="text-center py-12 px-4 space-y-2">
+                  <Bookmark className="w-8 h-8 text-subtle mx-auto opacity-40" />
+                  <p className="text-xs font-mono text-muted">
+                    No bookmarks saved for this book yet.
+                  </p>
+                  <p className="text-[11px] text-subtle">
+                    Tap &quot;Add Bookmark&quot; to save key moments with optional notes.
+                  </p>
+                </div>
+              ) : (
+                bookmarksData.bookmarks.map((bm) => (
+                  <div
+                    key={bm.id}
+                    className="group p-3 rounded-lg border border-border bg-surface hover:border-accent/40 transition-colors flex items-start justify-between gap-3"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        seekTo(bm.positionSeconds);
+                        setShowBookmarks(false);
+                      }}
+                      className="flex-1 text-left cursor-pointer space-y-1 min-w-0"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-accent/15 text-accent text-xs font-mono font-bold">
+                          {formatScrubberTime(bm.positionSeconds)}
+                        </span>
+                        {bm.chapterTitle && (
+                          <span className="text-[11px] font-mono text-muted truncate">
+                            {bm.chapterTitle}
+                          </span>
+                        )}
+                      </div>
+                      {bm.note && (
+                        <p className="text-xs text-text break-words line-clamp-3 pt-0.5 font-sans">
+                          {bm.note}
+                        </p>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => deleteBookmarkMutation.mutate(bm.id)}
+                      className="p-1.5 rounded text-subtle hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer shrink-0 opacity-60 group-hover:opacity-100"
+                      title="Delete bookmark"
+                      aria-label="Delete bookmark"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

@@ -11,6 +11,7 @@ import {
 export interface WaveformScrubberProps {
   currentTime: number;
   duration: number;
+  bufferedTime?: number;
   chapters?: Chapter[];
   onSeek: (seconds: number) => void;
   className?: string;
@@ -52,6 +53,7 @@ const TOTAL_BARS = 64;
 export function WaveformScrubber({
   currentTime,
   duration,
+  bufferedTime = 0,
   chapters = [],
   onSeek,
   className = "",
@@ -91,6 +93,8 @@ export function WaveformScrubber({
   const effectiveTime = isScrubbing ? scrubTime : currentTime;
   const progressRatio = duration > 0 ? Math.min(1, Math.max(0, effectiveTime / duration)) : 0;
   const activeBarIndex = Math.floor(progressRatio * TOTAL_BARS);
+  const bufferedRatio = duration > 0 ? Math.min(1, Math.max(0, bufferedTime / duration)) : 0;
+  const bufferedBarIndex = Math.floor(bufferedRatio * TOTAL_BARS);
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!containerRef.current || duration <= 0) return;
@@ -220,6 +224,7 @@ export function WaveformScrubber({
       <div className="h-10 w-full flex items-center gap-[2px] px-1 relative">
         {bars.map((bar) => {
           const isPlayed = bar.index <= activeBarIndex;
+          const isBuffered = !isPlayed && bar.index <= bufferedBarIndex;
           const heightPx = Math.max(4, Math.round(bar.height * 34));
 
           return (
@@ -229,7 +234,9 @@ export function WaveformScrubber({
                 className={`w-full rounded-sm transition-colors duration-75 ${
                   isPlayed
                     ? "bg-accent opacity-95 group-hover:opacity-100"
-                    : "bg-elevated opacity-50 group-hover:opacity-75"
+                    : isBuffered
+                      ? "bg-text/35 opacity-90 group-hover:opacity-100"
+                      : "bg-elevated opacity-50 group-hover:opacity-75"
                 }`}
               />
             </div>

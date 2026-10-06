@@ -1,7 +1,8 @@
-import { ChevronUp, FastForward, Moon, Pause, Play, Rewind, Zap } from "lucide-react";
-import type { ChangeEvent } from "react";
+import { ChevronUp, FastForward, Moon, Pause, Play, Rewind, X, Zap } from "lucide-react";
+import { type ChangeEvent, useState } from "react";
 import { useAudio } from "../../context/audio-context";
 import { getBookCoverUrl } from "../../lib/covers";
+import type { SleepTimerPreset } from "../../lib/sleep-timer";
 import { FullPlayerModal } from "./FullPlayerModal";
 import { formatScrubberTime } from "./WaveformScrubber";
 
@@ -11,6 +12,7 @@ export function MiniPlayer() {
     isPlaying,
     currentTime,
     duration,
+    bufferedTime,
     playbackRate,
     voiceBoost,
     smartSpeed,
@@ -22,7 +24,11 @@ export function MiniPlayer() {
     setRate,
     toggleVoiceBoost,
     toggleSmartSpeed,
+    startSleepTimer,
+    cancelSleepTimer,
   } = useAudio();
+
+  const [showSleepPopover, setShowSleepPopover] = useState(false);
 
   if (!currentBook) {
     return null;
@@ -57,8 +63,20 @@ export function MiniPlayer() {
       <FullPlayerModal />
 
       <div className="shrink-0 z-40 border-t border-border bg-surface px-3 sm:px-4 py-2 sm:py-2.5 transition-all">
-        {/* Interactive top progress scrubber bar */}
-        <div className="relative group w-full -mt-2 sm:-mt-2.5 mb-1.5 sm:mb-2">
+        {/* Interactive top progress scrubber bar with dual buffered & played visual tracks */}
+        <div className="relative group w-full -mt-2 sm:-mt-2.5 mb-1.5 sm:mb-2 h-1 bg-elevated overflow-hidden">
+          {/* Buffered track */}
+          <div
+            className="absolute top-0 bottom-0 left-0 bg-text/30 pointer-events-none transition-all duration-150"
+            style={{
+              width: `${Math.min(100, Math.max(0, duration > 0 ? (bufferedTime / duration) * 100 : 0))}%`,
+            }}
+          />
+          {/* Played track */}
+          <div
+            className="absolute top-0 bottom-0 left-0 bg-accent pointer-events-none transition-all duration-75"
+            style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
+          />
           <input
             type="range"
             min="0"
@@ -67,7 +85,7 @@ export function MiniPlayer() {
             value={progressPercent || 0}
             onChange={handleSeekChange}
             aria-label="Audio progress scrubber"
-            className="w-full h-1 bg-elevated rounded-none appearance-none cursor-pointer accent-accent"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           />
         </div>
 
@@ -158,20 +176,69 @@ export function MiniPlayer() {
 
           {/* Right: Time Display, Sleep Badge & DSP Toggles */}
           <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 shrink-0">
-            {/* Sleep timer indicator if active */}
-            {sleepTimerState.isActive && (
+            {/* One-Tap Sleep Timer Button & Quick Popover */}
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => setIsFullPlayerOpen(true)}
-                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-accent/20 border border-accent/40 text-accent cursor-pointer"
-                title="Sleep Timer Active (click to view)"
+                onClick={() => setShowSleepPopover((prev) => !prev)}
+                className={`flex items-center gap-1 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded text-[10px] font-mono transition-colors cursor-pointer ${
+                  sleepTimerState.isActive
+                    ? "bg-accent/20 border border-accent/40 text-accent font-semibold"
+                    : "surface-card text-muted hover:text-text hover:border-accent"
+                }`}
+                title="Sleep Timer (One-tap quick presets)"
+                aria-label="Sleep Timer"
               >
                 <Moon className="w-3 h-3" />
-                <span className="hidden xs:inline">
-                  {formatScrubberTime(sleepTimerState.remainingSeconds)}
-                </span>
+                {sleepTimerState.isActive && (
+                  <span className="hidden xs:inline">
+                    {formatScrubberTime(sleepTimerState.remainingSeconds)}
+                  </span>
+                )}
               </button>
-            )}
+
+              {showSleepPopover && (
+                <div className="absolute bottom-9 right-0 bg-surface border border-border rounded-lg shadow-2xl p-2 z-50 min-w-36 flex flex-col gap-1 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="flex items-center justify-between px-1.5 py-1 border-b border-border/60 text-[10px] font-mono text-muted uppercase tracking-wider">
+                    <span>Sleep Timer</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowSleepPopover(false)}
+                      className="text-subtle hover:text-text cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  {([15, 30, 45, 60, "end-of-chapter"] as SleepTimerPreset[]).map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => {
+                        startSleepTimer(preset);
+                        setShowSleepPopover(false);
+                      }}
+                      className="w-full text-left px-2 py-1.5 rounded hover:bg-elevated text-xs font-mono text-text cursor-pointer transition-colors"
+                    >
+                      {preset === "end-of-chapter" ? "End of Chapter" : `${preset} minutes`}
+                    </button>
+                  ))}
+
+                  {sleepTimerState.isActive && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        cancelSleepTimer();
+                        setShowSleepPopover(false);
+                      }}
+                      className="w-full text-left px-2 py-1.5 rounded hover:bg-destructive/10 text-xs font-mono text-destructive cursor-pointer transition-colors border-t border-border/50 mt-1"
+                    >
+                      Turn Off Timer
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="text-[11px] font-mono text-muted hidden lg:block">
               <span>{formatTime(currentTime)}</span>

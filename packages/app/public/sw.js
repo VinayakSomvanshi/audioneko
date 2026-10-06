@@ -1,16 +1,24 @@
 // audioneko Service Worker — Offline Range Streaming & PWA Shell Cache
+const CACHE_NAME = "audioneko-shell-v1";
 const OPFS_ROOT_DIR = "audioneko_books";
 const AUDIO_FILE_NAME = "audio.bin";
 
-self.addEventListener("install", (_event) => {
-  self.skipWaiting();
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(["/", "/index.html", "/manifest.json"]).catch(() => {}))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+      .then((keys) =>
+        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
+      )
       .then(() => self.clients.claim()),
   );
 });
@@ -120,12 +128,62 @@ async function handleAudioStreamFetch(request) {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Audio range proxy interceptor
+  // 1. Audio range streaming interceptor (OPFS)
   if (url.pathname.startsWith("/api/stream/")) {
     event.respondWith(handleAudioStreamFetch(event.request));
     return;
   }
 
-  // Allow standard network navigation
-  return;
+  // 2. Pass through all other API endpoints and external requests directly to network
+  if (url.pathname.startsWith("/api/") || url.origin !== self.location.origin) {
+    return;
+  }
+
+  // 3. HTML Navigation requests (Network-First with offline index.html fallback)
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", clone));
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cache = await caches.open(CACHE_NAME);
+          const cached = (await cache.match(event.request)) || (await cache.match("/index.html"));
+          return (
+            cached ||
+            new Response("Offline - audioneko", {
+              headers: { "Content-Type": "text/html" },
+            })
+          );
+        }),
+    );
+    return;
+  }
+
+  // 4. Static assets (Stale-While-Revalidate: serve cached asset instantly, fetch update in background)
+  if (
+    url.pathname.startsWith("/assets/") ||
+    /\.(js|css|png|jpg|jpeg|svg|webp|woff2|ico)$/i.test(url.pathname)
+  ) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cachedResponse = await cache.match(event.request);
+        const fetchPromise = fetch(event.request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              cache.put(event.request, networkResponse.clone());
+            }
+            return networkResponse;
+          })
+          .catch(() => cachedResponse);
+
+        return cachedResponse || fetchPromise;
+      }),
+    );
+    return;
+  }
 });

@@ -764,6 +764,78 @@ app.delete("/api/shelves/:id/books/:bookId", requireAuth, async (c) => {
 });
 
 // ==========================================
+// Bookmarks API Routes
+// ==========================================
+
+// Get all bookmarks for a specific book by authenticated user
+app.get("/api/bookmarks/:bookId", requireAuth, async (c) => {
+  const user = c.get("user");
+  const bookId = c.req.param("bookId");
+  const db = createDb(c.env.DB);
+  const userBookmarks = await db
+    .select()
+    .from(schema.bookmarks)
+    .where(and(eq(schema.bookmarks.userId, user.id), eq(schema.bookmarks.bookId, bookId)))
+    .orderBy(asc(schema.bookmarks.positionSeconds));
+  return c.json({ bookmarks: userBookmarks });
+});
+
+// Create a new bookmark at current audio position
+app.post("/api/bookmarks", requireAuth, async (c) => {
+  const user = c.get("user");
+  const body = await c.req.json<{
+    bookId: string;
+    positionSeconds: number;
+    chapterTitle?: string;
+    note?: string;
+  }>();
+
+  if (!body.bookId || body.positionSeconds === undefined) {
+    return c.json({ error: "Missing required fields: bookId, positionSeconds" }, 400);
+  }
+
+  const db = createDb(c.env.DB);
+  const bookmarkId = `bm_${crypto.randomUUID()}`;
+  const now = Math.floor(Date.now() / 1000);
+
+  await db.insert(schema.bookmarks).values({
+    id: bookmarkId,
+    userId: user.id,
+    bookId: body.bookId,
+    positionSeconds: body.positionSeconds,
+    chapterTitle: body.chapterTitle || null,
+    note: body.note || null,
+    createdAt: now,
+  });
+
+  return c.json(
+    {
+      id: bookmarkId,
+      userId: user.id,
+      bookId: body.bookId,
+      positionSeconds: body.positionSeconds,
+      chapterTitle: body.chapterTitle || null,
+      note: body.note || null,
+      createdAt: now,
+    },
+    201,
+  );
+});
+
+// Delete a bookmark by ID
+app.delete("/api/bookmarks/:id", requireAuth, async (c) => {
+  const user = c.get("user");
+  const bookmarkId = c.req.param("id");
+  const db = createDb(c.env.DB);
+
+  await db
+    .delete(schema.bookmarks)
+    .where(and(eq(schema.bookmarks.id, bookmarkId), eq(schema.bookmarks.userId, user.id)));
+
+  return c.json({ success: true });
+});
+
+// ==========================================
 // Listening Analytics & Streaks Routes
 // ==========================================
 

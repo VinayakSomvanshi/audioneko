@@ -31,8 +31,10 @@ export interface AudioContextType {
   isPlaying: boolean;
   currentTime: number;
   duration: number;
+  bufferedTime: number;
   playbackRate: number;
   volume: number;
+  isMuted: boolean;
   voiceBoost: boolean;
   loudnessNormalization: boolean;
   smartSpeed: boolean;
@@ -55,6 +57,7 @@ export interface AudioContextType {
   previousChapter: () => void;
   setRate: (rate: number) => void;
   setVol: (vol: number) => void;
+  toggleMute: () => void;
   toggleVoiceBoost: () => void;
   toggleLoudnessNormalization: () => void;
   toggleSmartSpeed: () => void;
@@ -79,6 +82,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const [duration, setDuration] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [volume, setVolume] = useState(1.0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [bufferedTime, setBufferedTime] = useState(0);
   const [isFullPlayerOpen, setIsFullPlayerOpen] = useState(false);
   const [isPiPActive, setIsPiPActive] = useState(false);
 
@@ -113,11 +118,18 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const chaptersRef = useRef<Chapter[]>([]);
   const currentChapterRef = useRef<Chapter | null>(null);
   const sleepTimerStateRef = useRef(sleepTimerState);
+  const volumeRef = useRef(1.0);
+  const isMutedRef = useRef(false);
+  const prevVolumeRef = useRef(1.0);
 
   const userRef = useRef(user);
   const isUserLoadingRef = useRef(isUserLoading);
+  const queryClientRef = useRef(queryClient);
 
   // Keep refs in sync
+  useEffect(() => {
+    queryClientRef.current = queryClient;
+  }, [queryClient]);
   useEffect(() => {
     userRef.current = user;
   }, [user]);
@@ -139,6 +151,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     isPlayingRef.current = isPlaying;
   }, [isPlaying]);
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
   useEffect(() => {
     chaptersRef.current = chapters;
   }, [chapters]);
@@ -350,10 +368,36 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     sleepTimerRef.current = timer;
     const unsubTimer = timer.subscribe(setSleepTimerState);
 
+    const updateBufferedRange = () => {
+      if (audio.buffered.length > 0) {
+        const ct = audio.currentTime;
+        let highest = 0;
+        let matched = false;
+        for (let i = 0; i < audio.buffered.length; i++) {
+          const start = audio.buffered.start(i);
+          const end = audio.buffered.end(i);
+          if (ct >= start && ct <= end) {
+            setBufferedTime(end);
+            matched = true;
+            break;
+          }
+          if (end > highest) highest = end;
+        }
+        if (!matched && highest > 0) {
+          setBufferedTime(highest);
+        }
+      }
+    };
+
+    const onProgress = () => {
+      updateBufferedRange();
+    };
+
     const onTimeUpdate = () => {
       const t = audio.currentTime;
       setCurrentTime(t);
       currentTimeRef.current = t;
+      updateBufferedRange();
       setMediaSessionPositionState({
         duration: audio.duration || 0,
         playbackRate: audio.playbackRate || 1.0,
@@ -396,7 +440,26 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       setMediaSessionPlaybackState("none");
       // Clear saved progress — book finished
       const book = currentBookRef.current;
-      if (book) clearProgress(book.id);
+      if (book) {
+        clearProgress(book.id);
+        // Series auto-queue: if book has seriesId and seriesIndex, check for next book in series
+        if (book.seriesId && typeof book.seriesIndex === "number") {
+          const allBooks = queryClientRef.current.getQueryData<Book[]>(["books"]) || [];
+          const seriesBooks = allBooks
+            .filter((b) => b.seriesId === book.seriesId && typeof b.seriesIndex === "number")
+            .sort((a, b) => (a.seriesIndex || 0) - (b.seriesIndex || 0));
+          const currentIndex = seriesBooks.findIndex((b) => b.id === book.id);
+          if (currentIndex !== -1 && currentIndex < seriesBooks.length - 1) {
+            const nextBook = seriesBooks[currentIndex + 1];
+            if (nextBook) {
+              console.log("[audioneko] Auto-playing next book in series:", nextBook.title);
+              setTimeout(() => {
+                playBookRef.current?.(nextBook, 0);
+              }, 1200);
+            }
+          }
+        }
+      }
     };
 
     const onAudioError = () => {
@@ -427,6 +490,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("durationchange", onDurationChange);
+    audio.addEventListener("progress", onProgress);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
@@ -440,6 +504,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       audio.src = "";
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("durationchange", onDurationChange);
+      audio.removeEventListener("progress", onProgress);
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
@@ -746,9 +811,25 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const setVol = useCallback((vol: number) => {
     const clamped = Math.max(0, Math.min(1, vol));
     setVolume(clamped);
+    if (clamped > 0) {
+      setIsMuted(false);
+      prevVolumeRef.current = clamped;
+    } else {
+      setIsMuted(true);
+    }
     const effectiveVolume = clamped * sleepTimerStateRef.current.volumeMultiplier;
     audioEngine.setVolume(effectiveVolume);
   }, []);
+
+  const toggleMute = useCallback(() => {
+    if (isMutedRef.current) {
+      const restoreVol = prevVolumeRef.current > 0 ? prevVolumeRef.current : 1.0;
+      setVol(restoreVol);
+    } else {
+      prevVolumeRef.current = volumeRef.current > 0 ? volumeRef.current : 1.0;
+      setVol(0);
+    }
+  }, [setVol]);
 
   const toggleVoiceBoost = useCallback(() => {
     setVoiceBoostState((prev) => {
@@ -860,6 +941,81 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     });
   }, [seekTo, resume]);
 
+  // Global Desktop Keyboard Hotkeys
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore if user is inside an input, textarea, select, or contenteditable element
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+
+      // Ignore when modifier keys (Cmd, Ctrl, Alt) are pressed
+      if (e.metaKey || e.ctrlKey || e.altKey) {
+        return;
+      }
+
+      switch (e.code) {
+        case "Space": {
+          e.preventDefault();
+          togglePlay();
+          break;
+        }
+        case "ArrowLeft": {
+          e.preventDefault();
+          skipBy(-15);
+          break;
+        }
+        case "ArrowRight": {
+          e.preventDefault();
+          skipBy(30);
+          break;
+        }
+        case "ArrowUp": {
+          e.preventDefault();
+          setVol(Math.min(1, volumeRef.current + 0.05));
+          break;
+        }
+        case "ArrowDown": {
+          e.preventDefault();
+          setVol(Math.max(0, volumeRef.current - 0.05));
+          break;
+        }
+        case "KeyM": {
+          e.preventDefault();
+          toggleMute();
+          break;
+        }
+        case "BracketLeft": {
+          e.preventDefault();
+          previousChapter();
+          break;
+        }
+        case "BracketRight": {
+          e.preventDefault();
+          nextChapter();
+          break;
+        }
+        case "KeyF": {
+          e.preventDefault();
+          setIsFullPlayerOpen((prev) => !prev);
+          break;
+        }
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [togglePlay, skipBy, setVol, toggleMute, previousChapter, nextChapter]);
+
   return (
     <AudioContext.Provider
       value={{
@@ -869,8 +1025,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         isPlaying,
         currentTime,
         duration,
+        bufferedTime,
         playbackRate,
         volume,
+        isMuted,
         voiceBoost,
         loudnessNormalization,
         smartSpeed,
@@ -893,6 +1051,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         previousChapter,
         setRate,
         setVol,
+        toggleMute,
         toggleVoiceBoost,
         toggleLoudnessNormalization,
         toggleSmartSpeed,

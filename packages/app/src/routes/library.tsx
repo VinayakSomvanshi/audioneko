@@ -39,6 +39,7 @@ export function LibraryPage() {
   const { playBook, prewarmBook, pause, resume, currentBook, isPlaying, currentTime, duration } =
     useAudio();
   const [activeFilter, setActiveFilter] = useState<"all" | "in-progress" | "downloaded">("all");
+  const [selectedNarrator, setSelectedNarrator] = useState<string>("all");
   const [sortBy, setSortBy] = useState<LibrarySortOption>(() => {
     if (typeof window !== "undefined") {
       return (localStorage.getItem("audioneko_sort_by") as LibrarySortOption) || "series";
@@ -188,15 +189,35 @@ export function LibraryPage() {
     return booksList.find((b) => b.id === latestId) ?? null;
   }, [currentBook, currentTime, duration, isPlaying, bookProgressMap, booksList]);
 
-  // Filtered books based on active tab
+  // Distinct narrators present in the library
+  const allNarrators = useMemo(() => {
+    const set = new Set<string>();
+    for (const b of booksList) {
+      if (b.narrator) {
+        const parts = b.narrator
+          .split(/[,&]/)
+          .map((n) => n.trim())
+          .filter(Boolean);
+        for (const p of parts) set.add(p);
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [booksList]);
+
+  // Filtered books based on active tab and selected narrator
   const downloadedIds = new Set(downloadedBooks.map((b) => b.bookId));
 
   const filteredBooks = booksList.filter((book) => {
-    if (activeFilter === "in-progress") {
-      return inProgressIds.has(book.id);
+    if (activeFilter === "in-progress" && !inProgressIds.has(book.id)) {
+      return false;
     }
-    if (activeFilter === "downloaded") {
-      return downloadedIds.has(book.id);
+    if (activeFilter === "downloaded" && !downloadedIds.has(book.id)) {
+      return false;
+    }
+    if (selectedNarrator !== "all") {
+      if (!book.narrator || !book.narrator.toLowerCase().includes(selectedNarrator.toLowerCase())) {
+        return false;
+      }
     }
     return true;
   });
@@ -449,6 +470,38 @@ export function LibraryPage() {
           </div>
         </div>
       </div>
+
+      {/* Narrator Filter Chips (shown when library has narrator metadata) */}
+      {allNarrators.length > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-2 -mt-1 border-b border-border/40">
+          <span className="text-[11px] font-mono text-muted shrink-0 mr-1">Narrator:</span>
+          <button
+            type="button"
+            onClick={() => setSelectedNarrator("all")}
+            className={`px-2.5 py-0.5 text-[11px] font-mono rounded-full border transition-colors cursor-pointer shrink-0 ${
+              selectedNarrator === "all"
+                ? "border-accent bg-accent/15 text-accent font-semibold"
+                : "border-border bg-surface text-muted hover:text-text hover:border-text-subtle"
+            }`}
+          >
+            All ({allNarrators.length})
+          </button>
+          {allNarrators.map((narrator) => (
+            <button
+              key={narrator}
+              type="button"
+              onClick={() => setSelectedNarrator(selectedNarrator === narrator ? "all" : narrator)}
+              className={`px-2.5 py-0.5 text-[11px] font-mono rounded-full border transition-colors cursor-pointer shrink-0 ${
+                selectedNarrator === narrator
+                  ? "border-accent bg-accent/15 text-accent font-semibold"
+                  : "border-border bg-surface text-muted hover:text-text hover:border-text-subtle"
+              }`}
+            >
+              {narrator}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Book Grid or Empty State */}
       {sortedBooks.length === 0 ? (
