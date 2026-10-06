@@ -218,3 +218,29 @@ export type ListenAlongServerMessage =
       type: "LISTENER_COUNT";
       count: number;
     };
+
+export interface AuthorProfile {
+  name: string;
+  photoUrl: string | null;
+  bio: string | null;
+  birthDate: string | null;
+  topWork: string | null;
+  workCount?: number | null;
+  openLibraryKey: string | null;
+  goodreadsId?: string | null;
+  wikidataId?: string | null;
+}
+
+export interface AuthorItem {
+  name: string;
+  bookCount: number;
+  seriesCount: number;
+  seriesNames: string[];
+  totalDurationSeconds: number;
+  books: Book[];
+  photoUrl?: string | null;
+  bio?: string | null;
+  birthDate?: string | null;
+  topWork?: string | null;
+  openLibraryKey?: string | null;
+}

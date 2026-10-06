@@ -8,6 +8,7 @@ import { type AuthContextVariables, requireAdmin, requireAuth } from "./auth/mid
 import { inviteRoutes } from "./auth/routes";
 import { createDb } from "./db";
 import * as schema from "./db/schema";
+import { enrichAuthorMetadata } from "./drive/author-enrich";
 import { extractChaptersFromM4b } from "./drive/metadata";
 import { scanDriveLibrary } from "./drive/scanner";
 import { handleAudioStreamRequest } from "./drive/stream";
@@ -396,8 +397,8 @@ app.get("/api/authors", requireAuth, async (c) => {
     }
   }
 
-  const authorsList = Array.from(authorMap.values())
-    .map((a) => {
+  const authorsList = await Promise.all(
+    Array.from(authorMap.values()).map(async (a) => {
       a.seriesCount = a.seriesNames.length;
       // Sort books: first by series name, then by seriesIndex, then title
       a.books.sort((x, y) => {
@@ -408,11 +409,29 @@ app.get("/api/authors", requireAuth, async (c) => {
         if (!x.seriesName && y.seriesName) return 1;
         return x.title.localeCompare(y.title);
       });
-      return a;
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
+
+      const meta = await enrichAuthorMetadata(a.name, c.env);
+      return {
+        ...a,
+        photoUrl: meta.photoUrl,
+        bio: meta.bio,
+        birthDate: meta.birthDate,
+        topWork: meta.topWork,
+        openLibraryKey: meta.openLibraryKey,
+      };
+    }),
+  );
+
+  authorsList.sort((a, b) => a.name.localeCompare(b.name));
 
   return c.json({ authors: authorsList });
+});
+
+// Single Author Profile Ingestion Endpoint
+app.get("/api/authors/:name", requireAuth, async (c) => {
+  const authorName = decodeURIComponent(c.req.param("name"));
+  const profile = await enrichAuthorMetadata(authorName, c.env);
+  return c.json({ profile });
 });
 
 // Book Cover Proxy endpoint

@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { createDb } from "../db";
 import * as schema from "../db/schema";
 import type { Env } from "../types";
+import { enrichAuthorMetadata } from "./author-enrich";
 import { enrichBookMetadata } from "./enrich";
 import { extractChaptersFromM4b } from "./metadata";
 import { getGoogleAccessToken } from "./token";
@@ -646,6 +647,22 @@ export async function scanDriveLibrary(
       format: parsed.format,
       durationSeconds,
     });
+  }
+
+  // Pre-warm dynamic author metadata in KV cache for all discovered authors
+  const uniqueAuthors = new Set<string>();
+  for (const b of importedBooks) {
+    if (b.author && b.author !== "Unknown Author") {
+      uniqueAuthors.add(b.author);
+    }
+  }
+
+  for (const authorName of uniqueAuthors) {
+    try {
+      await enrichAuthorMetadata(authorName, env);
+    } catch {
+      // Ignore background author prewarm failure
+    }
   }
 
   return {

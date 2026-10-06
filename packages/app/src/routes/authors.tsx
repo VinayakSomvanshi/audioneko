@@ -9,23 +9,25 @@ import { getBookCoverUrl } from "../lib/covers";
 
 function AuthorAvatar({
   name,
+  photoUrl,
   className = "w-14 h-14",
   textSize = "text-base",
 }: {
   name: string;
+  photoUrl?: string | null;
   className?: string;
   textSize?: string;
 }) {
   const [imgError, setImgError] = useState(false);
-  const photoUrl = getAuthorPhotoUrl(name);
+  const resolvedPhoto = photoUrl || getAuthorPhotoUrl(name);
 
   return (
     <div
       className={`${className} rounded-full bg-surface border border-border group-hover:border-accent flex items-center justify-center text-accent font-bold font-mono ${textSize} shrink-0 overflow-hidden relative transition-colors shadow-inner`}
     >
-      {photoUrl && !imgError ? (
+      {resolvedPhoto && !imgError ? (
         <img
-          src={photoUrl}
+          src={resolvedPhoto}
           alt={name}
           onError={() => setImgError(true)}
           className="w-full h-full object-cover"
@@ -45,6 +47,11 @@ interface AuthorItem {
   seriesNames: string[];
   totalDurationSeconds: number;
   books: Book[];
+  photoUrl?: string | null;
+  bio?: string | null;
+  birthDate?: string | null;
+  topWork?: string | null;
+  openLibraryKey?: string | null;
 }
 
 export function AuthorsPage() {
@@ -199,12 +206,13 @@ export function AuthorsPage() {
         </div>
 
         {/* Author Header Banner */}
-        <div className="surface-card p-4 sm:p-6 md:p-8 border border-border flex items-center justify-between">
+        <div className="surface-card p-4 sm:p-6 md:p-8 border border-border flex flex-col gap-4">
           <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
             <AuthorAvatar
               name={activeAuthor.name}
-              className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16"
-              textSize="text-base sm:text-lg"
+              photoUrl={activeAuthor.photoUrl}
+              className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20"
+              textSize="text-lg sm:text-xl"
             />
             <div className="space-y-1 min-w-0 flex-1">
               <div className="text-[10px] sm:text-[11px] font-mono text-accent uppercase tracking-wider">
@@ -225,9 +233,23 @@ export function AuthorsPage() {
                 )}
                 <span>•</span>
                 <span>{formatDuration(activeAuthor.totalDurationSeconds)} Listening Time</span>
+                {Boolean(activeAuthor.birthDate) && (
+                  <>
+                    <span>•</span>
+                    <span>Born {activeAuthor.birthDate}</span>
+                  </>
+                )}
               </div>
             </div>
           </div>
+
+          {Boolean(activeAuthor.bio) && (
+            <div className="pt-3 border-t border-border/60">
+              <p className="text-xs sm:text-sm text-muted font-sans leading-relaxed line-clamp-3">
+                {activeAuthor.bio}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Series Sections */}
@@ -372,7 +394,7 @@ export function AuthorsPage() {
               >
                 <div className="flex items-start gap-4">
                   {/* Avatar / Portrait */}
-                  <AuthorAvatar name={author.name} />
+                  <AuthorAvatar name={author.name} photoUrl={author.photoUrl} />
 
                   <div className="space-y-1 flex-1 min-w-0">
                     <h2 className="text-base font-bold text-text group-hover:text-accent transition-colors line-clamp-1">
