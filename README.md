@@ -13,18 +13,103 @@ The complete technical architecture, data model, performance budget, security th
 
 ---
 
-## Core Highlights
+## Feature Catalog
 
-* **Serverless Edge Architecture**: Operates on Cloudflare (Workers with Static Assets, D1, Durable Objects, KV) and Google Cloud Platform with minimal operational overhead.
-* **Instant Zero-Latency Playback**: Sub-100ms audio startup via speculative background pre-warming, multi-tier metadata caching, non-blocking audio pipelines, and RFC 7233 range-streaming.
-* **Google Drive as Single Source of Truth**: Original audiobook files remain securely stored in Google Drive ("Cold Vault"). The edge indexes, enriches, and caches active streams without redundant storage duplication.
-* **3-Tier Streaming Pipeline**: Client OPFS (offline pre-cache on listener device) -> Cloudflare Edge Cache API (2 MB sliced audio ranges) -> Authenticated Google Drive Streaming Proxy with open-ended RFC 7233 range requests.
-* **Client-Side Web Audio DSP**: Custom audio engine featuring Smart Speed (dynamic silence trimming), Voice Boost EQ (85 Hz high-pass cut, 2.2 kHz dialogue lift, sibilance taming), and loudness normalization.
-* **Full-Featured Player Experience**: Dynamic waveform scrubber with 4-tier decelerated fine-scrubbing (1x, 0.5x, 0.25x, 0.1x), desktop keyboard shortcuts, dual buffered/played progress tracks, sleep timer with audio fade-out, bookmarks, and notes.
-* **Cross-Device Sync and Social Presence**: Cloudflare Durable Objects with hibernatable WebSockets for sub-second playback sync across tabs and devices, real-time friend activity presence, and synchronized listen-along rooms.
-* **Audiobookshelf (ABS) Compatibility Layer**: Emulates the Audiobookshelf REST and WebSocket APIs (`/api/v1/authorize`, `/api/libraries`, `/api/items`, `/api/session/local`), allowing third-party mobile clients like Plappa (iOS) and ShelfPlayer (Android) to connect directly.
-* **Cryptographic Invites and Access Control**: Single-use 256-bit entropy cryptographic invite tokens, email/password credentials managed by Better Auth, and role-based listener/admin authorization.
-* **Offline-First PWA**: Progressive Web App with standalone display support, Service Worker stale-while-revalidate asset caching, and book storage in the Origin Private File System (OPFS).
+### 1. Audio Player and Web Audio DSP Engine
+* **Dual-Engine Audio Transport**: Hybrid pipeline pairing an HTML5 `HTMLMediaElement` for smooth stream buffering with a Web Audio API audio graph for low-latency digital signal processing.
+* **Speculative Zero-Latency Pre-Warming**: Pre-warms audio streams on card hover, focus, and pointer down events, achieving sub-100ms Time-to-First-Audio (TTFA).
+* **Smart Speed (Silence Trimming)**: Client-side `AudioWorkletNode` executing rolling-window RMS energy calculations. Detects non-vocal pauses below -42 dB and accelerates playback without pitch distortion or clipping speech.
+* **Voice Boost Parametric Equalizer**: 3-band speech intelligibility biquad filter consisting of an 85 Hz high-pass rumble filter, a 2.2 kHz dialogue presence lift, and a 7.5 kHz sibilance taming notch.
+* **Loudness Normalization and Compression**: Real-time `DynamicsCompressorNode` enforcing a consistent -16 LUFS broadcast target to smooth abrupt volume variances between different narrators and productions.
+* **Variable Playback Speeds**: Granular playback rates from 0.5x to 3.0x in 0.05x increments using native WSOLA pitch preservation (`preservesPitch = true`).
+* **Gain Ramp Crossfading**: Automated 40ms linear gain ramp-up and ramp-down on play, pause, and seek events to eliminate speaker pops and clicks.
+* **Picture-in-Picture Visualizer**: HTML5 Canvas rendering real-time frequency bar spectrum analysis alongside book artwork, streaming to Picture-in-Picture (PiP) mode.
+* **Volume and Mute Memory**: In-player volume slider with non-zero volume memory and instant mute toggle.
+
+### 2. Precision Scrubbing, Waveforms and Chapters
+* **Decelerated 4-Speed Fine-Scrubbing**: Vertical-drag scrubber with decelerated seek rates (1x at normal height, 0.5x, 0.25x, and 0.1x as the pointer moves downward) for second-by-second navigation in 30+ hour audiobooks.
+* **Dual-Track Scrubber**: Waveform timeline displaying independent visual tracks for buffered network stream depth and current playback progress.
+* **Instant Embedded Chapter Parsing**: Streaming binary parsers for ISO-BMFF / MP4 atoms (`chpl`, `mvhd`) in `.m4b` files and ID3v2.3/ID3v2.4 frames (`CHAP`, `CTOC`) in `.mp3` files, extracting chapter titles, timestamps, and offsets in under 80ms without downloading entire files.
+* **Chapter Drawer and Timelines**: Full player drawer listing all chapters with active chapter indicators, chapter durations, remaining countdown clocks, and single-click seeking.
+* **Quick Navigation Controls**: Instant chapter step buttons and configurable quick-skip buttons (+/-15 seconds backward and +/-30 seconds forward).
+
+### 3. Desktop Controls and Native Mobile Integration
+* **Global Desktop Hotkeys**: Full keyboard navigation across the entire application:
+  * `Space` / `K`: Toggle Play / Pause
+  * `Left Arrow` / `Right Arrow`: Skip backward 15s / forward 15s
+  * `Shift + Left Arrow` / `Shift + Right Arrow`: Skip backward 30s / forward 30s
+  * `Up Arrow` / `Down Arrow`: Adjust volume up / down
+  * `M`: Toggle Mute
+  * `[` / `]`: Skip to Previous / Next Chapter
+  * `F`: Toggle Full Player Modal
+  * `Cmd+K` / `Ctrl+K`: Global Search Palette
+* **Native Media Session Integration**: Comprehensive `navigator.mediaSession` implementation providing high-resolution cover artwork, title, author, interactive scrub bar, and hardware media key handlers for lock screens, headphone clickers, and CarStream / Android Auto.
+* **Tactile Haptic Feedback**: Optional tactile device vibration (`navigator.vibrate`) on key playback and scrub interactions on supported mobile hardware.
+* **Ambient Dynamic Backdrop**: Real-time extraction of dominant color palettes from active book artwork, rendering an animated obsidian blurred ambient backdrop.
+
+### 4. Smart Sleep Timer
+* **Countdown Presets**: Quick selection for 5, 15, 30, 45, or 60 minutes.
+* **End of Chapter Mode**: Automatically synchronizes the sleep timer to pause playback at the exact millisecond the current chapter concludes.
+* **MiniPlayer Quick Access**: One-tap sleep timer popover directly on the docked mini-player without expanding the full modal.
+* **Exponential Volume Fade**: Smooth 30-second exponential audio decay leading up to timer expiration to prevent abrupt waking.
+* **Shake-to-Extend**: Accelerometer-driven motion detection allowing listeners to extend the timer by 15 minutes by gently shaking their mobile device without turning on the screen.
+
+### 5. Library Discovery, Shelves and Organization
+* **Google Drive Cold Vault**: Secure primary storage in Google Drive with hierarchical traversal supporting single-file chaptered M4B files, multi-track MP3 folders, and nested directory layouts.
+* **Heuristic Metadata Extraction**: Automatic tokenizer parsing author names, book titles, series name, volume numbers, release years, and narrator tags directly from folder and file naming structures.
+* **Multi-Tier Cover Art Cascade**: Priority extraction from embedded `covr` / `APIC` binary tags -> local `cover.jpg` / `folder.png` -> Open Library Covers API -> Google Books API -> client-side procedural gradient.
+* **1:1 High-Resolution Square Artwork Presentation**: Uniform 1:1 aspect ratio layout with zero-cutoff fit and ambient background reflection across all views.
+* **Dynamic Smart Shelves**:
+  * *Continue Listening*: Sorted by last-played timestamp with pre-warmed streaming buffers and progress percentages.
+  * *Up Next in Series*: Automatically identifies and surfaces the next chronological unread book in a series.
+  * *Recently Added*: Highlights newly indexed titles from the latest Google Drive scan.
+  * *Favorites and Custom Shelves*: User-curated reading lists and personal shelves.
+* **Faceted Narrator Filter Chips**: Dynamic filter chips derived from scanned metadata for one-tap filtering by voice talent.
+* **Series Continuous Auto-Queue**: Automatically queues and transitions playback to the subsequent volume upon completing the current audiobook.
+* **Dedicated Navigation Routes**: Dedicated views for Authors (`/authors`), Series (`/series`), Shelves (`/shelves`), and Book Details (`/book/:id`).
+
+### 6. Instant Search and Command Palette
+* **Sub-5ms Client-Side Search**: In-memory inverted index powered by MiniSearch indexing titles, authors, narrators, and series with zero network round trips.
+* **Fuzzy Typo Tolerance and Prefix Matching**: Resilient search matching queries with spelling errors or partial word stems.
+* **Global Command Palette (`Cmd+K` / `Ctrl+K`)**: Keyboard-driven modal with live query execution latency tracking, arrow-key navigation, and instant play triggering.
+
+### 7. Bookmarks, Notes and Annotations
+* **Single-Tap Bookmarking**: Creates instant timestamped bookmarks capturing exact playback offset, active chapter, and creation date.
+* **Note-Taking Drawer**: Slide-over drawer to compose and edit personal annotations associated with specific audiobook passages.
+* **Dedicated REST API**: Backed by `/api/bookmarks` with input sanitization, user isolation, and atomic persistence in Cloudflare D1.
+
+### 8. Real-Time Multi-Device Sync and Social Presence
+* **Cloudflare Durable Objects (`SyncRoom`)**: Stateful, hibernatable WebSocket connections maintaining real-time listener state across browser tabs, smartphones, and desktop computers.
+* **Conflict-Free State Resolution**: Hybrid Logical Clocks (HLC) and Monotonic Progress Vectors resolve multi-device playback discrepancies without position loss.
+* **Cross-Device Resume Toast**: Unobtrusive banner alerting listeners when playback progress advanced on another device, allowing one-click synchronization.
+* **Friends Live Activity Bar**: Real-time edge presence tracking displaying active friends, their current audiobook, and percentage progress with live pulsing indicators.
+* **Synchronized Listen-Along Rooms**: Shared rooms over WebSockets where a host coordinates playback. Dynamic audio clock slewing aligns listener audio within +/-50ms without acoustic clicks.
+
+### 9. Offline-First Progressive Web App (OPFS)
+* **Origin Private File System (OPFS)**: High-performance streaming storage engine storing multi-gigabyte audiobooks directly in private browser storage, bypassing IndexedDB quota bottlenecks.
+* **Service Worker HTTP 206 Interception**: Service Worker intercepts audio range requests for saved titles, streaming Partial Content (`206 Partial Content`) directly from local OPFS blobs when offline.
+* **Storage Management Dashboard (`/offline`)**: Detailed client storage meter displaying total device quota, consumed bytes per audiobook, and one-tap chapter/book eviction.
+* **PWA Standalone App**: Installable Progressive Web App with standalone window display, custom theme colors, and offline app shell caching.
+
+### 10. Listening Analytics and Engagement
+* **Consecutive Day Listening Streaks**: Automated daily streak counter tracking active listening consistency.
+* **GitHub-Style Activity Heatmap**: Interactive 365-day contribution grid displaying daily listening engagement and duration on the `/analytics` route.
+* **Session Metrics**: Tracks total hours listened, top authors, and completion percentages.
+
+### 11. Audiobookshelf (ABS) API Compatibility
+* **Third-Party Client Support**: Emulates Audiobookshelf REST and WebSocket endpoints (`/login`, `/api/v1/login`, `/api/libraries`, `/api/items/:id`, `/api/session/local`, `/api/v1/me/progress`).
+* **Mobile Ecosystem Integration**: Connects native third-party mobile applications like Plappa (iOS), ShelfPlayer (Android), and official Audiobookshelf clients directly to the audioneko edge backend.
+* **Flexible Authentication**: Supports HTTP Bearer tokens, `x-token` headers, and URL token query parameters.
+
+### 12. Security, Authentication and Administration
+* **Better Auth Infrastructure**: Secure email and password authentication with PBKDF2 password hashing and secure HttpOnly cookie sessions.
+* **Cryptographic Invite Tokens**: Single-use 256-bit entropy cryptographic invite links (`/join?token=...`) with SHA-256 token hashing and atomic redemption counters to ensure private, invite-only access.
+* **Curator Admin Control Plane (`/admin`, `/admin-invites`)**:
+  * On-demand incremental and deep Google Drive library rescans.
+  * Health status cards monitoring Google Drive API quotas and database records.
+  * System operational logs with level filtering.
+  * Invite link generator with expiration and usage constraints.
+* **Edge Security and Bot Protection**: Cloudflare Turnstile integration, WAF rate limiting, and RFC 7233 byte-range validation.
 
 ---
 
