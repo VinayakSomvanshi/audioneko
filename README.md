@@ -29,6 +29,8 @@ The complete technical architecture, data model, performance budget, security th
 * **Smart Speed (Silence Trimming)**: Client-side `AudioWorkletNode` executing rolling-window RMS energy calculations. Detects non-vocal pauses below -42 dB and accelerates playback without pitch distortion or clipping speech.
 * **Voice Boost Parametric Equalizer**: 3-band speech intelligibility biquad filter consisting of an 85 Hz high-pass rumble filter, a 2.2 kHz dialogue presence lift, and a 7.5 kHz sibilance taming notch.
 * **Loudness Normalization and Compression**: Real-time `DynamicsCompressorNode` enforcing a consistent -16 LUFS broadcast target to smooth abrupt volume variances between different narrators and productions.
+* **Multi-Band Voice Equalizer Presets**: Voice intelligibility presets (Clear Dialogue, Warm Acoustic, Deep Voice, Podcast Master) alongside custom 5-band frequency attenuation control.
+* **Enhanced Media Session and Headset Remapping**: Hardware headset button customization (double-tap skip, triple-tap previous) alongside native lock screen timeline sync and media controls.
 * **Variable Playback Speeds**: Granular playback rates from 0.5x to 3.0x in 0.05x increments using native WSOLA pitch preservation (`preservesPitch = true`).
 * **Gain Ramp Crossfading**: Automated 40ms linear gain ramp-up and ramp-down on play, pause, and seek events to eliminate speaker pops and clicks.
 * **Picture-in-Picture Visualizer**: HTML5 Canvas rendering real-time frequency bar spectrum analysis alongside book artwork, streaming to Picture-in-Picture (PiP) mode.
@@ -54,6 +56,7 @@ The complete technical architecture, data model, performance budget, security th
 * **Native Media Session Integration**: Comprehensive `navigator.mediaSession` implementation providing high-resolution cover artwork, title, author, interactive scrub bar, and hardware media key handlers for lock screens, headphone clickers, and CarStream / Android Auto.
 * **Tactile Haptic Feedback**: Optional tactile device vibration (`navigator.vibrate`) on key playback and scrub interactions on supported mobile hardware.
 * **Ambient Dynamic Backdrop**: Real-time extraction of dominant color palettes from active book artwork, rendering an animated obsidian blurred ambient backdrop.
+* **Obsidian Aesthetics and Blinking Neko Indicators**: Built upon the `sober-thoughts` design philosophy (obsidian dark surfaces, high contrast, tactile 1px borders) with a custom `NekoIcon` brand silhouette and animated glowing pulse indicators (`BlinkingNeko`) replacing generic status dots across Continue Listening, active downloads, cross-device resume toasts, and book detail headers.
 
 ### 4. Smart Sleep Timer
 * **Countdown Presets**: Quick selection for 5, 15, 30, 45, or 60 minutes.
@@ -74,7 +77,6 @@ The complete technical architecture, data model, performance budget, security th
   * *Up Next in Series*: Automatically identifies and surfaces the next chronological unread book in a series.
   * *Recently Added*: Highlights newly indexed titles from the latest Google Drive scan.
   * *Favorites and Custom Shelves*: User-curated reading lists and personal shelves.
-* **Faceted Narrator Filter Chips**: Dynamic filter chips derived from scanned metadata for one-tap filtering by voice talent.
 * **Series Continuous Auto-Queue**: Automatically queues and transitions playback to the subsequent volume upon completing the current audiobook.
 * **Dedicated Navigation Routes**: Dedicated views for Authors (`/authors`), Series (`/series`), Shelves (`/shelves`), and Book Details (`/book/:id`).
 
@@ -90,25 +92,28 @@ The complete technical architecture, data model, performance budget, security th
 * **High-Resolution Quote Card Generator**: Built-in HTML5 Canvas generator rendering 1200x675 exportable PNG quote cards with typographic styling and customizable aesthetic themes (`editorial-dark`, `sober-minimal`, `warm-paper`).
 * **Dedicated REST API**: Backed by `/api/bookmarks` and `/api/bookmarks/:id` with input sanitization, user isolation, and atomic persistence in Cloudflare D1.
 
-### 8. Real-Time Multi-Device Sync and Social Presence
+### 8. Real-Time Multi-Device Sync and Listen-Along Rooms
 * **Cloudflare Durable Objects (`SyncRoom`)**: Stateful, hibernatable WebSocket connections maintaining real-time listener state across browser tabs, smartphones, and desktop computers.
 * **Conflict-Free State Resolution**: Hybrid Logical Clocks (HLC) and Monotonic Progress Vectors resolve multi-device playback discrepancies without position loss.
 * **Cross-Device Resume Toast**: Unobtrusive banner alerting listeners when playback progress advanced on another device, allowing one-click synchronization.
-* **Friends Live Activity Bar**: Real-time edge presence tracking displaying active friends, their current audiobook, and percentage progress with live pulsing indicators.
 * **Synchronized Listen-Along Rooms**: Shared rooms over WebSockets where a host coordinates playback. Dynamic audio clock slewing aligns listener audio within +/-50ms without acoustic clicks.
 
 ### 9. Offline-First Progressive Web App (OPFS)
 * **Origin Private File System (OPFS)**: High-performance streaming storage engine storing multi-gigabyte audiobooks directly in private browser storage, bypassing IndexedDB quota bottlenecks.
+* **Multi-Task Download Queue**: Concurrent background audio downloads with granular progress tracking, speed calculation, and estimated completion times.
+* **Pause, Resume, and Cancel Controls**: Individual and bulk controls (`Pause All`, `Resume All`, `Cancel All`) with state preservation that survives page reloads without restarting downloads.
+* **Persistent Offline Cover Artwork**: Caches high-resolution book covers locally in OPFS alongside audio data for full visual fidelity while offline.
 * **Service Worker HTTP 206 Interception**: Service Worker intercepts audio range requests for saved titles, streaming Partial Content (`206 Partial Content`) directly from local OPFS blobs when offline.
 * **Storage Management Dashboard (`/offline`)**: Detailed client storage meter displaying total device quota, consumed bytes per audiobook, and one-tap chapter/book eviction.
 * **PWA Standalone App**: Installable Progressive Web App with standalone window display, custom theme colors, and offline app shell caching.
 
-### 10. Listening Analytics and Community Metrics
-* **Consecutive Day Listening Streaks**: Automated daily streak counter tracking active listening consistency.
-* **GitHub-Style Activity Heatmap**: Interactive 365-day contribution grid displaying daily listening engagement and duration on the `/analytics` route.
+### 10. Listening Analytics and Streaks
+* **Consecutive Day Listening Streaks**: Automated daily streak counter tracking active listening consistency with local timezone alignment.
+* **GitHub-Style Activity Heatmap**: Interactive 365-day contribution grid displaying daily listening engagement and duration on the `/analytics` route with automatic listener local timezone alignment.
+* **StoryGraph & Goodreads CSV Sync**: Import and export reading progress via CSV to cross-reference finished titles with external reading platforms directly from the `/analytics` route.
 * **Weekly Reading Velocity**: Computes active listening time over the past 7 days with trend analysis.
 * **Playback Pace Analysis**: Calculates weighted average playback rates across completed listening sessions.
-* **Peak Listening Hour**: Identifies listener peak engagement time windows throughout the 24-hour cycle.
+* **Peak Listening Hour**: Identifies listener peak engagement time windows shifted accurately into the user's local timezone.
 * **Session Metrics**: Tracks total hours listened, top authors, and completion percentages.
 
 ### 11. Audiobookshelf (ABS) API Compatibility
