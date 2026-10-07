@@ -155,11 +155,15 @@ inviteRoutes.post("/register", async (c) => {
     await redeemInviteToken(db, body.token);
 
     // Dispatch welcome email to new listener
-    dispatchWelcomeEmail(c.env, {
-      to: body.email.toLowerCase().trim(),
-      name: body.name.trim(),
-      role: verification.invite.role,
-    }).catch((err) => console.error("[email] Error sending welcome email:", err));
+    try {
+      await dispatchWelcomeEmail(c.env, {
+        to: body.email.toLowerCase().trim(),
+        name: body.name.trim(),
+        role: verification.invite.role,
+      });
+    } catch (err) {
+      console.error("[email] Error sending welcome email:", err);
+    }
 
     // If invite assigned a specific role (e.g. admin), ensure it is persisted in the database
     if (verification.invite.role && verification.invite.role !== "listener") {

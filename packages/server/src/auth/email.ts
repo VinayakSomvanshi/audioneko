@@ -170,7 +170,13 @@ export async function dispatchPasswordResetEmail(
       }
 
       const errorText = await res.text();
-      console.error(`[email] Resend delivery failed for ${to}:`, res.status, errorText);
+      if (res.status === 403) {
+        console.warn(
+          `[email] Resend sandbox restriction: Emails can only be sent to the Resend account owner until a custom domain is verified at resend.com/domains: ${errorText}`,
+        );
+      } else {
+        console.error(`[email] Resend delivery failed for ${to}:`, res.status, errorText);
+      }
       return { sent: false, provider: "resend", error: errorText };
     } catch (err) {
       console.error(`[email] Resend network error for ${to}:`, err);
@@ -418,7 +424,13 @@ export async function dispatchWelcomeEmail(
         return { sent: true, provider: "resend" };
       }
       const errorText = await res.text();
-      console.error(`[email] Resend welcome delivery failed for ${to}:`, res.status, errorText);
+      if (res.status === 403) {
+        console.warn(
+          `[email] Resend sandbox restriction: Emails can only be sent to the Resend account owner until a custom domain is verified at resend.com/domains: ${errorText}`,
+        );
+      } else {
+        console.error(`[email] Resend welcome delivery failed for ${to}:`, res.status, errorText);
+      }
       return { sent: false, provider: "resend", error: errorText };
     } catch (err) {
       console.error(`[email] Resend welcome network error for ${to}:`, err);
