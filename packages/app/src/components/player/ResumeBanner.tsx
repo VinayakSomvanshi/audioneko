@@ -1,5 +1,6 @@
 import type { BookProgressRecord } from "@audioneko/shared";
 import type React from "react";
+import { BlinkingNeko } from "../icons/NekoIcon";
 
 interface ResumeBannerProps {
   remoteRecord: BookProgressRecord | null;
@@ -38,7 +39,7 @@ export const ResumeBanner: React.FC<ResumeBannerProps> = ({
       className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md bg-surface border border-border rounded-lg shadow-2xl p-3.5 flex items-center justify-between gap-3 text-sm animate-in fade-in slide-in-from-bottom-2 duration-200"
     >
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-2 h-2 rounded-full bg-accent animate-pulse shrink-0" />
+        <BlinkingNeko className="w-3.5 h-3.5 text-accent shrink-0" />
         <div className="min-w-0">
           <p className="text-text font-medium truncate leading-tight">Resumed on {deviceLabel}</p>
           <p className="text-xs text-text-muted truncate mt-0.5">

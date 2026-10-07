@@ -48,3 +48,13 @@ export function NekoIcon({ className = "w-5 h-5", ...props }: SVGProps<SVGSVGEle
     </svg>
   );
 }
+
+/**
+ * Cute Blinking Neko indicator replacing generic pulsing dots
+ */
+export function BlinkingNeko({
+  className = "w-3.5 h-3.5 text-accent",
+  ...props
+}: SVGProps<SVGSVGElement>) {
+  return <NekoIcon className={`inline-block shrink-0 neko-pulse ${className}`} {...props} />;
+}

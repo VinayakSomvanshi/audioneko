@@ -9,6 +9,7 @@ import {
   isBookDownloaded,
   isOpfsSupported,
 } from "../../lib/opfs";
+import { BlinkingNeko, NekoIcon } from "../icons/NekoIcon";
 
 interface DownloadButtonProps {
   meta?: OfflineBookMeta;
@@ -143,17 +144,17 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
           </>
         ) : isDownloading ? (
           <>
-            <div className="w-3 h-3 rounded-full border-2 border-accent border-t-transparent animate-spin" />
+            <BlinkingNeko className="w-3.5 h-3.5 text-accent" />
             <span className="font-mono">{progressPercent}%</span>
           </>
         ) : isPaused ? (
           <>
-            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            <NekoIcon className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span className="font-mono text-xs">Paused ({progressPercent}%)</span>
           </>
         ) : isQueued ? (
           <>
-            <span className="w-2 h-2 rounded-full bg-muted animate-pulse" />
+            <BlinkingNeko className="w-3.5 h-3.5 text-muted opacity-60" />
             <span>Queued</span>
           </>
         ) : (

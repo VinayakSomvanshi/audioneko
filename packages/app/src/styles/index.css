@@ -139,6 +139,27 @@ body {
   }
 }
 
+/* Cute Blinking Neko Indicator */
+.neko-pulse {
+  display: inline-block;
+  animation: nekopulse 2.4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes nekopulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: drop-shadow(0 0 3px rgba(224, 72, 56, 0.45));
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+    filter: drop-shadow(0 0 0px transparent);
+  }
+}
+
 /* Tactile Surface Cards & Containers */
 .surface-card {
   background-color: var(--bg-surface);

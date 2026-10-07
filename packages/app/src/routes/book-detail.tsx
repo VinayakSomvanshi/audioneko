@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { ArrowLeft, BookOpen, Check, ListMusic, Loader2, Play, RotateCcw, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { BlinkingNeko } from "../components/icons/NekoIcon";
 import { DownloadButton } from "../components/storage/DownloadButton";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
@@ -215,7 +216,7 @@ export function BookDetailPage() {
         <div className="flex-1 space-y-4 min-w-0 w-full">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs font-mono text-accent">
-              <span className="logo-dot" />
+              <BlinkingNeko className="w-3.5 h-3.5 text-accent" />
               <span>{book.format.toUpperCase()} AUDIOBOOK</span>
             </div>
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-text break-words">

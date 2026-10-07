@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, BookOpen, ChevronRight, Play, Search, User, Users } from "lucide-react";
 import { useMemo, useState } from "react";
+import { BlinkingNeko } from "../components/icons/NekoIcon";
 import { useAudio } from "../context/audio-context";
 import { getAuthorPhotoUrl } from "../lib/author-photos";
 import { getBookCoverUrl } from "../lib/covers";
@@ -260,7 +261,7 @@ export function AuthorsPage() {
             <div key={seriesName} className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-2 gap-1.5">
                 <div className="flex flex-wrap items-center gap-2 min-w-0">
-                  <span className="logo-dot" />
+                  <BlinkingNeko className="w-3.5 h-3.5 text-accent" />
                   <h2 className="text-sm font-bold text-text font-mono uppercase tracking-wide">
                     {seriesName} Series
                   </h2>

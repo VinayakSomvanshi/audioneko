@@ -8,6 +8,7 @@ import {
   searchBooks,
   updateSearchIndex,
 } from "../../lib/search";
+import { BlinkingNeko } from "../icons/NekoIcon";
 
 interface SearchPaletteModalProps {
   isOpen: boolean;
@@ -184,7 +185,7 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
 
           {searchDurationMs !== null && (
             <div className="flex items-center gap-1.5 text-accent">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+              <BlinkingNeko className="w-3 h-3 text-accent" />
               <span>{searchDurationMs}ms</span>
             </div>
           )}

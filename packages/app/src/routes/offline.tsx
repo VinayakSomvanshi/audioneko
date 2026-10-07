@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { BlinkingNeko } from "../components/icons/NekoIcon";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
 import { type DownloadTask, useDownloads } from "../lib/download-manager";
@@ -289,7 +290,7 @@ export function OfflinePage() {
         <div className="surface-card border border-border rounded-xl p-4 sm:p-5 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse" />
+              <BlinkingNeko className="w-3.5 h-3.5 text-accent" />
               <h2 className="text-sm font-semibold text-text tracking-tight">
                 Active Downloads ({activeTasks.length})
               </h2>
@@ -344,8 +345,8 @@ export function OfflinePage() {
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-text truncate">{task.title}</p>
                         {task.status === "downloading" ? (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-accent/15 text-accent border border-accent/30 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-ping" />
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-accent/15 text-accent border border-accent/30 flex items-center gap-1.5">
+                            <BlinkingNeko className="w-3 h-3 text-accent" />
                             Downloading
                           </span>
                         ) : task.status === "paused" ? (
