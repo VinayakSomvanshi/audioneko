@@ -18,4 +18,8 @@ export interface Env {
   GOOGLE_DRIVE_FOLDER_ID?: string;
   STREAM_SIGNING_SECRET?: string;
   SHELF_QUEUE?: Queue<ShelfQueueMessage>;
+  RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
+  BREVO_API_KEY?: string;
+  POSTMARK_API_KEY?: string;
 }

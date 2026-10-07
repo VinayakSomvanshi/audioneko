@@ -9,6 +9,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { createDb } from "../db";
 import * as schema from "../db/schema";
 import type { Env } from "../types";
+import { dispatchPasswordResetEmail } from "./email";
 
 export function createAuth(env: Env) {
   const db = createDb(env.DB);
@@ -40,7 +41,7 @@ export function createAuth(env: Env) {
       autoSignIn: true,
       sendResetPassword: async ({
         user,
-        url,
+        url: _url,
         token,
       }: {
         user: { email: string; name?: string };
@@ -48,28 +49,15 @@ export function createAuth(env: Env) {
         token: string;
       }) => {
         console.log(`[auth] Password reset requested for ${user.email} (token: ${token})`);
-        const resendApiKey = (env as unknown as { RESEND_API_KEY?: string }).RESEND_API_KEY;
-        if (resendApiKey) {
-          try {
-            await fetch("https://api.resend.com/emails", {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${resendApiKey}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                from:
-                  (env as unknown as { EMAIL_FROM?: string }).EMAIL_FROM ||
-                  "audioneko <auth@audioneko.app>",
-                to: user.email,
-                subject: "Reset your audioneko password",
-                html: `<p>A password reset was requested for your audioneko account (${user.name}).</p><p><a href="${url}">Click here to reset your password</a></p><p>Or enter this reset token: <code>${token}</code></p>`,
-              }),
-            });
-          } catch (err) {
-            console.error("[auth] Failed to send password reset email:", err);
-          }
-        }
+        const baseUrl = env.APP_URL || "https://audioneko.greatmidoriya.workers.dev";
+        const directResetUrl = `${baseUrl.replace(/\/$/, "")}/login?token=${token}&email=${encodeURIComponent(user.email)}`;
+
+        await dispatchPasswordResetEmail(env, {
+          to: user.email,
+          recipientName: user.name,
+          resetUrl: directResetUrl,
+          token,
+        });
       },
     },
     session: {
