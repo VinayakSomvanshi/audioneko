@@ -59,12 +59,12 @@ export async function dispatchPasswordResetEmail(
     .subtitle {
       font-size: 12px;
       font-family: monospace;
-      color: #737373;
+      color: #a3a3a3;
       margin-top: 4px;
     }
     .content {
       font-size: 14px;
-      color: #a3a3a3;
+      color: #e5e5e5;
       margin-bottom: 24px;
     }
     .button-wrap {
@@ -85,22 +85,22 @@ export async function dispatchPasswordResetEmail(
     }
     .token-box {
       background-color: #1a1a1a;
-      border: 1px solid #262626;
+      border: 1px solid #333333;
       border-radius: 6px;
       padding: 16px;
       margin-top: 24px;
       font-family: monospace;
       font-size: 12px;
-      color: #d4d4d4;
+      color: #ffffff;
       word-break: break-all;
     }
     .token-label {
-      color: #737373;
+      color: #a3a3a3;
       font-size: 11px;
       margin-bottom: 6px;
     }
     .token-value {
-      color: #e04838;
+      color: #ff5442;
       font-weight: 700;
       font-size: 14px;
       letter-spacing: 0.05em;
@@ -111,7 +111,7 @@ export async function dispatchPasswordResetEmail(
       margin-top: 32px;
       font-size: 11px;
       font-family: monospace;
-      color: #525252;
+      color: #737373;
     }
   </style>
 </head>
@@ -133,7 +133,7 @@ export async function dispatchPasswordResetEmail(
         <div class="token-label">Alternative: Manual Reset Token</div>
         <div class="token-value">${token}</div>
       </div>
-      <p style="margin-top: 16px; font-size: 12px; color: #737373;">
+      <p style="margin-top: 16px; font-size: 12px; color: #a3a3a3;">
         This token is valid for 1 hour. If you did not request this reset, you can safely ignore this email.
       </p>
     </div>
