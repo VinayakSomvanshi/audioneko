@@ -89,12 +89,9 @@ export function JoinPage() {
         <div className="inline-flex p-4 rounded-2xl bg-accent-bg border border-accent/30 text-accent shadow-lg shadow-accent/10 ring-1 ring-accent/20 mb-1 transition-transform duration-300 hover:scale-105">
           <NekoIcon className="w-10 h-10 text-accent" />
         </div>
-        <div className="flex items-center justify-center gap-2.5">
+        <div className="flex items-center justify-center">
           <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-text">
             audioneko
-          </span>
-          <span className="text-[10px] uppercase tracking-widest text-accent border border-accent/40 bg-accent-bg px-2 py-0.5 rounded font-mono font-semibold">
-            beta
           </span>
         </div>
         <p className="text-xs font-mono text-muted max-w-xs mx-auto">
