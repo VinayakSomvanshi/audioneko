@@ -157,7 +157,7 @@ export function JoinPage() {
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Vinayak Somvanshi"
+                placeholder="Your full name"
                 className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
               />
             </div>
