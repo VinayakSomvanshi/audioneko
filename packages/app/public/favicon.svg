@@ -1,6 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
   <rect width="32" height="32" rx="8" fill="#131010" />
-  <circle cx="16" cy="16" r="4" fill="#dd4444" />
-  <path d="M10 11L13 14M22 11L19 14" stroke="#dd4444" stroke-width="2" stroke-linecap="round" />
-  <path d="M7 16a9 9 0 0 1 18 0" fill="none" stroke="#dd4444" stroke-width="2" stroke-linecap="round" />
+  <!-- Neko Outline Silhouette -->
+  <path
+    d="M16 10 C 13.5 10 11.8 11 10.8 11.8 L 6.2 5.5 C 5.5 4.6 4.2 5.2 4.5 6.4 L 6.2 14.5 C 4.8 17.2 4.8 20.8 7.5 23.8 C 10 26.5 13 26.8 16 26.8 C 19 26.8 22 26.5 24.5 23.8 C 27.2 20.8 27.2 17.2 25.8 14.5 L 27.5 6.4 C 27.8 5.2 26.5 4.6 25.8 5.5 L 21.2 11.8 C 20.2 11 18.5 10 16 10 Z"
+    fill="none"
+    stroke="#e2725b"
+    stroke-width="2"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <!-- Alert Inner Ears -->
+  <path
+    d="M7.8 11.8 L 7 8 L 10.8 11.2"
+    fill="none"
+    stroke="#e2725b"
+    stroke-width="1.3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M24.2 11.8 L 25 8 L 21.2 11.2"
+    fill="none"
+    stroke="#e2725b"
+    stroke-width="1.3"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <!-- Expressive Eyes -->
+  <circle cx="11.5" cy="17" r="1.5" fill="#e2725b" />
+  <circle cx="20.5" cy="17" r="1.5" fill="#e2725b" />
+  <!-- Cute Nose -->
+  <path d="M15.2 19.8 L 16.8 19.8 L 16 20.6 Z" fill="#e2725b" />
+  <!-- Whiskers -->
+  <path
+    d="M4 17.5 H 7.5 M4 20.5 H 8 M28 17.5 H 24.5 M28 20.5 H 24"
+    stroke="#e2725b"
+    stroke-width="1.4"
+    stroke-linecap="round"
+  />
 </svg>

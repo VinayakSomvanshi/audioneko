@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { AlertCircle, CheckCircle2, KeyRound, Loader2 } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
+import { NekoIcon } from "../components/icons/NekoIcon";
 
 export function JoinPage() {
   const navigate = useNavigate();
@@ -84,8 +85,8 @@ export function JoinPage() {
   return (
     <div className="max-w-md mx-auto py-12 px-4 space-y-6">
       <div className="text-center space-y-2">
-        <div className="inline-flex p-3 surface-card rounded-full text-accent mb-2">
-          <KeyRound className="w-6 h-6" />
+        <div className="inline-flex p-3 surface-card rounded-2xl text-accent mb-2 border border-border shadow-sm">
+          <NekoIcon className="w-8 h-8 text-accent" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-text">Join audioneko</h1>
         <p className="text-xs font-mono text-muted">Private, invite-only audiobook library</p>

@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Loader2, LogIn, ShieldAlert } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
+import { NekoIcon } from "../components/icons/NekoIcon";
 import { signIn, useCurrentUser } from "../lib/auth-client";
 
 export function LoginPage() {
@@ -42,8 +43,8 @@ export function LoginPage() {
   return (
     <div className="max-w-md mx-auto py-12 px-4 space-y-6">
       <div className="text-center space-y-2">
-        <div className="inline-flex p-3 surface-card rounded-full text-accent mb-2">
-          <LogIn className="w-6 h-6" />
+        <div className="inline-flex p-3 surface-card rounded-2xl text-accent mb-2 border border-border shadow-sm">
+          <NekoIcon className="w-8 h-8 text-accent" />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-text">Sign In</h1>
         <p className="text-xs font-mono text-muted">Access your personal audioneko shelf</p>

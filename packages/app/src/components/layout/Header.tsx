@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Moon, Search, ShieldCheck, Sun, User as UserIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { signOut, useCurrentUser } from "../../lib/auth-client";
+import { NekoIcon } from "../icons/NekoIcon";
 
 interface HeaderProps {
   onSearchClick?: () => void;
@@ -48,9 +49,9 @@ export function Header({ onSearchClick }: HeaderProps) {
       {/* Brand logo */}
       <Link
         to="/"
-        className="flex items-center gap-2 font-mono text-sm md:text-base font-medium tracking-tight text-text hover:text-accent transition-colors"
+        className="flex items-center gap-2 font-mono text-sm md:text-base font-medium tracking-tight text-text hover:text-accent transition-colors group"
       >
-        <span className="logo-dot" />
+        <NekoIcon className="w-5 h-5 text-accent shrink-0 transition-transform duration-200 group-hover:scale-110" />
         <span>audioneko</span>
         <span className="text-[10px] uppercase tracking-widest text-muted border border-border px-1.5 py-0.5 rounded font-mono hidden sm:inline-block">
           beta
