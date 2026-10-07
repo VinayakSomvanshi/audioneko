@@ -8,7 +8,9 @@ import {
   Moon,
   Search,
   ShieldCheck,
+  Sliders,
   Sun,
+  User,
   Users,
   X,
 } from "lucide-react";
@@ -21,6 +23,7 @@ interface MobileNavDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onSearchClick?: () => void;
+  onProfileClick?: () => void;
   isDark: boolean;
   onToggleTheme: () => void;
 }
@@ -29,6 +32,7 @@ export function MobileNavDrawer({
   isOpen,
   onClose,
   onSearchClick,
+  onProfileClick,
   isDark,
   onToggleTheme,
 }: MobileNavDrawerProps) {
@@ -174,14 +178,30 @@ export function MobileNavDrawer({
         {/* Drawer Footer: User & Settings */}
         <div className="p-3 border-t border-border bg-surface/50 space-y-2">
           {user && (
-            <div className="px-3 py-1.5 flex items-center justify-between text-xs font-mono">
-              <span className="text-muted truncate max-w-[170px]">{user.name || user.email}</span>
-              {isAdmin && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/30 uppercase font-semibold">
-                  Admin
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onProfileClick?.();
+              }}
+              className="w-full text-left px-3 py-2 rounded-lg border border-border bg-surface hover:border-accent hover:text-accent transition-colors flex items-center justify-between text-xs font-mono group cursor-pointer"
+              title="Open Profile and Preferences"
+            >
+              <div className="flex items-center gap-2 truncate">
+                <User className="w-3.5 h-3.5 text-accent shrink-0" />
+                <span className="text-text font-medium group-hover:text-accent truncate">
+                  {user.name || user.email}
                 </span>
-              )}
-            </div>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {isAdmin && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/15 text-accent border border-accent/30 uppercase font-semibold">
+                    Admin
+                  </span>
+                )}
+                <Sliders className="w-3 h-3 text-muted group-hover:text-accent" />
+              </div>
+            </button>
           )}
 
           <div className="flex items-center gap-2">

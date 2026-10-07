@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Loader2, LogIn, ShieldAlert } from "lucide-react";
+import { Loader2, ShieldAlert } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
+import { ForgotPasswordModal } from "../components/auth/ForgotPasswordModal";
 import { NekoIcon } from "../components/icons/NekoIcon";
 import { signIn, useCurrentUser } from "../lib/auth-client";
 
@@ -11,6 +12,27 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Forgot password modal state
+  const [isForgotOpen, setIsForgotOpen] = useState(false);
+  const [initialResetToken, setInitialResetToken] = useState("");
+  const [initialResetEmail, setInitialResetEmail] = useState("");
+
+  // Check URL query parameters for reset token
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token") || params.get("resetToken");
+    const mail = params.get("email");
+    if (token) {
+      setInitialResetToken(token);
+      if (mail) {
+        setInitialResetEmail(mail);
+        setEmail(mail);
+      }
+      setIsForgotOpen(true);
+    }
+  }, []);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -74,9 +96,21 @@ export function LoginPage() {
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="login-password-input" className="block text-xs font-mono text-muted">
-              Password
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="login-password-input" className="block text-xs font-mono text-muted">
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setInitialResetEmail(email);
+                  setIsForgotOpen(true);
+                }}
+                className="text-[11px] font-mono text-muted hover:text-accent transition-colors cursor-pointer"
+              >
+                Forgot password?
+              </button>
+            </div>
             <input
               id="login-password-input"
               type="password"
@@ -112,6 +146,17 @@ export function LoginPage() {
           </span>
         </div>
       </div>
+
+      {/* Forgot / Reset Password Dialog */}
+      <ForgotPasswordModal
+        isOpen={isForgotOpen}
+        onClose={() => setIsForgotOpen(false)}
+        initialEmail={initialResetEmail || email}
+        initialToken={initialResetToken}
+        onSuccess={() => {
+          setErrorMsg(null);
+        }}
+      />
     </div>
   );
 }

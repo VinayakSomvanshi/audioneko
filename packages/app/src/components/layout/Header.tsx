@@ -7,9 +7,10 @@ import { NekoIcon } from "../icons/NekoIcon";
 interface HeaderProps {
   onSearchClick?: () => void;
   onMenuClick?: () => void;
+  onProfileClick?: () => void;
 }
 
-export function Header({ onSearchClick, onMenuClick }: HeaderProps) {
+export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderProps) {
   const { user, isAdmin } = useCurrentUser();
   const [isDark, setIsDark] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
@@ -129,7 +130,17 @@ export function Header({ onSearchClick, onMenuClick }: HeaderProps) {
                 <span>Admin</span>
               </Link>
             )}
-            <span className="text-xs font-mono text-muted hidden lg:inline">{user.name}</span>
+            <button
+              type="button"
+              onClick={onProfileClick}
+              className="flex items-center gap-1.5 px-2 py-1 rounded surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer text-xs font-mono group"
+              title="Profile and Playback Preferences"
+            >
+              <UserIcon className="w-3.5 h-3.5 text-accent" />
+              <span className="font-medium group-hover:underline truncate max-w-[120px]">
+                {user.name}
+              </span>
+            </button>
             <button
               type="button"
               disabled={isSigningOut}

@@ -81,6 +81,12 @@ export function AdminDashboardPage() {
   const [users, setUsers] = useState<UserItem[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+  const [generatedResetLink, setGeneratedResetLink] = useState<{
+    email: string;
+    url: string;
+    token: string;
+  } | null>(null);
 
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
@@ -243,6 +249,28 @@ export function AdminDashboardPage() {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2500);
+  };
+
+  const handleGenerateResetLink = async (targetUser: UserItem) => {
+    setResettingUserId(targetUser.id);
+    setGeneratedResetLink(null);
+    try {
+      const res = await fetch(`/api/admin/users/${targetUser.id}/reset-token`, {
+        method: "POST",
+      });
+      const data = (await res.json()) as { success?: boolean; resetUrl?: string; token?: string };
+      if (data.success && data.resetUrl && data.token) {
+        setGeneratedResetLink({
+          email: targetUser.email,
+          url: data.resetUrl,
+          token: data.token,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to generate reset link:", err);
+    } finally {
+      setResettingUserId(null);
+    }
   };
 
   if (authLoading) {
@@ -722,6 +750,44 @@ export function AdminDashboardPage() {
               </button>
             </div>
 
+            {generatedResetLink && (
+              <div className="p-4 bg-accent-bg/15 border-b border-accent/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono text-accent font-semibold flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5" />
+                    <span>Password Reset Link for {generatedResetLink.email}:</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setGeneratedResetLink(null)}
+                    className="text-[11px] font-mono text-muted hover:text-text cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <input
+                    type="text"
+                    readOnly
+                    value={generatedResetLink.url}
+                    className="flex-1 px-3 py-1.5 text-xs font-mono bg-bg border border-border rounded text-text select-all min-w-0"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => copyToClipboard(generatedResetLink.url, "reset-link")}
+                    className="px-3 py-1.5 bg-accent text-bg text-xs font-mono font-medium rounded flex items-center justify-center gap-1.5 hover:opacity-90 cursor-pointer shrink-0"
+                  >
+                    {copiedId === "reset-link" ? (
+                      <Check className="w-3.5 h-3.5" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                    <span>{copiedId === "reset-link" ? "Copied" : "Copy Link"}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {usersLoading && users.length === 0 ? (
               <div className="p-12 text-center text-xs font-mono text-muted">
                 Loading registered users...
@@ -763,24 +829,41 @@ export function AdminDashboardPage() {
                           </span>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleUserRole(u)}
-                            disabled={updatingUserId === u.id || u.id === user?.id}
-                            className={`px-3 py-1 rounded text-xs font-mono border transition-colors cursor-pointer ${
-                              u.role === "admin"
-                                ? "border-border text-muted hover:text-rose-400 hover:border-rose-400/50"
-                                : "border-accent/40 text-accent hover:bg-accent-bg"
-                            } disabled:opacity-30 disabled:cursor-not-allowed`}
-                          >
-                            {updatingUserId === u.id ? (
-                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : u.role === "admin" ? (
-                              "Demote to Listener"
-                            ) : (
-                              "Promote to Admin"
-                            )}
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleGenerateResetLink(u)}
+                              disabled={resettingUserId === u.id}
+                              className="px-2.5 py-1 rounded text-xs font-mono border border-border surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer flex items-center gap-1.5"
+                              title="Generate 1-click password reset link for user"
+                            >
+                              {resettingUserId === u.id ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                <KeyRound className="w-3 h-3 text-accent" />
+                              )}
+                              <span>Reset Link</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleToggleUserRole(u)}
+                              disabled={updatingUserId === u.id || u.id === user?.id}
+                              className={`px-3 py-1 rounded text-xs font-mono border transition-colors cursor-pointer ${
+                                u.role === "admin"
+                                  ? "border-border text-muted hover:text-rose-400 hover:border-rose-400/50"
+                                  : "border-accent/40 text-accent hover:bg-accent-bg"
+                              } disabled:opacity-30 disabled:cursor-not-allowed`}
+                            >
+                              {updatingUserId === u.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : u.role === "admin" ? (
+                                "Demote to Listener"
+                              ) : (
+                                "Promote to Admin"
+                              )}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

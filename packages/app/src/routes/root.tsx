@@ -6,12 +6,14 @@ import { MobileNavDrawer } from "../components/layout/MobileNavDrawer";
 import { MobileQuickNav } from "../components/layout/MobileQuickNav";
 import { Sidebar } from "../components/layout/Sidebar";
 import { MiniPlayer } from "../components/player/MiniPlayer";
+import { ProfilePreferencesModal } from "../components/profile/ProfilePreferencesModal";
 import { SearchPaletteModal } from "../components/search/SearchPaletteModal";
 import { useCurrentUser } from "../lib/auth-client";
 
 export function RootLayout() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
@@ -102,6 +104,7 @@ export function RootLayout() {
       <Header
         onSearchClick={() => setIsSearchOpen(true)}
         onMenuClick={() => setIsDrawerOpen(true)}
+        onProfileClick={() => setIsProfileOpen(true)}
       />
 
       {/* Mobile Horizontal Quick Navigation Bar */}
@@ -128,6 +131,15 @@ export function RootLayout() {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         onSearchClick={() => setIsSearchOpen(true)}
+        onProfileClick={() => setIsProfileOpen(true)}
+        isDark={isDark}
+        onToggleTheme={handleToggleTheme}
+      />
+
+      {/* Profile & Playback Preferences Dialog */}
+      <ProfilePreferencesModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
         isDark={isDark}
         onToggleTheme={handleToggleTheme}
       />

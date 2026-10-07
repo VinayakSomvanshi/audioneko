@@ -38,6 +38,39 @@ export function createAuth(env: Env) {
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,
+      sendResetPasswordEmail: async ({
+        user,
+        url,
+        token,
+      }: {
+        user: { email: string; name?: string };
+        url: string;
+        token: string;
+      }) => {
+        console.log(`[auth] Password reset requested for ${user.email} (token: ${token})`);
+        const resendApiKey = (env as unknown as { RESEND_API_KEY?: string }).RESEND_API_KEY;
+        if (resendApiKey) {
+          try {
+            await fetch("https://api.resend.com/emails", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${resendApiKey}`,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                from:
+                  (env as unknown as { EMAIL_FROM?: string }).EMAIL_FROM ||
+                  "audioneko <auth@audioneko.app>",
+                to: user.email,
+                subject: "Reset your audioneko password",
+                html: `<p>A password reset was requested for your audioneko account (${user.name}).</p><p><a href="${url}">Click here to reset your password</a></p><p>Or enter this reset token: <code>${token}</code></p>`,
+              }),
+            });
+          } catch (err) {
+            console.error("[auth] Failed to send password reset email:", err);
+          }
+        }
+      },
     },
     session: {
       expiresIn: 60 * 60 * 24 * 30, // 30-day persistent session

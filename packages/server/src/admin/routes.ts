@@ -152,3 +152,46 @@ adminRoutes.delete("/invites/:id", requireAuth, requireAdmin, async (c) => {
   await deleteInvite(db, id);
   return c.json({ success: true, deletedId: id });
 });
+
+/**
+ * Admin: Generate a password reset link/token for any registered user
+ */
+adminRoutes.post("/users/:id/reset-token", requireAuth, requireAdmin, async (c) => {
+  const targetUserId = c.req.param("id");
+  const db = createDb(c.env.DB);
+  const targetUsers = await db
+    .select()
+    .from(schema.user)
+    .where(eq(schema.user.id, targetUserId))
+    .limit(1);
+  const targetUser = targetUsers[0];
+
+  if (!targetUser) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  const token = `${crypto.randomUUID().replace(/-/g, "")}${crypto.randomUUID().replace(/-/g, "")}`;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24); // 24 hours
+
+  await db.insert(schema.verification).values({
+    id: `ver_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`,
+    identifier: targetUser.email,
+    value: token,
+    expiresAt,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  const baseUrl = c.env.APP_URL || new URL(c.req.url).origin;
+  const resetUrl = `${baseUrl}/login?token=${token}&email=${encodeURIComponent(targetUser.email)}`;
+
+  return c.json({
+    success: true,
+    token,
+    resetUrl,
+    email: targetUser.email,
+    name: targetUser.name,
+    expiresAt: expiresAt.toISOString(),
+  });
+});
