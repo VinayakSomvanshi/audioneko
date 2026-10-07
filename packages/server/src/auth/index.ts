@@ -38,7 +38,7 @@ export function createAuth(env: Env) {
     emailAndPassword: {
       enabled: true,
       autoSignIn: true,
-      sendResetPasswordEmail: async ({
+      sendResetPassword: async ({
         user,
         url,
         token,

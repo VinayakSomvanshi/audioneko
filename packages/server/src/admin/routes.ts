@@ -176,8 +176,8 @@ adminRoutes.post("/users/:id/reset-token", requireAuth, requireAdmin, async (c) 
 
   await db.insert(schema.verification).values({
     id: `ver_${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`,
-    identifier: targetUser.email,
-    value: token,
+    identifier: `reset-password:${token}`,
+    value: targetUser.id,
     expiresAt,
     createdAt: now,
     updatedAt: now,
