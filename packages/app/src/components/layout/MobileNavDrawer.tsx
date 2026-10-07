@@ -12,8 +12,8 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect } from "react";
-import { signOut, useCurrentUser } from "../../lib/auth-client";
+import { useEffect, useState } from "react";
+import { performSignOut, useCurrentUser } from "../../lib/auth-client";
 import { useDownloads } from "../../lib/download-manager";
 import { BlinkingNeko, NekoIcon } from "../icons/NekoIcon";
 
@@ -35,6 +35,7 @@ export function MobileNavDrawer({
   const location = useLocation();
   const { user, isAdmin } = useCurrentUser();
   const { activeCount } = useDownloads();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Close drawer on escape key and prevent background scroll
   useEffect(() => {
@@ -196,13 +197,15 @@ export function MobileNavDrawer({
             {user ? (
               <button
                 type="button"
-                onClick={() => {
+                disabled={isSigningOut}
+                onClick={async () => {
+                  setIsSigningOut(true);
                   onClose();
-                  signOut();
+                  await performSignOut();
                 }}
-                className="px-3 py-2 rounded-lg border border-border bg-surface text-xs font-mono text-muted hover:text-accent hover:border-accent transition-colors cursor-pointer"
+                className="px-3 py-2 rounded-lg border border-border bg-surface text-xs font-mono text-muted hover:text-accent hover:border-accent transition-colors cursor-pointer disabled:opacity-50"
               >
-                Sign out
+                {isSigningOut ? "Signing out..." : "Sign out"}
               </button>
             ) : (
               <Link

@@ -14,6 +14,22 @@ export interface CurrentUser {
   role: "admin" | "listener";
 }
 
+export async function performSignOut() {
+  try {
+    await Promise.race([signOut(), new Promise((resolve) => setTimeout(resolve, 1200))]);
+  } catch (err) {
+    console.warn("Sign-out request failed, forcing redirect to login:", err);
+  } finally {
+    try {
+      localStorage.removeItem("audioneko-active-shelf");
+    } catch {}
+
+    if (typeof window !== "undefined") {
+      window.location.replace("/login");
+    }
+  }
+}
+
 export function useCurrentUser() {
   const { data: session, isPending } = useSession();
 
@@ -32,14 +48,16 @@ export function useCurrentUser() {
     enabled: Boolean(session?.user),
   });
 
+  const sessionUser = session?.user as unknown as CurrentUser | undefined;
   const sessionRole = (session?.user as { role?: string })?.role;
   const role = (adminMe?.user?.role || sessionRole || "listener") as "admin" | "listener";
-  const isAdmin = role === "admin" || adminMe?.isAdmin === true;
+  const isAdmin = Boolean(sessionUser) && (role === "admin" || adminMe?.isAdmin === true);
+  const user = sessionUser ? adminMe?.user || sessionUser : undefined;
 
   return {
-    user: adminMe?.user || (session?.user as unknown as CurrentUser | undefined),
+    user,
     session,
-    role,
+    role: user ? role : "listener",
     isAdmin,
     isLoading: isPending || (Boolean(session?.user) && isMeLoading),
   };

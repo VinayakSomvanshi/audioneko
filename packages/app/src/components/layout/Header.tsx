@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Menu, Moon, Search, ShieldCheck, Sun, User as UserIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { signOut, useCurrentUser } from "../../lib/auth-client";
+import { performSignOut, useCurrentUser } from "../../lib/auth-client";
 import { NekoIcon } from "../icons/NekoIcon";
 
 interface HeaderProps {
@@ -12,6 +12,7 @@ interface HeaderProps {
 export function Header({ onSearchClick, onMenuClick }: HeaderProps) {
   const { user, isAdmin } = useCurrentUser();
   const [isDark, setIsDark] = useState(true);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     const isDarkTheme = document.documentElement.classList.contains("dark");
@@ -131,10 +132,15 @@ export function Header({ onSearchClick, onMenuClick }: HeaderProps) {
             <span className="text-xs font-mono text-muted hidden lg:inline">{user.name}</span>
             <button
               type="button"
-              onClick={() => signOut()}
-              className="hidden md:inline-block text-xs font-mono px-2.5 py-1 surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer"
+              disabled={isSigningOut}
+              onClick={() => {
+                setIsSigningOut(true);
+                performSignOut();
+              }}
+              className="text-xs font-mono px-2.5 py-1 surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer disabled:opacity-50"
+              title="Sign out directly to login"
             >
-              Sign out
+              {isSigningOut ? "Signing out..." : "Sign out"}
             </button>
           </div>
         ) : (
