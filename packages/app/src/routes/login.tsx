@@ -63,16 +63,32 @@ export function LoginPage() {
   };
 
   return (
-    <div className="max-w-md mx-auto py-12 px-4 space-y-6">
-      <div className="text-center space-y-2">
-        <div className="inline-flex p-3 surface-card rounded-2xl text-accent mb-2 border border-border shadow-sm">
-          <NekoIcon className="w-8 h-8 text-accent" />
+    <div className="max-w-md mx-auto py-8 sm:py-12 px-4 space-y-6">
+      {/* Prominent audioneko center branding */}
+      <div className="text-center space-y-3">
+        <div className="inline-flex p-4 rounded-2xl bg-accent-bg border border-accent/30 text-accent shadow-lg shadow-accent/10 ring-1 ring-accent/20 mb-1 transition-transform duration-300 hover:scale-105">
+          <NekoIcon className="w-10 h-10 text-accent" />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-text">Sign In</h1>
-        <p className="text-xs font-mono text-muted">Access your personal audioneko shelf</p>
+        <div className="flex items-center justify-center gap-2.5">
+          <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-text">
+            audioneko
+          </span>
+          <span className="text-[10px] uppercase tracking-widest text-accent border border-accent/40 bg-accent-bg px-2 py-0.5 rounded font-mono font-semibold">
+            beta
+          </span>
+        </div>
+        <p className="text-xs font-mono text-muted max-w-xs mx-auto">
+          Private, self-hosted audiobook streaming sanctuary
+        </p>
       </div>
 
       <div className="surface-card p-6 border border-border space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-border">
+          <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-text">
+            Sign In
+          </h2>
+          <span className="text-[11px] font-mono text-muted">Personal Shelf</span>
+        </div>
         {errorMsg && (
           <div className="p-2.5 rounded bg-red-950/30 border border-red-800/40 text-red-400 text-xs font-mono">
             {errorMsg}

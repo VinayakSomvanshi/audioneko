@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { Menu, Moon, Search, ShieldCheck, Sun, User as UserIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { performSignOut, useCurrentUser } from "../../lib/auth-client";
@@ -15,6 +15,10 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
   const [isDark, setIsDark] = useState(true);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isAuthPage = pathname === "/login" || pathname === "/join";
+  const showSearch = Boolean(user && !isAuthPage && onSearchClick);
+
   useEffect(() => {
     const isDarkTheme = document.documentElement.classList.contains("dark");
     setIsDark(isDarkTheme);
@@ -25,7 +29,11 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
         toggleTheme();
       }
       // Trigger search with '/'
-      if (e.key === "/" && !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement).tagName)) {
+      if (
+        showSearch &&
+        e.key === "/" &&
+        !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement).tagName)
+      ) {
         e.preventDefault();
         onSearchClick?.();
       }
@@ -33,7 +41,7 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onSearchClick]);
+  }, [onSearchClick, showSearch]);
 
   const toggleTheme = () => {
     const nextDark = !isDark;
@@ -51,15 +59,17 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
     <header className="sticky top-0 z-40 min-h-14 h-auto pt-[env(safe-area-inset-top,0px)] border-b border-border bg-bg/95 backdrop-blur-sm px-3 sm:px-4 md:px-6 flex items-center justify-between transition-colors">
       <div className="flex items-center gap-2">
         {/* Mobile menu drawer trigger */}
-        <button
-          type="button"
-          onClick={onMenuClick}
-          className="p-1.5 md:hidden surface-card text-muted hover:text-text hover:border-accent transition-colors cursor-pointer"
-          aria-label="Open navigation menu"
-          title="Open menu"
-        >
-          <Menu className="w-4 h-4 text-accent" />
-        </button>
+        {user && onMenuClick && (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="p-1.5 md:hidden surface-card text-muted hover:text-text hover:border-accent transition-colors cursor-pointer"
+            aria-label="Open navigation menu"
+            title="Open menu"
+          >
+            <Menu className="w-4 h-4 text-accent" />
+          </button>
+        )}
 
         {/* Brand logo */}
         <Link
@@ -75,38 +85,44 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
       </div>
 
       {/* Center / Search bar trigger */}
-      <div className="flex-1 max-w-md mx-4 hidden md:block">
-        <button
-          type="button"
-          onClick={onSearchClick}
-          className="w-full flex items-center justify-between px-3.5 py-1.5 text-xs text-muted surface-card hover:border-text-subtle transition-colors cursor-pointer"
-        >
-          <span className="flex items-center gap-2">
-            <Search className="w-3.5 h-3.5 text-accent" />
-            <span>Search books, authors, series...</span>
-          </span>
-          <div className="flex items-center gap-1.5">
-            <kbd className="px-1.5 py-0.5 text-[10px] font-mono border border-border rounded bg-elevated text-subtle">
-              ⌘K
-            </kbd>
-            <span className="text-[10px] text-muted/60 font-mono">or</span>
-            <kbd className="px-1.5 py-0.5 text-[10px] font-mono border border-border rounded bg-elevated text-subtle">
-              /
-            </kbd>
-          </div>
-        </button>
-      </div>
+      {showSearch ? (
+        <div className="flex-1 max-w-md mx-4 hidden md:block">
+          <button
+            type="button"
+            onClick={onSearchClick}
+            className="w-full flex items-center justify-between px-3.5 py-1.5 text-xs text-muted surface-card hover:border-text-subtle transition-colors cursor-pointer"
+          >
+            <span className="flex items-center gap-2">
+              <Search className="w-3.5 h-3.5 text-accent" />
+              <span>Search books, authors, series...</span>
+            </span>
+            <div className="flex items-center gap-1.5">
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono border border-border rounded bg-elevated text-subtle">
+                ⌘K
+              </kbd>
+              <span className="text-[10px] text-muted/60 font-mono">or</span>
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono border border-border rounded bg-elevated text-subtle">
+                /
+              </kbd>
+            </div>
+          </button>
+        </div>
+      ) : (
+        <div className="flex-1" />
+      )}
 
       {/* Right controls: Theme toggle & Auth status */}
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onSearchClick}
-          className="p-2 md:hidden surface-card text-muted hover:text-text cursor-pointer"
-          aria-label="Search"
-        >
-          <Search className="w-4 h-4" />
-        </button>
+        {showSearch && (
+          <button
+            type="button"
+            onClick={onSearchClick}
+            className="p-2 md:hidden surface-card text-muted hover:text-text cursor-pointer"
+            aria-label="Search"
+          >
+            <Search className="w-4 h-4" />
+          </button>
+        )}
 
         <button
           type="button"
@@ -155,13 +171,15 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
             </button>
           </div>
         ) : (
-          <Link
-            to="/login"
-            className="flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 surface-card hover:border-accent hover:text-accent transition-colors"
-          >
-            <UserIcon className="w-3.5 h-3.5" />
-            <span>Sign in</span>
-          </Link>
+          pathname !== "/login" && (
+            <Link
+              to="/login"
+              className="flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 surface-card hover:border-accent hover:text-accent transition-colors"
+            >
+              <UserIcon className="w-3.5 h-3.5" />
+              <span>Sign in</span>
+            </Link>
+          )
         )}
       </div>
     </header>
