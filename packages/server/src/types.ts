@@ -21,5 +21,6 @@ export interface Env {
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
   BREVO_API_KEY?: string;
+  BREVO_SENDER_EMAIL?: string;
   POSTMARK_API_KEY?: string;
 }

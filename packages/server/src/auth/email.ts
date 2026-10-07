@@ -13,6 +13,17 @@ export interface SendEmailResult {
   error?: string;
 }
 
+export function parseSender(fromStr?: string): { name: string; email: string } {
+  if (!fromStr) {
+    return { name: "audioneko", email: "vinzyzk@gmail.com" };
+  }
+  const match = fromStr.match(/^(.*?)\s*<([^>]+)>$/);
+  if (match) {
+    return { name: match[1].trim() || "audioneko", email: match[2].trim() };
+  }
+  return { name: "audioneko", email: fromStr.trim() };
+}
+
 export async function dispatchPasswordResetEmail(
   env: Env,
   params: SendEmailParams,
@@ -172,25 +183,21 @@ export async function dispatchPasswordResetEmail(
       const errorText = await res.text();
       if (res.status === 403) {
         console.warn(
-          `[email] Resend sandbox restriction: Emails can only be sent to the Resend account owner until a custom domain is verified at resend.com/domains: ${errorText}`,
+          `[email] Resend sandbox restriction: Emails can only be sent to the Resend account owner until a custom domain is verified at resend.com/domains: ${errorText}. Falling back to secondary provider.`,
         );
       } else {
         console.error(`[email] Resend delivery failed for ${to}:`, res.status, errorText);
       }
-      return { sent: false, provider: "resend", error: errorText };
+      // If Resend failed (e.g. sandbox restriction 403), fall through to Brevo if available
     } catch (err) {
       console.error(`[email] Resend network error for ${to}:`, err);
-      return {
-        sent: false,
-        provider: "resend",
-        error: err instanceof Error ? err.message : String(err),
-      };
     }
   }
 
   // 2. Check Brevo (Sendinblue)
   if (env.BREVO_API_KEY) {
     try {
+      const parsedSender = parseSender(env.BREVO_SENDER_EMAIL || env.EMAIL_FROM);
       const res = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
         headers: {
@@ -198,7 +205,7 @@ export async function dispatchPasswordResetEmail(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          sender: { name: "audioneko", email: env.EMAIL_FROM || "no-reply@audioneko.app" },
+          sender: parsedSender,
           to: [{ email: to, name: recipientName }],
           subject: emailSubject,
           htmlContent: emailHtml,
@@ -426,24 +433,20 @@ export async function dispatchWelcomeEmail(
       const errorText = await res.text();
       if (res.status === 403) {
         console.warn(
-          `[email] Resend sandbox restriction: Emails can only be sent to the Resend account owner until a custom domain is verified at resend.com/domains: ${errorText}`,
+          `[email] Resend sandbox restriction: Emails can only be sent to the Resend account owner until a custom domain is verified at resend.com/domains: ${errorText}. Falling back to secondary provider.`,
         );
       } else {
         console.error(`[email] Resend welcome delivery failed for ${to}:`, res.status, errorText);
       }
-      return { sent: false, provider: "resend", error: errorText };
+      // If Resend failed (e.g. sandbox restriction 403), fall through to Brevo
     } catch (err) {
       console.error(`[email] Resend welcome network error for ${to}:`, err);
-      return {
-        sent: false,
-        provider: "resend",
-        error: err instanceof Error ? err.message : String(err),
-      };
     }
   }
 
   if (env.BREVO_API_KEY) {
     try {
+      const parsedSender = parseSender(env.BREVO_SENDER_EMAIL || env.EMAIL_FROM);
       const res = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
         headers: {
@@ -451,14 +454,23 @@ export async function dispatchWelcomeEmail(
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          sender: { name: "audioneko", email: env.EMAIL_FROM || "no-reply@audioneko.app" },
+          sender: parsedSender,
           to: [{ email: to, name }],
           subject: emailSubject,
           htmlContent: emailHtml,
         }),
       });
-      return { sent: res.ok, provider: "brevo" };
+
+      if (res.ok) {
+        console.log(`[email] Successfully dispatched welcome email to ${to} via Brevo`);
+        return { sent: true, provider: "brevo" };
+      }
+
+      const errorText = await res.text();
+      console.error(`[email] Brevo welcome delivery failed for ${to}:`, res.status, errorText);
+      return { sent: false, provider: "brevo", error: errorText };
     } catch (err) {
+      console.error(`[email] Brevo welcome network error for ${to}:`, err);
       return { sent: false, provider: "brevo", error: String(err) };
     }
   }
