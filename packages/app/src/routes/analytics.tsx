@@ -5,7 +5,6 @@ import { Activity, ArrowLeft, FileSpreadsheet } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ActivityHeatmap } from "../components/analytics/ActivityHeatmap";
 import { CsvImportExportModal } from "../components/analytics/CsvImportExportModal";
-import { FriendActivityBar } from "../components/social/FriendActivityBar";
 
 export function AnalyticsPage() {
   const queryClient = useQueryClient();
@@ -53,7 +52,8 @@ export function AnalyticsPage() {
   useEffect(() => {
     async function loadAnalytics() {
       try {
-        const res = await fetch("/api/analytics/summary");
+        const tzOffset = -new Date().getTimezoneOffset();
+        const res = await fetch(`/api/analytics/summary?tzOffset=${tzOffset}`);
         if (res.ok) {
           const data = (await res.json()) as ListeningAnalyticsResponse;
           setAnalytics(data);
@@ -88,10 +88,10 @@ export function AnalyticsPage() {
           </div>
           <div className="min-w-0">
             <h1 className="text-xl md:text-2xl font-bold text-text break-words">
-              Listening Analytics & Social
+              Listening Analytics & Streaks
             </h1>
             <p className="text-xs font-mono text-muted mt-0.5 break-words">
-              Daily listening streaks, contribution heatmap, and small-group friend activity
+              Daily listening streaks, velocity, and listening activity heatmap
             </p>
           </div>
         </div>
@@ -119,11 +119,6 @@ export function AnalyticsPage() {
           Start listening to audiobooks to generate streaks and your activity heatmap.
         </div>
       )}
-
-      {/* Social Presence Section */}
-      <div className="space-y-4">
-        <FriendActivityBar />
-      </div>
 
       <CsvImportExportModal
         isOpen={isCsvModalOpen}

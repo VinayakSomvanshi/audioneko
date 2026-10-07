@@ -1100,7 +1100,9 @@ app.post("/api/analytics/listen", requireAuth, async (c) => {
 app.get("/api/analytics/summary", requireAuth, async (c) => {
   const user = c.get("user");
   const db = createDb(c.env.DB);
-  const analytics = await getUserListeningAnalytics(user.id, db);
+  const tzParam = c.req.query("tzOffset");
+  const tzOffsetMinutes = tzParam ? Number.parseInt(tzParam, 10) || 0 : 0;
+  const analytics = await getUserListeningAnalytics(user.id, db, tzOffsetMinutes);
   return c.json(analytics);
 });
 

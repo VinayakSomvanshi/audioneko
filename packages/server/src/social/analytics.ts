@@ -35,7 +35,10 @@ export function formatIsoDate(date: Date): string {
 /**
  * Computes consecutive days streak ending today or yesterday
  */
-export function computeStreaks(activeDatesSet: Set<string>): {
+export function computeStreaks(
+  activeDatesSet: Set<string>,
+  referenceTodayStr?: string,
+): {
   currentStreak: number;
   longestStreak: number;
 } {
@@ -71,14 +74,14 @@ export function computeStreaks(activeDatesSet: Set<string>): {
   }
 
   // Determine current streak: does it include today or yesterday?
-  const today = formatIsoDate(new Date());
-  const yesterdayDate = new Date();
-  yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+  const today = referenceTodayStr || formatIsoDate(new Date());
+  const todayDate = new Date(`${today}T00:00:00Z`);
+  const yesterdayDate = new Date(todayDate.getTime() - 86400 * 1000);
   const yesterday = formatIsoDate(yesterdayDate);
 
   let currentStreak = 0;
   if (activeDatesSet.has(today) || activeDatesSet.has(yesterday)) {
-    const checkDate = activeDatesSet.has(today) ? new Date() : yesterdayDate;
+    const checkDate = activeDatesSet.has(today) ? new Date(todayDate) : yesterdayDate;
 
     while (true) {
       const dateKey = formatIsoDate(checkDate);
@@ -125,6 +128,7 @@ export async function recordListeningEvent(
 export async function getUserListeningAnalytics(
   userId: string,
   db: Database,
+  tzOffsetMinutes = 0,
 ): Promise<ListeningAnalyticsResponse> {
   const oneYearAgoTimestamp = Math.floor(Date.now() / 1000) - 365 * 86400;
 
@@ -150,7 +154,8 @@ export async function getUserListeningAnalytics(
 
   const totalBooksCompleted = completedBooks[0]?.count || 0;
 
-  // 3. Aggregate daily listening totals and listening velocity
+  // 3. Aggregate daily listening totals and listening velocity shifted to user's local timezone
+  const tzShiftSec = tzOffsetMinutes * 60;
   const dailyMap = new Map<string, { seconds: number; count: number }>();
   let totalListenedSeconds = 0;
   let weightedRateSum = 0;
@@ -160,7 +165,8 @@ export async function getUserListeningAnalytics(
   const hourBuckets = new Array(24).fill(0);
 
   for (const ev of events) {
-    const evDate = new Date(ev.timestamp * 1000);
+    const localMs = (ev.timestamp + tzShiftSec) * 1000;
+    const evDate = new Date(localMs);
     const dateKey = formatIsoDate(evDate);
     totalListenedSeconds += ev.duration;
 
@@ -202,16 +208,17 @@ export async function getUserListeningAnalytics(
     }
   }
 
-  const { currentStreak, longestStreak } = computeStreaks(activeDatesSet);
+  const nowLocalMs = Date.now() + tzShiftSec * 1000;
+  const localTodayDate = new Date(nowLocalMs);
+  const localTodayStr = formatIsoDate(localTodayDate);
+  const { currentStreak, longestStreak } = computeStreaks(activeDatesSet, localTodayStr);
 
   // 5. Construct full 365-day grid history
   const dailyHistory: DailyListeningData[] = [];
-  const today = new Date();
   let todaySeconds = 0;
 
   for (let i = 364; i >= 0; i--) {
-    const d = new Date(today);
-    d.setUTCDate(today.getUTCDate() - i);
+    const d = new Date(nowLocalMs - i * 86400 * 1000);
     const dateStr = formatIsoDate(d);
     const data = dailyMap.get(dateStr) || { seconds: 0, count: 0 };
 
@@ -238,9 +245,9 @@ export async function getUserListeningAnalytics(
     totalBooksCompleted,
     todayListenedSeconds: Math.round(todaySeconds),
     averageDailySeconds,
-    dailyHistory,
     averagePlaybackRate,
     weeklyVelocityMinutes,
     peakListeningHour,
+    dailyHistory,
   };
 }

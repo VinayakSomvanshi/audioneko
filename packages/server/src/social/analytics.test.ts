@@ -150,4 +150,39 @@ describe("Listening Analytics & Streaks Engine", () => {
     expect(todayEntry?.secondsListened).toBe(1800);
     expect(todayEntry?.intensity).toBe(2);
   });
+
+  it("calculates peak listening hour based on user local timezone offset", async () => {
+    // 2026-10-07 07:00:00 UTC
+    const utc7am = Math.floor(new Date("2026-10-07T07:00:00Z").getTime() / 1000);
+    const mockDb = {
+      select: vi.fn().mockImplementation((fields) => {
+        if ("count" in fields) {
+          return {
+            from: vi.fn().mockReturnValue({
+              where: vi.fn().mockReturnValue({
+                all: vi.fn().mockResolvedValue([{ count: 0 }]),
+              }),
+            }),
+          };
+        }
+        return {
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              all: vi
+                .fn()
+                .mockResolvedValue([{ duration: 1800, timestamp: utc7am, playbackRate: 1.0 }]),
+            }),
+          }),
+        };
+      }),
+    } as unknown as Database;
+
+    // Without offset (UTC), peak hour should be 7 (7 AM UTC)
+    const utcSummary = await getUserListeningAnalytics("user_123", mockDb, 0);
+    expect(utcSummary.peakListeningHour).toBe(7);
+
+    // With IST offset (+330 minutes / +5h30m), 07:00 UTC becomes 12:30 local -> peak hour 12 (12 PM)
+    const istSummary = await getUserListeningAnalytics("user_123", mockDb, 330);
+    expect(istSummary.peakListeningHour).toBe(12);
+  });
 });
