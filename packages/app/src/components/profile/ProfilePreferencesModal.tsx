@@ -292,7 +292,7 @@ export function ProfilePreferencesModal({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Your name or handle"
-                    className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none rounded"
+                    className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
                   />
                 </div>
 
@@ -384,7 +384,7 @@ export function ProfilePreferencesModal({
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     placeholder="Enter current password"
-                    className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none rounded"
+                    className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
                   />
                 </div>
 
@@ -403,7 +403,7 @@ export function ProfilePreferencesModal({
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Enter new password"
-                    className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none rounded"
+                    className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
                   />
                 </div>
 
@@ -422,7 +422,7 @@ export function ProfilePreferencesModal({
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter new password"
-                    className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none rounded"
+                    className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
                   />
                 </div>
 
@@ -471,7 +471,7 @@ export function ProfilePreferencesModal({
                           Number.parseInt(e.target.value, 10),
                         )
                       }
-                      className="w-full px-2.5 py-1.5 text-xs font-mono surface-card focus:border-accent outline-none rounded cursor-pointer"
+                      className="w-full px-2.5 py-1.5 text-xs font-mono surface-card text-text focus:border-accent outline-none rounded cursor-pointer"
                     >
                       <option value={5}>5 seconds</option>
                       <option value={10}>10 seconds</option>
@@ -498,7 +498,7 @@ export function ProfilePreferencesModal({
                           Number.parseInt(e.target.value, 10),
                         )
                       }
-                      className="w-full px-2.5 py-1.5 text-xs font-mono surface-card focus:border-accent outline-none rounded cursor-pointer"
+                      className="w-full px-2.5 py-1.5 text-xs font-mono surface-card text-text focus:border-accent outline-none rounded cursor-pointer"
                     >
                       <option value={10}>10 seconds</option>
                       <option value={15}>15 seconds</option>
@@ -590,7 +590,7 @@ export function ProfilePreferencesModal({
                   onChange={(e) =>
                     handleUpdatePreference("equalizerPreset", e.target.value as EqualizerPresetId)
                   }
-                  className="w-full px-2.5 py-1.5 text-xs font-mono surface-card focus:border-accent outline-none rounded cursor-pointer"
+                  className="w-full px-2.5 py-1.5 text-xs font-mono surface-card text-text focus:border-accent outline-none rounded cursor-pointer"
                 >
                   {Object.values(EQUALIZER_PRESETS).map((p) => (
                     <option key={p.id} value={p.id}>

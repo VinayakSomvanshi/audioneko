@@ -456,7 +456,7 @@ export function AdminDashboardPage() {
                     placeholder="1Eb41o9yGeJoojEYniUZvRCjaxBziLN-Z"
                     value={folderId}
                     onChange={(e) => setFolderId(e.target.value)}
-                    className="flex-1 px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none"
+                    className="flex-1 px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
                   />
                   <button
                     type="submit"
@@ -560,7 +560,7 @@ export function AdminDashboardPage() {
                   max={100}
                   value={maxUses}
                   onChange={(e) => setMaxUses(Number.parseInt(e.target.value, 10) || 1)}
-                  className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none"
+                  className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
                 />
               </div>
 
@@ -575,7 +575,7 @@ export function AdminDashboardPage() {
                   max={60}
                   value={expiresInDays}
                   onChange={(e) => setExpiresInDays(Number.parseInt(e.target.value, 10) || 7)}
-                  className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none"
+                  className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
                 />
               </div>
 

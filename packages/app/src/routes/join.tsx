@@ -135,7 +135,7 @@ export function JoinPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Vinayak Somvanshi"
-                className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none"
+                className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
               />
             </div>
 
@@ -150,7 +150,7 @@ export function JoinPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@domain.com"
-                className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none"
+                className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
               />
             </div>
 
@@ -166,7 +166,7 @@ export function JoinPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none"
+                className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
               />
               <span className="text-[10px] font-mono text-subtle">
                 Minimum 8 characters. Stored securely with PBKDF2 hashing.

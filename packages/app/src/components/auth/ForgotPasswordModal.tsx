@@ -245,7 +245,7 @@ export function ForgotPasswordModal({
                     value={requestEmail}
                     onChange={(e) => setRequestEmail(e.target.value)}
                     placeholder="you@domain.com"
-                    className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none rounded"
+                    className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
                   />
                 </div>
 
@@ -308,7 +308,7 @@ export function ForgotPasswordModal({
                     value={resetToken}
                     onChange={(e) => setResetToken(e.target.value)}
                     placeholder="Paste reset token here"
-                    className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none rounded"
+                    className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
                   />
                 </div>
 
@@ -324,7 +324,7 @@ export function ForgotPasswordModal({
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none rounded"
+                    className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
                   />
                 </div>
 
@@ -343,7 +343,7 @@ export function ForgotPasswordModal({
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="••••••••••••"
-                    className="w-full px-3 py-2 text-xs font-mono surface-card focus:border-accent outline-none rounded"
+                    className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded"
                   />
                 </div>
 
