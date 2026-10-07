@@ -4,10 +4,13 @@ import {
   clearAllDownloadedBooks,
   deleteDownloadedBook,
   downloadBookToOpfs,
+  getBookCoverBlobUrl,
   getDownloadedBooks,
+  getPartialDownloadBytes,
   getStorageEstimate,
   isBookDownloaded,
   isOpfsSupported,
+  saveBookCoverToOpfs,
 } from "./opfs";
 
 // Mock OPFS filesystem in-memory structures
@@ -30,20 +33,56 @@ class MockFile {
     const sliced = this.content.slice(start, end);
     return new MockFile(sliced, type);
   }
+
+  async arrayBuffer(): Promise<ArrayBuffer> {
+    return this.content.buffer.slice(
+      this.content.byteOffset,
+      this.content.byteOffset + this.content.byteLength,
+    );
+  }
+
+  stream(): ReadableStream<Uint8Array> {
+    const data = this.content;
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(data);
+        controller.close();
+      },
+    });
+  }
 }
 
 class MockWritable {
   public chunks: Uint8Array[] = [];
   public closed = false;
+  public position = 0;
   private handle: MockFileHandle;
 
-  constructor(handle: MockFileHandle) {
+  constructor(handle: MockFileHandle, options?: { keepExistingData?: boolean }) {
     this.handle = handle;
+    if (options?.keepExistingData && handle.file.content.byteLength > 0) {
+      this.chunks = [new Uint8Array(handle.file.content)];
+      this.position = handle.file.content.byteLength;
+    }
   }
 
-  async write(data: Uint8Array | string): Promise<void> {
-    const chunk = typeof data === "string" ? new TextEncoder().encode(data) : data;
+  async seek(pos: number): Promise<void> {
+    this.position = pos;
+  }
+
+  async write(data: Uint8Array | string | ArrayBuffer | Blob): Promise<void> {
+    let chunk: Uint8Array;
+    if (typeof data === "string") {
+      chunk = new TextEncoder().encode(data);
+    } else if (data instanceof ArrayBuffer) {
+      chunk = new Uint8Array(data);
+    } else if (data instanceof Uint8Array) {
+      chunk = data;
+    } else {
+      chunk = new Uint8Array(0);
+    }
     this.chunks.push(chunk);
+    this.position += chunk.byteLength;
   }
 
   async close(): Promise<void> {
@@ -78,8 +117,8 @@ class MockFileHandle {
     return this.file;
   }
 
-  async createWritable(): Promise<MockWritable> {
-    return new MockWritable(this);
+  async createWritable(options?: { keepExistingData?: boolean }): Promise<MockWritable> {
+    return new MockWritable(this, options);
   }
 }
 
@@ -147,6 +186,11 @@ describe("Origin Private File System (OPFS) Download Manager", () => {
         }),
       },
     });
+
+    vi.stubGlobal("URL", {
+      createObjectURL: vi.fn(() => "blob:http://localhost/test-blob-url"),
+      revokeObjectURL: vi.fn(),
+    });
   });
 
   afterEach(() => {
@@ -167,8 +211,10 @@ describe("Origin Private File System (OPFS) Download Manager", () => {
   it("downloads audio stream into OPFS using streaming chunks and writes meta", async () => {
     const samplePayload = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
 
-    // Mock fetch streaming response
-    vi.stubGlobal("fetch", async () => {
+    vi.stubGlobal("fetch", async (url: string) => {
+      if (url.includes("/api/covers/")) {
+        return new Response(new Uint8Array([255, 216, 255]), { status: 200 });
+      }
       const stream = new ReadableStream({
         start(controller) {
           controller.enqueue(samplePayload.slice(0, 4));
@@ -211,58 +257,66 @@ describe("Origin Private File System (OPFS) Download Manager", () => {
     expect(books[0]?.fileSizeBytes).toBe(8);
   });
 
-  it("downloads large multi-megabyte audiobooks across sequential 2 MB chunk ranges", async () => {
-    const chunk1 = new Uint8Array(2 * 1024 * 1024);
-    const chunk2 = new Uint8Array(1024 * 1024);
-    const totalSize = 3 * 1024 * 1024; // 3 MB
+  it("resumes partial downloads using HTTP range requests without restarting from zero", async () => {
+    // 1. Pre-seed audio.part in OPFS with 4 bytes already written
+    const booksDir = await mockRootDir.getDirectoryHandle("audioneko_books", { create: true });
+    const bookDir = await booksDir.getDirectoryHandle("book_resume_test", { create: true });
+    const partHandle = await bookDir.getFileHandle("audio.part", { create: true });
+    const partWritable = await partHandle.createWritable();
+    await partWritable.write(new Uint8Array([10, 20, 30, 40]));
+    await partWritable.close();
 
-    const requestedRanges: string[] = [];
-    vi.stubGlobal("fetch", async (_url: string, init?: RequestInit) => {
-      const range = (init?.headers as Record<string, string>)?.Range || "";
-      requestedRanges.push(range);
-      const isFirst = range.includes("0-2097151");
-      const payload = isFirst ? chunk1 : chunk2;
+    const partialBefore = await getPartialDownloadBytes("book_resume_test");
+    expect(partialBefore).toBe(4);
 
+    let requestedRange = "";
+    vi.stubGlobal("fetch", async (url: string, init?: RequestInit) => {
+      if (url.includes("/api/covers/")) {
+        return new Response(new Uint8Array([255, 216]), { status: 200 });
+      }
+      requestedRange = (init?.headers as Record<string, string>)?.Range || "";
       const stream = new ReadableStream({
         start(controller) {
-          controller.enqueue(payload);
+          controller.enqueue(new Uint8Array([50, 60, 70, 80]));
           controller.close();
         },
       });
-
       return new Response(stream, {
         status: 206,
-        headers: { "Content-Length": payload.byteLength.toString() },
+        headers: {
+          "Content-Range": "bytes 4-7/8",
+          "Content-Length": "4",
+        },
       });
     });
 
     const meta: OfflineBookMeta = {
-      bookId: "book_offline_large",
-      title: "The Way of Kings",
-      author: "Brandon Sanderson",
-      durationSeconds: 150000,
-      fileSizeBytes: totalSize,
+      bookId: "book_resume_test",
+      title: "Resumed Book",
+      author: "Author",
+      durationSeconds: 1000,
+      fileSizeBytes: 8,
       downloadedAt: 0,
     };
 
-    const progressUpdates: number[] = [];
-    await downloadBookToOpfs(meta, {
-      onProgress: (p) => {
-        progressUpdates.push(p.progressPercent);
-      },
-    });
+    await downloadBookToOpfs(meta);
 
-    expect(requestedRanges).toHaveLength(2);
-    expect(requestedRanges[0]).toBe("bytes=0-2097151");
-    expect(requestedRanges[1]).toBe("bytes=2097152-3145727");
-    expect(progressUpdates[progressUpdates.length - 1]).toBe(100);
+    // Range must have requested starting from 4 bytes!
+    expect(requestedRange).toBe("bytes=4-");
 
-    const isDownloaded = await isBookDownloaded("book_offline_large");
-    expect(isDownloaded).toBe(true);
+    const isDone = await isBookDownloaded("book_resume_test");
+    expect(isDone).toBe(true);
+  });
+
+  it("stores and resolves book cover images in OPFS", async () => {
+    const coverData = new Uint8Array([137, 80, 78, 71]); // PNG magic bytes
+    await saveBookCoverToOpfs("book_cover_test", coverData);
+
+    const blobUrl = await getBookCoverBlobUrl("book_cover_test");
+    expect(blobUrl).toBe("blob:http://localhost/test-blob-url");
   });
 
   it("deletes a downloaded book from OPFS cleanly", async () => {
-    // Seed book in mock directory
     const booksDir = await mockRootDir.getDirectoryHandle("audioneko_books", {
       create: true,
     });

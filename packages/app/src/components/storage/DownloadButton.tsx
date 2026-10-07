@@ -1,12 +1,11 @@
 import type { Book } from "@audioneko/shared";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { getBookCoverUrl } from "../../lib/covers";
+import { useDownloads } from "../../lib/download-manager";
 import {
-  type DownloadProgress,
   type OfflineBookMeta,
   deleteDownloadedBook,
-  downloadBookToOpfs,
   isBookDownloaded,
   isOpfsSupported,
 } from "../../lib/opfs";
@@ -25,10 +24,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
   className = "",
 }) => {
   const [isDownloaded, setIsDownloaded] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const { getTask, enqueue, pause, resume, cancel } = useDownloads();
 
   const supported = isOpfsSupported();
 
@@ -39,7 +35,8 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
           bookId: book.id,
           title: book.title,
           author: book.author,
-          coverUrl: book.coverR2Key ? getBookCoverUrl(book) : undefined,
+          coverR2Key: book.coverR2Key,
+          coverUrl: getBookCoverUrl(book),
           durationSeconds: book.durationSeconds,
           format: book.format,
           fileSizeBytes: book.fileSizeBytes,
@@ -48,6 +45,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
       : null;
 
   const targetBookId = bookMeta?.bookId;
+  const currentTask = targetBookId ? getTask(targetBookId) : undefined;
 
   useEffect(() => {
     let mounted = true;
@@ -66,15 +64,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
 
   if (!supported || !bookMeta) return null;
 
-  const handleDownload = async () => {
-    if (isDownloading) {
-      // Cancel active download
-      abortControllerRef.current?.abort();
-      setIsDownloading(false);
-      setProgress(0);
-      return;
-    }
-
+  const handleAction = async () => {
     if (isDownloaded) {
       // Remove downloaded book
       await deleteDownloadedBook(bookMeta.bookId);
@@ -83,53 +73,56 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
       return;
     }
 
-    setIsDownloading(true);
-    setProgress(0);
-    setError(null);
-
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-
-    try {
-      await downloadBookToOpfs(bookMeta, {
-        signal: controller.signal,
-        onProgress: (p: DownloadProgress) => {
-          setProgress(p.progressPercent);
-        },
-      });
-      setIsDownloaded(true);
-      onDownloadedChange?.(true);
-    } catch (err: unknown) {
-      if (err instanceof Error && err.name === "AbortError") {
-        // User cancelled
-      } else {
-        const msg = err instanceof Error ? err.message : "Download failed";
-        setError(msg);
+    if (currentTask) {
+      if (currentTask.status === "downloading") {
+        pause(bookMeta.bookId);
+        return;
       }
-    } finally {
-      setIsDownloading(false);
-      abortControllerRef.current = null;
+      if (currentTask.status === "paused" || currentTask.status === "error") {
+        resume(bookMeta.bookId);
+        return;
+      }
+      if (currentTask.status === "queued") {
+        await cancel(bookMeta.bookId);
+        return;
+      }
     }
+
+    // Start download
+    await enqueue(bookMeta);
   };
+
+  const isDownloading = currentTask?.status === "downloading";
+  const isPaused = currentTask?.status === "paused";
+  const isQueued = currentTask?.status === "queued";
+  const progressPercent = currentTask?.progressPercent ?? 0;
 
   return (
     <div className={`relative inline-flex flex-col items-start ${className}`}>
       <button
         type="button"
-        onClick={handleDownload}
+        onClick={handleAction}
         className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
           isDownloaded
             ? "bg-accent-bg border-accent/40 text-accent hover:bg-accent/20"
             : isDownloading
               ? "bg-elevated border-accent text-text"
-              : "bg-surface hover:bg-elevated border-border text-text"
+              : isPaused
+                ? "bg-elevated border-amber-500/40 text-amber-400 hover:bg-elevated/80"
+                : isQueued
+                  ? "bg-surface border-border text-muted"
+                  : "bg-surface hover:bg-elevated border-border text-text"
         }`}
         title={
           isDownloaded
             ? "Downloaded offline — click to remove"
             : isDownloading
-              ? `Downloading (${progress}%) — click to cancel`
-              : "Download for offline listening"
+              ? `Downloading (${progressPercent}%) — click to pause`
+              : isPaused
+                ? `Paused at ${progressPercent}% — click to resume`
+                : isQueued
+                  ? "Queued in download manager — click to cancel"
+                  : "Download for offline listening"
         }
       >
         {isDownloaded ? (
@@ -151,7 +144,17 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         ) : isDownloading ? (
           <>
             <div className="w-3 h-3 rounded-full border-2 border-accent border-t-transparent animate-spin" />
-            <span className="font-mono">{progress}%</span>
+            <span className="font-mono">{progressPercent}%</span>
+          </>
+        ) : isPaused ? (
+          <>
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="font-mono text-xs">Paused ({progressPercent}%)</span>
+          </>
+        ) : isQueued ? (
+          <>
+            <span className="w-2 h-2 rounded-full bg-muted animate-pulse" />
+            <span>Queued</span>
           </>
         ) : (
           <>
@@ -176,9 +179,12 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         )}
       </button>
 
-      {error && (
-        <span className="text-[10px] text-accent mt-1 max-w-[140px] truncate" title={error}>
-          {error}
+      {currentTask?.errorMessage && (
+        <span
+          className="text-[10px] text-accent mt-1 max-w-[140px] truncate"
+          title={currentTask.errorMessage}
+        >
+          {currentTask.errorMessage}
         </span>
       )}
     </div>

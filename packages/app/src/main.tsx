@@ -3,6 +3,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { AudioProvider } from "./context/audio-context";
+import { DownloadProvider } from "./lib/download-manager";
 import { router } from "./router";
 import "./styles/index.css";
 
@@ -22,7 +23,9 @@ if (rootElement && !rootElement.innerHTML) {
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <AudioProvider>
-          <RouterProvider router={router} />
+          <DownloadProvider>
+            <RouterProvider router={router} />
+          </DownloadProvider>
         </AudioProvider>
       </QueryClientProvider>
     </React.StrictMode>,

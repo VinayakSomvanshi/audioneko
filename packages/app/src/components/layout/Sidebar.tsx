@@ -9,10 +9,12 @@ import {
   Users,
 } from "lucide-react";
 import { useCurrentUser } from "../../lib/auth-client";
+import { useDownloads } from "../../lib/download-manager";
 
 export function Sidebar() {
   const location = useLocation();
   const { isAdmin } = useCurrentUser();
+  const { activeCount } = useDownloads();
 
   const navItems = [
     { label: "Library", href: "/", icon: Library },
@@ -50,7 +52,12 @@ export function Sidebar() {
               }`}
             >
               <Icon className={`w-4 h-4 ${isActive ? "text-accent" : "text-subtle"}`} />
-              <span>{item.label}</span>
+              <span className="flex-1">{item.label}</span>
+              {item.href === "/offline" && activeCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono bg-accent/20 text-accent border border-accent/40 font-semibold animate-pulse">
+                  {activeCount}
+                </span>
+              )}
             </Link>
           );
         })}

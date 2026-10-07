@@ -22,6 +22,8 @@ export interface DownloadProgress {
   downloadedBytes: number;
   totalBytes: number;
   progressPercent: number;
+  speedBytesPerSec?: number;
+  estimatedTimeSeconds?: number;
   errorMessage?: string;
 }
 
@@ -31,9 +33,11 @@ export interface StorageEstimateResult {
   percentUsed: number;
 }
 
-const OPFS_ROOT_DIR = "audioneko_books";
-const AUDIO_FILE_NAME = "audio.bin";
-const META_FILE_NAME = "meta.json";
+export const OPFS_ROOT_DIR = "audioneko_books";
+export const AUDIO_FILE_NAME = "audio.bin";
+export const PART_FILE_NAME = "audio.part";
+export const COVER_FILE_NAME = "cover.jpg";
+export const META_FILE_NAME = "meta.json";
 
 /**
  * Checks whether the Origin Private File System (OPFS) is supported by the current browser.
@@ -107,6 +111,79 @@ export async function isBookDownloaded(bookId: string): Promise<boolean> {
 }
 
 /**
+ * Checks if a partial download file (audio.part) exists and returns its byte size.
+ */
+export async function getPartialDownloadBytes(bookId: string): Promise<number> {
+  const booksDir = await getBooksDirectory();
+  if (!booksDir) return 0;
+
+  try {
+    const bookDir = await booksDir.getDirectoryHandle(bookId);
+    const partHandle = await bookDir.getFileHandle(PART_FILE_NAME);
+    const file = await partHandle.getFile();
+    return file.size;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Removes incomplete audio.part file if cancelled or resetting.
+ */
+export async function removePartialDownload(bookId: string): Promise<void> {
+  const booksDir = await getBooksDirectory();
+  if (!booksDir) return;
+
+  try {
+    const bookDir = await booksDir.getDirectoryHandle(bookId);
+    await bookDir.removeEntry(PART_FILE_NAME);
+  } catch {
+    // Ignore if not present
+  }
+}
+
+/**
+ * Saves a book cover image to OPFS.
+ */
+export async function saveBookCoverToOpfs(
+  bookId: string,
+  coverData: ArrayBuffer | Blob,
+): Promise<void> {
+  const booksDir = await getBooksDirectory();
+  if (!booksDir) return;
+
+  try {
+    const bookDir = await booksDir.getDirectoryHandle(bookId, { create: true });
+    const coverHandle = await bookDir.getFileHandle(COVER_FILE_NAME, { create: true });
+    const writable = await coverHandle.createWritable();
+    await writable.write(coverData);
+    await writable.close();
+  } catch (err) {
+    console.warn(`Failed to save cover for ${bookId} in OPFS:`, err);
+  }
+}
+
+/**
+ * Retrieves an Object URL for the downloaded book cover stored in OPFS if available.
+ */
+export async function getBookCoverBlobUrl(bookId: string): Promise<string | null> {
+  const booksDir = await getBooksDirectory();
+  if (!booksDir) return null;
+
+  try {
+    const bookDir = await booksDir.getDirectoryHandle(bookId);
+    const coverHandle = await bookDir.getFileHandle(COVER_FILE_NAME);
+    const coverFile = await coverHandle.getFile();
+    if (coverFile.size > 0) {
+      return URL.createObjectURL(coverFile);
+    }
+  } catch {
+    // Cover not cached in OPFS
+  }
+  return null;
+}
+
+/**
  * Lists all audiobooks currently downloaded to the local OPFS storage.
  */
 export async function getDownloadedBooks(): Promise<OfflineBookMeta[]> {
@@ -152,10 +229,12 @@ export async function getDownloadedBooks(): Promise<OfflineBookMeta[]> {
 export interface DownloadOptions {
   onProgress?: (progress: DownloadProgress) => void;
   signal?: AbortSignal;
+  resumeFromOffset?: number;
 }
 
 /**
  * Downloads an audiobook from the streaming proxy directly into OPFS using streaming chunk writing.
+ * Supports resuming via HTTP Range requests into audio.part before finalizing to audio.bin.
  * Eliminates memory exhaustion by avoiding in-memory Blob/ArrayBuffer accumulation.
  */
 export async function downloadBookToOpfs(
@@ -168,152 +247,150 @@ export async function downloadBookToOpfs(
   }
 
   const { onProgress, signal } = options ?? {};
+  const bookDir = await booksDir.getDirectoryHandle(meta.bookId, { create: true });
+
+  // Check if existing audio.part exists for resume
+  let existingBytes = 0;
+  try {
+    const existingPart = await bookDir.getFileHandle(PART_FILE_NAME);
+    const partFile = await existingPart.getFile();
+    existingBytes = partFile.size;
+  } catch {
+    existingBytes = 0;
+  }
+
+  const streamUrl = `/api/stream/${meta.bookId}`;
+
+  // Determine total bytes
+  let totalBytes = meta.fileSizeBytes || 0;
+  if (totalBytes <= 0) {
+    try {
+      const headRes = await fetch(streamUrl, { method: "HEAD", signal });
+      const lenHeader = headRes.headers.get("Content-Length");
+      if (lenHeader) totalBytes = Number.parseInt(lenHeader, 10);
+    } catch {
+      // Fallback
+    }
+  }
+
+  // If already fully downloaded in audio.part
+  if (totalBytes > 0 && existingBytes >= totalBytes) {
+    await finalizeDownload(bookDir, meta, totalBytes);
+    onProgress?.({
+      bookId: meta.bookId,
+      status: "completed",
+      downloadedBytes: totalBytes,
+      totalBytes,
+      progressPercent: 100,
+    });
+    return;
+  }
+
+  const partHandle = await bookDir.getFileHandle(PART_FILE_NAME, { create: true });
+  // Open writable stream. If existing bytes exist, seek to end
+  const writable = await partHandle.createWritable({
+    keepExistingData: existingBytes > 0,
+  });
+
+  if (existingBytes > 0) {
+    await writable.seek(existingBytes);
+  }
+
+  let downloadedBytes = existingBytes;
+  let lastSpeedTime = Date.now();
+  let lastSpeedBytes = downloadedBytes;
 
   onProgress?.({
     bookId: meta.bookId,
     status: "downloading",
-    downloadedBytes: 0,
-    totalBytes: meta.fileSizeBytes || 0,
-    progressPercent: 0,
+    downloadedBytes,
+    totalBytes: totalBytes || 0,
+    progressPercent: totalBytes > 0 ? Math.round((downloadedBytes / totalBytes) * 100) : 0,
   });
 
-  const bookDir = await booksDir.getDirectoryHandle(meta.bookId, { create: true });
-  const audioHandle = await bookDir.getFileHandle(AUDIO_FILE_NAME, { create: true });
-
-  const writable = await audioHandle.createWritable();
-
-  const CHUNK_DOWNLOAD_SIZE = 2 * 1024 * 1024; // 2 MB aligned chunk stream
-  const streamUrl = `/api/stream/${meta.bookId}`;
-
   try {
-    let totalBytes = meta.fileSizeBytes || 0;
+    const rangeHeader = existingBytes > 0 ? `bytes=${existingBytes}-` : undefined;
+    const headers: Record<string, string> = {
+      Accept: "audio/mp4, audio/mpeg, audio/*;q=0.9, */*;q=0.8",
+    };
+    if (rangeHeader) {
+      headers.Range = rangeHeader;
+    }
 
-    // Probe HEAD if size unknown
+    const response = await fetch(streamUrl, {
+      signal,
+      headers,
+    });
+
+    if (!response.ok && response.status !== 206) {
+      throw new Error(
+        `Failed to download audio stream: HTTP ${response.status} ${response.statusText}`,
+      );
+    }
+
     if (totalBytes <= 0) {
-      try {
-        const headRes = await fetch(streamUrl, { method: "HEAD", signal });
-        const lenHeader = headRes.headers.get("Content-Length");
-        if (lenHeader) totalBytes = Number.parseInt(lenHeader, 10);
-      } catch {
-        // Fallback
+      const cl = response.headers.get("Content-Length");
+      const cr = response.headers.get("Content-Range");
+      if (cr) {
+        const totalMatch = cr.match(/\/(\d+)$/);
+        if (totalMatch?.[1]) totalBytes = Number.parseInt(totalMatch[1], 10);
+      } else if (cl) {
+        totalBytes = existingBytes + Number.parseInt(cl, 10);
       }
     }
 
-    let downloadedBytes = 0;
+    if (!response.body) {
+      throw new Error("Response body is empty or not streamable");
+    }
 
-    if (totalBytes > CHUNK_DOWNLOAD_SIZE) {
-      // Multi-chunk sequential range streaming for large audiobooks
-      let offset = 0;
-      while (offset < totalBytes) {
-        if (signal?.aborted) {
-          throw new Error("Download aborted by user");
+    const reader = response.body.getReader();
+
+    while (true) {
+      if (signal?.aborted) {
+        throw new Error("Download aborted by user");
+      }
+
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      if (value) {
+        await writable.write(value);
+        downloadedBytes += value.byteLength;
+
+        const now = Date.now();
+        let speedBytesPerSec: number | undefined;
+        let estimatedTimeSeconds: number | undefined;
+
+        if (now - lastSpeedTime >= 800) {
+          const elapsedSec = (now - lastSpeedTime) / 1000;
+          const diffBytes = downloadedBytes - lastSpeedBytes;
+          speedBytesPerSec = Math.round(diffBytes / elapsedSec);
+          if (speedBytesPerSec > 0 && totalBytes > downloadedBytes) {
+            estimatedTimeSeconds = Math.round((totalBytes - downloadedBytes) / speedBytesPerSec);
+          }
+          lastSpeedTime = now;
+          lastSpeedBytes = downloadedBytes;
         }
 
-        const chunkEnd = Math.min(offset + CHUNK_DOWNLOAD_SIZE - 1, totalBytes - 1);
-        const chunkRes = await fetch(streamUrl, {
-          signal,
-          headers: {
-            Range: `bytes=${offset}-${chunkEnd}`,
-            Accept: "audio/mp4, audio/mpeg, audio/*;q=0.9, */*;q=0.8",
-          },
+        const percent =
+          totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+
+        onProgress?.({
+          bookId: meta.bookId,
+          status: "downloading",
+          downloadedBytes,
+          totalBytes,
+          progressPercent: percent,
+          speedBytesPerSec,
+          estimatedTimeSeconds,
         });
-
-        if (!chunkRes.ok && chunkRes.status !== 206) {
-          throw new Error(
-            `Failed to download audio chunk [${chunkRes.status}]: ${chunkRes.statusText}`,
-          );
-        }
-
-        if (!chunkRes.body) {
-          throw new Error("Chunk response body is empty or not streamable");
-        }
-
-        const reader = chunkRes.body.getReader();
-        while (true) {
-          if (signal?.aborted) {
-            throw new Error("Download aborted by user");
-          }
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (value) {
-            await writable.write(value);
-            downloadedBytes += value.byteLength;
-            const percent = Math.min(100, Math.round((downloadedBytes / totalBytes) * 100));
-            onProgress?.({
-              bookId: meta.bookId,
-              status: "downloading",
-              downloadedBytes,
-              totalBytes,
-              progressPercent: percent,
-            });
-          }
-        }
-
-        offset = chunkEnd + 1;
-      }
-    } else {
-      // Single-shot streaming for smaller audiobooks or tests
-      const response = await fetch(streamUrl, {
-        signal,
-        headers: {
-          Accept: "audio/mp4, audio/mpeg, audio/*;q=0.9, */*;q=0.8",
-        },
-      });
-
-      if (!response.ok && response.status !== 206) {
-        throw new Error(
-          `Failed to download audio stream: HTTP ${response.status} ${response.statusText}`,
-        );
-      }
-
-      const contentLengthHeader = response.headers.get("Content-Length");
-      if (totalBytes <= 0 && contentLengthHeader) {
-        totalBytes = Number.parseInt(contentLengthHeader, 10);
-      }
-
-      if (!response.body) {
-        throw new Error("Response body is empty or not streamable");
-      }
-
-      const reader = response.body.getReader();
-      while (true) {
-        if (signal?.aborted) {
-          throw new Error("Download aborted by user");
-        }
-
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        if (value) {
-          await writable.write(value);
-          downloadedBytes += value.byteLength;
-
-          const percent =
-            totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
-
-          onProgress?.({
-            bookId: meta.bookId,
-            status: "downloading",
-            downloadedBytes,
-            totalBytes,
-            progressPercent: percent,
-          });
-        }
       }
     }
 
     await writable.close();
 
-    // Persist meta.json
-    const metaHandle = await bookDir.getFileHandle(META_FILE_NAME, { create: true });
-    const metaWritable = await metaHandle.createWritable();
-    const finalMeta: OfflineBookMeta = {
-      ...meta,
-      fileSizeBytes: downloadedBytes,
-      downloadedAt: Date.now(),
-    };
-    await metaWritable.write(JSON.stringify(finalMeta, null, 2));
-    await metaWritable.close();
+    // Finalize download: promote audio.part to audio.bin, save cover & meta
+    await finalizeDownload(bookDir, meta, downloadedBytes);
 
     onProgress?.({
       bookId: meta.bookId,
@@ -324,22 +401,87 @@ export async function downloadBookToOpfs(
     });
   } catch (err: unknown) {
     try {
-      await writable.abort();
+      await writable.close();
     } catch {
-      // Ignore abort cleanup errors
+      // Ignore cleanup error
     }
 
     const errorMessage = err instanceof Error ? err.message : String(err);
+    const isAbort =
+      err instanceof Error && (err.name === "AbortError" || err.message.includes("aborted"));
+
     onProgress?.({
       bookId: meta.bookId,
-      status: "error",
-      downloadedBytes: 0,
-      totalBytes: meta.fileSizeBytes || 0,
-      progressPercent: 0,
-      errorMessage,
+      status: isAbort ? "paused" : "error",
+      downloadedBytes,
+      totalBytes: totalBytes || meta.fileSizeBytes || 0,
+      progressPercent:
+        totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0,
+      errorMessage: isAbort ? undefined : errorMessage,
     });
 
     throw err;
+  }
+}
+
+/**
+ * Promotes audio.part to audio.bin, caches cover picture, and writes meta.json.
+ */
+async function finalizeDownload(
+  bookDir: FileSystemDirectoryHandle,
+  meta: OfflineBookMeta,
+  finalSizeBytes: number,
+): Promise<void> {
+  const partHandle = await bookDir.getFileHandle(PART_FILE_NAME);
+  const partFile = await partHandle.getFile();
+
+  // Write final audio.bin
+  const audioHandle = await bookDir.getFileHandle(AUDIO_FILE_NAME, { create: true });
+  const audioWritable = await audioHandle.createWritable();
+
+  const CHUNK_SIZE = 4 * 1024 * 1024;
+  let offset = 0;
+  while (offset < partFile.size) {
+    const slice = partFile.slice(offset, offset + CHUNK_SIZE);
+    const buf = await slice.arrayBuffer();
+    await audioWritable.write(new Uint8Array(buf));
+    offset += CHUNK_SIZE;
+  }
+  await audioWritable.close();
+
+  // Cache cover picture into OPFS
+  try {
+    const coverUrl = meta.coverUrl || `/api/covers/${meta.bookId}`;
+    const coverRes = await fetch(coverUrl);
+    if (coverRes.ok) {
+      const coverBuf = await coverRes.arrayBuffer();
+      if (coverBuf.byteLength > 0) {
+        const coverHandle = await bookDir.getFileHandle(COVER_FILE_NAME, { create: true });
+        const coverWritable = await coverHandle.createWritable();
+        await coverWritable.write(coverBuf);
+        await coverWritable.close();
+      }
+    }
+  } catch {
+    // Cover download failure is non-fatal
+  }
+
+  // Persist meta.json
+  const metaHandle = await bookDir.getFileHandle(META_FILE_NAME, { create: true });
+  const metaWritable = await metaHandle.createWritable();
+  const finalMeta: OfflineBookMeta = {
+    ...meta,
+    fileSizeBytes: finalSizeBytes,
+    downloadedAt: Date.now(),
+  };
+  await metaWritable.write(JSON.stringify(finalMeta, null, 2));
+  await metaWritable.close();
+
+  // Delete audio.part
+  try {
+    await bookDir.removeEntry(PART_FILE_NAME);
+  } catch {
+    // Ignore
   }
 }
 

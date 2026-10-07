@@ -136,6 +136,46 @@ async function handleAudioStreamFetch(request) {
   }
 }
 
+/**
+ * Intercepts cover image requests and serves from OPFS if downloaded.
+ */
+async function handleCoverFetch(request) {
+  try {
+    const netRes = await fetch(request);
+    if (netRes && (netRes.status === 200 || netRes.status === 302 || netRes.status === 304)) {
+      return netRes;
+    }
+  } catch (_e) {
+    // Network failed, fall through to OPFS
+  }
+
+  try {
+    const url = new URL(request.url);
+    const bookId = url.pathname.slice("/api/covers/".length).split("?")[0];
+    if (navigator.storage && navigator.storage.getDirectory) {
+      const root = await navigator.storage.getDirectory();
+      const booksDir = await root.getDirectoryHandle(OPFS_ROOT_DIR);
+      const bookDir = await booksDir.getDirectoryHandle(bookId);
+      const coverHandle = await bookDir.getFileHandle("cover.jpg");
+      const coverFile = await coverHandle.getFile();
+      if (coverFile.size > 0) {
+        return new Response(coverFile, {
+          status: 200,
+          headers: {
+            "Content-Type": coverFile.type || "image/jpeg",
+            "Cache-Control": "public, max-age=604800",
+            "X-Audioneko-Source": "OPFS-Offline-Cover",
+          },
+        });
+      }
+    }
+  } catch (_err) {
+    // Fallback
+  }
+
+  return new Response(null, { status: 404 });
+}
+
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
@@ -145,7 +185,13 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2. Pass through all other API endpoints and external requests directly to network
+  // 2. Cover image interceptor with OPFS offline fallback
+  if (url.pathname.startsWith("/api/covers/")) {
+    event.respondWith(handleCoverFetch(event.request));
+    return;
+  }
+
+  // 3. Pass through all other API endpoints and external requests directly to network
   if (url.pathname.startsWith("/api/") || url.origin !== self.location.origin) {
     return;
   }
