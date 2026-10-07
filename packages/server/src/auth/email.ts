@@ -261,3 +261,216 @@ export async function dispatchPasswordResetEmail(
     error: "No email service configured on Cloudflare worker environment",
   };
 }
+
+export interface WelcomeEmailParams {
+  to: string;
+  name?: string;
+  role?: string;
+}
+
+export async function dispatchWelcomeEmail(
+  env: Env,
+  params: WelcomeEmailParams,
+): Promise<SendEmailResult> {
+  const { to, name, role } = params;
+  const nameDisplay = name || "Listener";
+  const baseUrl = env.APP_URL || "https://audioneko.greatmidoriya.workers.dev";
+  const appUrl = baseUrl.replace(/\/$/, "");
+
+  const emailSubject = "Welcome to audioneko!";
+  const emailHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Welcome to audioneko</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #0d0d0d;
+      color: #e5e5e5;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+    }
+    .wrapper {
+      max-width: 540px;
+      margin: 40px auto;
+      padding: 32px 24px;
+      background-color: #141414;
+      border: 1px solid #262626;
+      border-radius: 8px;
+    }
+    .header {
+      border-bottom: 1px solid #262626;
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #ffffff;
+      margin: 0;
+      letter-spacing: -0.02em;
+    }
+    .subtitle {
+      font-size: 12px;
+      font-family: monospace;
+      color: #a3a3a3;
+      margin-top: 4px;
+    }
+    .content {
+      font-size: 14px;
+      color: #e5e5e5;
+      margin-bottom: 24px;
+    }
+    .features {
+      background-color: #1a1a1a;
+      border: 1px solid #333333;
+      border-radius: 6px;
+      padding: 16px;
+      margin: 20px 0;
+      font-size: 13px;
+      color: #d4d4d4;
+    }
+    .feature-item {
+      margin-bottom: 8px;
+      padding-left: 4px;
+    }
+    .feature-item:last-child {
+      margin-bottom: 0;
+    }
+    .button-wrap {
+      margin: 28px 0;
+      text-align: center;
+    }
+    .btn {
+      display: inline-block;
+      padding: 12px 28px;
+      background-color: #e04838;
+      color: #ffffff !important;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: monospace;
+      border-radius: 4px;
+      letter-spacing: 0.04em;
+    }
+    .footer {
+      border-top: 1px solid #262626;
+      padding-top: 16px;
+      margin-top: 32px;
+      font-size: 11px;
+      font-family: monospace;
+      color: #737373;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <h1 class="title">Welcome to audioneko</h1>
+      <div class="subtitle">Private audiobook streaming library</div>
+    </div>
+    <div class="content">
+      <p>Hello ${nameDisplay},</p>
+      <p>Your account (<strong>${to}</strong>) has been successfully activated${role ? ` with <strong>${role}</strong> access` : ""}.</p>
+      
+      <div class="features">
+        <div class="feature-item">&bull; <strong>Continuous Streaming</strong>: Gapless chapter progression with smart pause rewind.</div>
+        <div class="feature-item">&bull; <strong>Offline Playback</strong>: Save entire books locally into device storage for offline listening.</div>
+        <div class="feature-item">&bull; <strong>Custom Equalizer</strong>: Voice-tailored audio filters engineered for spoken word clarity.</div>
+        <div class="feature-item">&bull; <strong>Cloud Sync</strong>: Seamless progress, speed, and bookmark synchronization across devices.</div>
+      </div>
+
+      <div class="button-wrap">
+        <a href="${appUrl}" class="btn">OPEN AUDIOBOOK LIBRARY</a>
+      </div>
+    </div>
+    <div class="footer">
+      audioneko audiobook platform - Instance invitation redeemed
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+
+  const fromAddress = env.EMAIL_FROM || "audioneko <onboarding@resend.dev>";
+
+  if (env.RESEND_API_KEY) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: fromAddress,
+          to: [to],
+          subject: emailSubject,
+          html: emailHtml,
+        }),
+      });
+
+      if (res.ok) {
+        console.log(`[email] Successfully dispatched welcome email to ${to} via Resend`);
+        return { sent: true, provider: "resend" };
+      }
+      const errorText = await res.text();
+      console.error(`[email] Resend welcome delivery failed for ${to}:`, res.status, errorText);
+      return { sent: false, provider: "resend", error: errorText };
+    } catch (err) {
+      console.error(`[email] Resend welcome network error for ${to}:`, err);
+      return {
+        sent: false,
+        provider: "resend",
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
+  if (env.BREVO_API_KEY) {
+    try {
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "api-key": env.BREVO_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          sender: { name: "audioneko", email: env.EMAIL_FROM || "no-reply@audioneko.app" },
+          to: [{ email: to, name }],
+          subject: emailSubject,
+          htmlContent: emailHtml,
+        }),
+      });
+      return { sent: res.ok, provider: "brevo" };
+    } catch (err) {
+      return { sent: false, provider: "brevo", error: String(err) };
+    }
+  }
+
+  if (env.POSTMARK_API_KEY) {
+    try {
+      const res = await fetch("https://api.postmarkapp.com/email", {
+        method: "POST",
+        headers: {
+          "X-Postmark-Server-Token": env.POSTMARK_API_KEY,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          From: env.EMAIL_FROM || "no-reply@audioneko.app",
+          To: to,
+          Subject: emailSubject,
+          HtmlBody: emailHtml,
+        }),
+      });
+      return { sent: res.ok, provider: "postmark" };
+    } catch (err) {
+      return { sent: false, provider: "postmark", error: String(err) };
+    }
+  }
+
+  return { sent: false, error: "No email provider configured" };
+}

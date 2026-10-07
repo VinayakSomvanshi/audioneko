@@ -50,7 +50,7 @@ export function createAuth(env: Env) {
       }) => {
         console.log(`[auth] Password reset requested for ${user.email} (token: ${token})`);
         const baseUrl = env.APP_URL || "https://audioneko.greatmidoriya.workers.dev";
-        const directResetUrl = `${baseUrl.replace(/\/$/, "")}/login?token=${token}&email=${encodeURIComponent(user.email)}`;
+        const directResetUrl = `${baseUrl.replace(/\/$/, "")}/login?resetToken=${token}&email=${encodeURIComponent(user.email)}`;
 
         await dispatchPasswordResetEmail(env, {
           to: user.email,

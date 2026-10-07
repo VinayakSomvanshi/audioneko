@@ -36,11 +36,15 @@ export function RootLayout() {
     }
   };
 
-  // Safeguard: If landing with invite ?token= on any route outside /join, redirect to /join
+  // Safeguard: If landing with invite ?token= on root or library, redirect to /join.
+  // Never redirect when on /login or when query indicates a password reset.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
-    if (token && window.location.pathname !== "/join") {
+    const isReset = params.has("resetToken") || params.has("email");
+    const currentPath = window.location.pathname;
+
+    if (token && !isReset && currentPath !== "/join" && currentPath !== "/login") {
       window.location.href = `/join?token=${encodeURIComponent(token)}`;
     }
   }, []);

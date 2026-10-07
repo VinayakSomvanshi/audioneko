@@ -184,7 +184,7 @@ adminRoutes.post("/users/:id/reset-token", requireAuth, requireAdmin, async (c) 
   });
 
   const baseUrl = c.env.APP_URL || new URL(c.req.url).origin;
-  const resetUrl = `${baseUrl}/login?token=${token}&email=${encodeURIComponent(targetUser.email)}`;
+  const resetUrl = `${baseUrl}/login?resetToken=${token}&email=${encodeURIComponent(targetUser.email)}`;
 
   return c.json({
     success: true,

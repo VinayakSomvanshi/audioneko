@@ -110,6 +110,16 @@ export function JoinPage() {
             <p className="text-[11px] font-mono text-subtle pt-2 border-t border-border">
               Contact the library curator for a fresh cryptographic invite link.
             </p>
+            {token && (
+              <div className="pt-2">
+                <a
+                  href={`/login?resetToken=${encodeURIComponent(token)}`}
+                  className="inline-block px-3 py-1.5 text-xs font-mono text-accent hover:underline border border-accent/30 rounded bg-accent-bg/10"
+                >
+                  Were you trying to reset your password? Click here
+                </a>
+              </div>
+            )}
           </div>
         ) : (
           <form onSubmit={handleRegister} className="space-y-4">
