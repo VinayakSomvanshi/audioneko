@@ -1,9 +1,10 @@
-import type { Book } from "@audioneko/shared";
+import type { Book, BookProgressRecord } from "@audioneko/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Bookmark,
+  FileSpreadsheet,
   FolderPlus,
   Loader2,
   Play,
@@ -14,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { CsvImportExportModal } from "../components/analytics/CsvImportExportModal";
 import { getBookCoverUrl } from "../lib/covers";
 
 interface CustomShelf {
@@ -40,6 +42,7 @@ export function ShelvesPage() {
   const [isCreatingShelf, setIsCreatingShelf] = useState(false);
   const [addingBookShelfId, setAddingBookShelfId] = useState<string | null>(null);
   const [shelfBookSearch, setShelfBookSearch] = useState("");
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
 
   // 1. Fetch user custom shelves
   const { data: shelvesData, isLoading: shelvesLoading } = useQuery<{ shelves: CustomShelf[] }>({
@@ -63,6 +66,17 @@ export function ShelvesPage() {
       const res = await fetch("/api/books");
       if (!res.ok) return { books: [] as Book[] };
       return (await res.json()) as { books: Book[] };
+    },
+    staleTime: 30_000,
+  });
+
+  // 3. Fetch progress for CSV export
+  const { data: progressData } = useQuery<{ progress: Record<string, BookProgressRecord> }>({
+    queryKey: ["allProgress"],
+    queryFn: async () => {
+      const res = await fetch("/api/progress/all");
+      if (!res.ok) return { progress: {} };
+      return res.json();
     },
     staleTime: 30_000,
   });
@@ -162,17 +176,28 @@ export function ShelvesPage() {
             </div>
           </div>
 
-          {/* Action button */}
-          {!isCreatingShelf && (
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto shrink-0">
             <button
               type="button"
-              onClick={() => setIsCreatingShelf(true)}
-              className="px-4 py-2 rounded bg-accent text-bg text-xs font-mono font-medium flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer self-start md:self-auto shrink-0 shadow-sm"
+              onClick={() => setIsCsvModalOpen(true)}
+              className="px-3 py-2 rounded border border-border bg-surface text-text hover:border-accent hover:text-accent text-xs font-mono font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Create New Shelf</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-accent" />
+              <span>Goodreads & StoryGraph</span>
             </button>
-          )}
+
+            {!isCreatingShelf && (
+              <button
+                type="button"
+                onClick={() => setIsCreatingShelf(true)}
+                className="px-4 py-2 rounded bg-accent text-bg text-xs font-mono font-medium flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create New Shelf</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Inline Create Shelf Form */}
@@ -485,6 +510,13 @@ export function ShelvesPage() {
           </div>
         )}
       </div>
+
+      <CsvImportExportModal
+        isOpen={isCsvModalOpen}
+        onClose={() => setIsCsvModalOpen(false)}
+        books={allBooks}
+        progressMap={progressData?.progress || {}}
+      />
     </div>
   );
 }

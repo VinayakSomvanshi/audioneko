@@ -14,15 +14,15 @@ export function MiniPlayer() {
     duration,
     bufferedTime,
     playbackRate,
-    voiceBoost,
     smartSpeed,
+    equalizerPreset,
+    setIsEqualizerOpen,
     sleepTimerState,
     setIsFullPlayerOpen,
     togglePlay,
     seekTo,
     skipBy,
     setRate,
-    toggleVoiceBoost,
     toggleSmartSpeed,
     startSleepTimer,
     cancelSleepTimer,
@@ -254,18 +254,18 @@ export function MiniPlayer() {
               <span>{formatTime(duration)}</span>
             </div>
 
-            {/* Voice Boost toggle - shown on sm+ */}
+            {/* Voice Equalizer - shown on sm+ */}
             <button
               type="button"
-              onClick={toggleVoiceBoost}
+              onClick={() => setIsEqualizerOpen(true)}
               className={`hidden sm:flex px-2 py-1 text-[10px] font-mono rounded surface-card transition-colors cursor-pointer items-center gap-1 ${
-                voiceBoost
+                equalizerPreset !== "flat"
                   ? "border-accent text-accent bg-accent-bg font-medium"
                   : "text-subtle hover:text-text"
               }`}
-              title="Voice Boost EQ (85Hz cut, 2.2kHz lift, sibilance taming)"
+              title="5-Band Voice Equalizer & Acoustic Presets"
             >
-              <span>EQ</span>
+              <span>EQ{equalizerPreset !== "flat" ? ` (${equalizerPreset})` : ""}</span>
             </button>
 
             {/* Smart Speed toggle - shown on md+ */}

@@ -3,6 +3,7 @@ import {
   Bookmark,
   ChevronDown,
   FastForward,
+  Headphones,
   ListMusic,
   Maximize2,
   Mic,
@@ -14,6 +15,7 @@ import {
   RotateCcw,
   SkipBack,
   SkipForward,
+  Sliders,
   Trash2,
   Volume2,
   VolumeX,
@@ -51,6 +53,9 @@ export function FullPlayerModal() {
     voiceBoost,
     smartSpeed,
     smartRewind,
+    equalizerPreset,
+    setIsEqualizerOpen,
+    setIsHeadsetSettingsOpen,
     isFullPlayerOpen,
     setIsFullPlayerOpen,
     togglePlay,
@@ -417,6 +422,32 @@ export function FullPlayerModal() {
           >
             <Mic className="w-3.5 h-3.5" />
             <span>Voice Boost</span>
+          </button>
+
+          {/* 5-Band Voice Equalizer Button */}
+          <button
+            type="button"
+            onClick={() => setIsEqualizerOpen(true)}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono border transition-colors cursor-pointer ${
+              equalizerPreset !== "flat"
+                ? "border-accent bg-accent/15 text-accent font-semibold"
+                : "border-border bg-surface text-muted hover:text-text"
+            }`}
+            title="5-Band Voice Equalizer & Acoustic Presets"
+          >
+            <Sliders className="w-3.5 h-3.5" />
+            <span>EQ{equalizerPreset !== "flat" ? ` (${equalizerPreset})` : ""}</span>
+          </button>
+
+          {/* Headset & Media Session Controls Button */}
+          <button
+            type="button"
+            onClick={() => setIsHeadsetSettingsOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono border border-border bg-surface text-muted hover:text-text transition-colors cursor-pointer"
+            title="Headset & Media Session Hardware Remapping"
+          >
+            <Headphones className="w-3.5 h-3.5" />
+            <span>Headset</span>
           </button>
 
           {/* Smart Speed Silence Trimmer Toggle */}

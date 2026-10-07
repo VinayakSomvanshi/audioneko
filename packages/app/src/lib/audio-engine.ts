@@ -3,24 +3,39 @@
  *
  * Implements:
  * 1. 40ms linear gain ramp-up / ramp-down on play/pause to eliminate speaker popping
- * 2. 3-band parametric Voice Boost EQ (85 Hz low rumble cut, 2.2 kHz speech intelligibility lift, 7.5 kHz sibilance taming)
+ * 2. 5-band parametric Voice Equalizer with Presets (80 Hz, 250 Hz, 1 kHz, 2.8 kHz, 8 kHz)
  * 3. Dynamic Loudness Normalization compressor targeting -16 LUFS
  * 4. Smart Speed AudioWorklet integration evaluating rolling 250ms RMS energy
  */
+
+import {
+  EQUALIZER_PRESETS,
+  type EqualizerBands,
+  type EqualizerPresetId,
+  loadEqualizerSettings,
+  saveEqualizerSettings,
+} from "./equalizer";
 
 export interface DspSettings {
   voiceBoost: boolean;
   loudnessNormalization: boolean;
   smartSpeed: boolean;
   basePlaybackRate: number;
+  equalizerPreset: EqualizerPresetId;
+  equalizerBands: EqualizerBands;
 }
 
 export class AudioEngine {
   private ctx: AudioContext | null = null;
   private sourceNode: MediaElementAudioSourceNode | null = null;
-  private highpassFilter: BiquadFilterNode | null = null;
-  private voiceBoostFilter: BiquadFilterNode | null = null;
-  private sibilanceFilter: BiquadFilterNode | null = null;
+
+  // 5-band Parametric Equalizer Filter Nodes
+  private eqBand80: BiquadFilterNode | null = null;
+  private eqBand250: BiquadFilterNode | null = null;
+  private eqBand1k: BiquadFilterNode | null = null;
+  private eqBand3k: BiquadFilterNode | null = null;
+  private eqBand8k: BiquadFilterNode | null = null;
+
   private compressorNode: DynamicsCompressorNode | null = null;
   private gainNode: GainNode | null = null;
   private analyserNode: AnalyserNode | null = null;
@@ -29,12 +44,19 @@ export class AudioEngine {
   private isInitialized = false;
   private isSilent = false;
   private currentVolume = 1.0;
-  private settings: DspSettings = {
-    voiceBoost: false,
-    loudnessNormalization: true,
-    smartSpeed: false,
-    basePlaybackRate: 1.0,
-  };
+  private settings: DspSettings;
+
+  constructor() {
+    const savedEq = loadEqualizerSettings();
+    this.settings = {
+      voiceBoost: savedEq.preset === "vocal-clarity",
+      loudnessNormalization: true,
+      smartSpeed: false,
+      basePlaybackRate: 1.0,
+      equalizerPreset: savedEq.preset,
+      equalizerBands: savedEq.bands,
+    };
+  }
 
   /**
    * Initializes the Web Audio graph and attaches to the HTMLMediaElement.
@@ -54,26 +76,39 @@ export class AudioEngine {
       this.ctx = new AudioCtx();
       this.sourceNode = this.ctx.createMediaElementSource(audioElement);
 
-      // 1. Voice Boost EQ Stage
-      // Band A: 85 Hz Highpass Filter (kills mic plosives & low-frequency desk rumble when voice boost is on)
-      this.highpassFilter = this.ctx.createBiquadFilter();
-      this.highpassFilter.type = "highpass";
-      this.highpassFilter.frequency.value = this.settings.voiceBoost ? 85 : 10;
-      this.highpassFilter.Q.value = Math.SQRT1_2;
+      // 1. 5-Band Voice Equalizer Stage
+      // Band 1: 80 Hz Low Shelf (low rumble / plosive reduction)
+      this.eqBand80 = this.ctx.createBiquadFilter();
+      this.eqBand80.type = "lowshelf";
+      this.eqBand80.frequency.value = 80;
+      this.eqBand80.gain.value = this.settings.equalizerBands.subBass80Hz;
 
-      // Band B: 2.2 kHz Peaking Filter (lift speech presence & intelligibility)
-      this.voiceBoostFilter = this.ctx.createBiquadFilter();
-      this.voiceBoostFilter.type = "peaking";
-      this.voiceBoostFilter.frequency.value = 2200;
-      this.voiceBoostFilter.Q.value = 1.2;
-      this.voiceBoostFilter.gain.value = this.settings.voiceBoost ? 3.5 : 0;
+      // Band 2: 250 Hz Peaking (chest resonance / lower mids warmth)
+      this.eqBand250 = this.ctx.createBiquadFilter();
+      this.eqBand250.type = "peaking";
+      this.eqBand250.frequency.value = 250;
+      this.eqBand250.Q.value = 1.2;
+      this.eqBand250.gain.value = this.settings.equalizerBands.warmth250Hz;
 
-      // Band C: 7.5 kHz Peaking / High-shelf (tames harsh sibilance "s" / "sh")
-      this.sibilanceFilter = this.ctx.createBiquadFilter();
-      this.sibilanceFilter.type = "peaking";
-      this.sibilanceFilter.frequency.value = 7500;
-      this.sibilanceFilter.Q.value = 1.0;
-      this.sibilanceFilter.gain.value = this.settings.voiceBoost ? -2.5 : 0;
+      // Band 3: 1 kHz Peaking (body / room acoustics)
+      this.eqBand1k = this.ctx.createBiquadFilter();
+      this.eqBand1k.type = "peaking";
+      this.eqBand1k.frequency.value = 1000;
+      this.eqBand1k.Q.value = 1.0;
+      this.eqBand1k.gain.value = this.settings.equalizerBands.mid1kHz;
+
+      // Band 4: 2.8 kHz Peaking (speech presence & intelligibility)
+      this.eqBand3k = this.ctx.createBiquadFilter();
+      this.eqBand3k.type = "peaking";
+      this.eqBand3k.frequency.value = 2800;
+      this.eqBand3k.Q.value = 1.2;
+      this.eqBand3k.gain.value = this.settings.equalizerBands.vocalClarity3kHz;
+
+      // Band 5: 8 kHz High Shelf (air / sibilance control)
+      this.eqBand8k = this.ctx.createBiquadFilter();
+      this.eqBand8k.type = "highshelf";
+      this.eqBand8k.frequency.value = 8000;
+      this.eqBand8k.gain.value = this.settings.equalizerBands.air8kHz;
 
       // 2. Loudness Normalization Dynamics Compressor Stage
       this.compressorNode = this.ctx.createDynamicsCompressor();
@@ -83,11 +118,13 @@ export class AudioEngine {
       this.gainNode = this.ctx.createGain();
       this.gainNode.gain.value = this.currentVolume;
 
-      // Connect standard DSP pipeline: source -> HPF -> VoiceBoost -> Sibilance -> Compressor -> Gain -> destination
-      this.sourceNode.connect(this.highpassFilter);
-      this.highpassFilter.connect(this.voiceBoostFilter);
-      this.voiceBoostFilter.connect(this.sibilanceFilter);
-      this.sibilanceFilter.connect(this.compressorNode);
+      // Connect 5-band DSP pipeline: source -> EQ1 -> EQ2 -> EQ3 -> EQ4 -> EQ5 -> Compressor -> Gain -> destination
+      this.sourceNode.connect(this.eqBand80);
+      this.eqBand80.connect(this.eqBand250);
+      this.eqBand250.connect(this.eqBand1k);
+      this.eqBand1k.connect(this.eqBand3k);
+      this.eqBand3k.connect(this.eqBand8k);
+      this.eqBand8k.connect(this.compressorNode);
       this.compressorNode.connect(this.gainNode);
       this.gainNode.connect(this.ctx.destination);
 
@@ -105,10 +142,9 @@ export class AudioEngine {
             this.handleSilenceState(event.data.isSilent, audioElement);
           }
         };
-        // Tap worklet into gain node to analyze live stream
         this.gainNode.connect(this.workletNode);
       } catch {
-        // AudioWorklet is optional / not supported in some sandboxes
+        // AudioWorklet is optional / fallback
       }
 
       this.isInitialized = true;
@@ -177,16 +213,47 @@ export class AudioEngine {
   }
 
   /**
-   * Toggles Voice Boost 3-band parametric EQ
+   * Sets 5-band Equalizer gains smoothly
+   */
+  public setEqualizerBands(bands: EqualizerBands): void {
+    this.settings.equalizerBands = { ...bands };
+    if (this.ctx) {
+      const now = this.ctx.currentTime;
+      this.eqBand80?.gain.linearRampToValueAtTime(bands.subBass80Hz, now + 0.02);
+      this.eqBand250?.gain.linearRampToValueAtTime(bands.warmth250Hz, now + 0.02);
+      this.eqBand1k?.gain.linearRampToValueAtTime(bands.mid1kHz, now + 0.02);
+      this.eqBand3k?.gain.linearRampToValueAtTime(bands.vocalClarity3kHz, now + 0.02);
+      this.eqBand8k?.gain.linearRampToValueAtTime(bands.air8kHz, now + 0.02);
+    }
+    saveEqualizerSettings({
+      preset: this.settings.equalizerPreset,
+      bands: this.settings.equalizerBands,
+    });
+  }
+
+  /**
+   * Applies an Equalizer preset by identifier
+   */
+  public setEqualizerPreset(presetId: EqualizerPresetId): void {
+    this.settings.equalizerPreset = presetId;
+    if (presetId !== "custom" && EQUALIZER_PRESETS[presetId]) {
+      const presetBands = EQUALIZER_PRESETS[presetId].bands;
+      this.setEqualizerBands(presetBands);
+    } else {
+      saveEqualizerSettings({
+        preset: "custom",
+        bands: this.settings.equalizerBands,
+      });
+    }
+    this.settings.voiceBoost = presetId === "vocal-clarity";
+  }
+
+  /**
+   * Toggles Voice Boost (bridges to vocal-clarity preset)
    */
   public setVoiceBoost(enabled: boolean): void {
     this.settings.voiceBoost = enabled;
-    if (this.voiceBoostFilter && this.sibilanceFilter && this.highpassFilter && this.ctx) {
-      const now = this.ctx.currentTime;
-      this.highpassFilter.frequency.linearRampToValueAtTime(enabled ? 85 : 10, now + 0.02);
-      this.voiceBoostFilter.gain.linearRampToValueAtTime(enabled ? 3.5 : 0, now + 0.02);
-      this.sibilanceFilter.gain.linearRampToValueAtTime(enabled ? -2.5 : 0, now + 0.02);
-    }
+    this.setEqualizerPreset(enabled ? "vocal-clarity" : "flat");
   }
 
   /**
@@ -225,10 +292,8 @@ export class AudioEngine {
     if (!this.settings.smartSpeed) return;
 
     if (isSilent) {
-      // Dynamic silence acceleration: speed up silence to 2.5x base rate
       audioElement.playbackRate = Math.min(3.0, this.settings.basePlaybackRate * 2.2);
     } else {
-      // Restore speaker's normal playback rate
       audioElement.playbackRate = this.settings.basePlaybackRate;
     }
   }
@@ -244,7 +309,6 @@ export class AudioEngine {
       this.compressorNode.attack.linearRampToValueAtTime(0.02, now + 0.02);
       this.compressorNode.release.linearRampToValueAtTime(0.3, now + 0.02);
     } else {
-      // Bypass compression - linear passthrough
       this.compressorNode.threshold.linearRampToValueAtTime(0, now + 0.02);
       this.compressorNode.ratio.linearRampToValueAtTime(1, now + 0.02);
     }

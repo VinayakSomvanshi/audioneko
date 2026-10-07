@@ -10,9 +10,17 @@ import {
   useRef,
   useState,
 } from "react";
+import { EqualizerModal } from "../components/player/EqualizerModal";
+import { HeadsetSettingsModal } from "../components/player/HeadsetSettingsModal";
 import { ResumeBanner } from "../components/player/ResumeBanner";
 import { audioEngine } from "../lib/audio-engine";
 import { useCurrentUser } from "../lib/auth-client";
+import type { EqualizerBands, EqualizerPresetId } from "../lib/equalizer";
+import {
+  type HeadsetRemappingSettings,
+  loadHeadsetSettings,
+  saveHeadsetSettings,
+} from "../lib/headset-remapping";
 import {
   registerMediaSessionHandlers,
   setMediaSessionMetadata,
@@ -50,6 +58,16 @@ export interface AudioContextType {
   loudnessNormalization: boolean;
   smartSpeed: boolean;
   smartRewind: boolean;
+  equalizerPreset: EqualizerPresetId;
+  equalizerBands: EqualizerBands;
+  setEqualizerPreset: (preset: EqualizerPresetId) => void;
+  setEqualizerBands: (bands: EqualizerBands) => void;
+  isEqualizerOpen: boolean;
+  setIsEqualizerOpen: (open: boolean) => void;
+  headsetSettings: HeadsetRemappingSettings;
+  setHeadsetSettings: (settings: HeadsetRemappingSettings) => void;
+  isHeadsetSettingsOpen: boolean;
+  setIsHeadsetSettingsOpen: (open: boolean) => void;
   isFullPlayerOpen: boolean;
   isPiPActive: boolean;
   sleepTimerState: SleepTimerState;
@@ -120,6 +138,19 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     volumeMultiplier: 1.0,
     shakeToExtendEnabled: true,
   });
+
+  const [equalizerPreset, setEqualizerPresetState] = useState<EqualizerPresetId>(
+    () => audioEngine.getSettings().equalizerPreset,
+  );
+  const [equalizerBands, setEqualizerBandsState] = useState<EqualizerBands>(
+    () => audioEngine.getSettings().equalizerBands,
+  );
+  const [isEqualizerOpen, setIsEqualizerOpen] = useState(false);
+
+  const [headsetSettings, setHeadsetSettingsState] = useState<HeadsetRemappingSettings>(() =>
+    loadHeadsetSettings(),
+  );
+  const [isHeadsetSettingsOpen, setIsHeadsetSettingsOpen] = useState(false);
 
   // Stable audio element ref - created ONCE, never replaced
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -632,17 +663,57 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     return ch;
   }, [chapters, currentTime, duration]);
 
-  // Media session handlers
+  // Media session handlers with headset remapping
+  const lastPauseClickMsRef = useRef<number>(0);
+  const headsetSettingsRef = useRef(headsetSettings);
+  useEffect(() => {
+    headsetSettingsRef.current = headsetSettings;
+  }, [headsetSettings]);
+
   useEffect(() => {
     const cleanup = registerMediaSessionHandlers({
       onPlay: resume,
-      onPause: pause,
+      onPause: () => {
+        const now = Date.now();
+        if (
+          headsetSettingsRef.current.doubleTapBookmark &&
+          now - lastPauseClickMsRef.current < 650
+        ) {
+          const book = currentBookRef.current;
+          const pos = currentTimeRef.current;
+          if (book) {
+            fetch(`/api/books/${book.id}/bookmarks`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: `Headset Bookmark at ${Math.floor(pos / 60)}:${String(Math.floor(pos % 60)).padStart(2, "0")}`,
+                position: pos,
+              }),
+            }).catch(() => {});
+          }
+        }
+        lastPauseClickMsRef.current = now;
+        pause();
+      },
       onStop: pause,
-      onSeekBackward: (offset) => skipBy(-offset),
-      onSeekForward: (offset) => skipBy(offset),
+      onSeekBackward: (offset) =>
+        skipBy(-(offset || headsetSettingsRef.current.seekBackwardSeconds)),
+      onSeekForward: (offset) => skipBy(offset || headsetSettingsRef.current.seekForwardSeconds),
       onSeekTo: (pos) => seekTo(pos),
-      onPreviousTrack: previousChapter,
-      onNextTrack: nextChapter,
+      onPreviousTrack: () => {
+        if (headsetSettingsRef.current.prevTrackAction === "skip-seconds") {
+          skipBy(-headsetSettingsRef.current.seekBackwardSeconds);
+        } else {
+          previousChapter();
+        }
+      },
+      onNextTrack: () => {
+        if (headsetSettingsRef.current.nextTrackAction === "skip-seconds") {
+          skipBy(headsetSettingsRef.current.seekForwardSeconds);
+        } else {
+          nextChapter();
+        }
+      },
     });
     return cleanup;
   }, [resume, pause, skipBy, seekTo, previousChapter, nextChapter]);
@@ -894,12 +965,32 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }, [setVol]);
 
+  const setEqualizerPreset = useCallback((preset: EqualizerPresetId) => {
+    audioEngine.setEqualizerPreset(preset);
+    setEqualizerPresetState(preset);
+    setEqualizerBandsState(audioEngine.getSettings().equalizerBands);
+    setVoiceBoostState(preset === "vocal-clarity");
+  }, []);
+
+  const setEqualizerBands = useCallback((bands: EqualizerBands) => {
+    audioEngine.setEqualizerBands(bands);
+    setEqualizerBandsState(bands);
+    setEqualizerPresetState("custom");
+    setVoiceBoostState(false);
+  }, []);
+
+  const setHeadsetSettings = useCallback((settings: HeadsetRemappingSettings) => {
+    setHeadsetSettingsState(settings);
+    saveHeadsetSettings(settings);
+  }, []);
+
   const toggleVoiceBoost = useCallback(() => {
     setVoiceBoostState((prev) => {
-      audioEngine.setVoiceBoost(!prev);
-      return !prev;
+      const next = !prev;
+      setEqualizerPreset(next ? "vocal-clarity" : "flat");
+      return next;
     });
-  }, []);
+  }, [setEqualizerPreset]);
 
   const toggleLoudnessNormalization = useCallback(() => {
     setLoudnessNormState((prev) => {
@@ -1128,6 +1219,16 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         toggleSmartSpeed,
         smartRewind,
         toggleSmartRewind,
+        equalizerPreset,
+        equalizerBands,
+        setEqualizerPreset,
+        setEqualizerBands,
+        isEqualizerOpen,
+        setIsEqualizerOpen,
+        headsetSettings,
+        setHeadsetSettings,
+        isHeadsetSettingsOpen,
+        setIsHeadsetSettingsOpen,
         startSleepTimer,
         extendSleepTimer,
         cancelSleepTimer,
@@ -1143,6 +1244,20 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         bookTitle={currentBook?.title}
         onJump={jumpToRemotePosition}
         onDismiss={dismissResumePrompt}
+      />
+      <EqualizerModal
+        isOpen={isEqualizerOpen}
+        onClose={() => setIsEqualizerOpen(false)}
+        currentPreset={equalizerPreset}
+        currentBands={equalizerBands}
+        onApplyPreset={setEqualizerPreset}
+        onUpdateBands={setEqualizerBands}
+      />
+      <HeadsetSettingsModal
+        isOpen={isHeadsetSettingsOpen}
+        onClose={() => setIsHeadsetSettingsOpen(false)}
+        settings={headsetSettings}
+        onUpdateSettings={setHeadsetSettings}
       />
     </AudioContext.Provider>
   );
