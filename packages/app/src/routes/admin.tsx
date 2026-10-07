@@ -1,8 +1,10 @@
 import {
   AlertTriangle,
+  BarChart2,
   BookOpen,
   Check,
   Copy,
+  Edit2,
   FolderSync,
   KeyRound,
   Library,
@@ -16,6 +18,9 @@ import {
   Users,
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { ModifyUserModal } from "../components/admin/ModifyUserModal";
+import { StrictConfirmModal } from "../components/admin/StrictConfirmModal";
+import { UserStatsModal } from "../components/admin/UserStatsModal";
 import { useCurrentUser } from "../lib/auth-client";
 
 interface InviteItem {
@@ -80,13 +85,19 @@ export function AdminDashboardPage() {
   // Users state
   const [users, setUsers] = useState<UserItem[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
-  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
   const [generatedResetLink, setGeneratedResetLink] = useState<{
     email: string;
     url: string;
     token: string;
   } | null>(null);
+
+  // User Actions modal states
+  const [statsConfirmUser, setStatsConfirmUser] = useState<UserItem | null>(null);
+  const [statsUserToView, setStatsUserToView] = useState<UserItem | null>(null);
+  const [modifyUser, setModifyUser] = useState<UserItem | null>(null);
+  const [deleteUser, setDeleteUser] = useState<UserItem | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
 
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
@@ -217,34 +228,6 @@ export function AdminDashboardPage() {
     }
   };
 
-  // Handle update user role
-  const handleToggleUserRole = async (targetUser: UserItem) => {
-    const nextRole = targetUser.role === "admin" ? "listener" : "admin";
-    if (targetUser.id === user?.id && nextRole !== "admin") {
-      alert("You cannot demote your own active admin account.");
-      return;
-    }
-
-    setUpdatingUserId(targetUser.id);
-    try {
-      const res = await fetch(`/api/admin/users/${targetUser.id}/role`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: nextRole }),
-      });
-
-      if (res.ok) {
-        setUsers((prev) =>
-          prev.map((u) => (u.id === targetUser.id ? { ...u, role: nextRole } : u)),
-        );
-      }
-    } catch (err) {
-      console.error("Failed to update user role:", err);
-    } finally {
-      setUpdatingUserId(null);
-    }
-  };
-
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -271,6 +254,30 @@ export function AdminDashboardPage() {
     } finally {
       setResettingUserId(null);
     }
+  };
+
+  const handleDeleteUserConfirm = async () => {
+    if (!deleteUser) return;
+    setIsDeletingUser(true);
+    try {
+      const res = await fetch(`/api/admin/users/${deleteUser.id}`, {
+        method: "DELETE",
+      });
+      const data = (await res.json()) as { success?: boolean; error?: string };
+      if (!res.ok || data.error) {
+        throw new Error(data.error || "Failed to delete user account.");
+      }
+      setUsers((prev) => prev.filter((u) => u.id !== deleteUser.id));
+      setDeleteUser(null);
+      fetchStats();
+    } finally {
+      setIsDeletingUser(false);
+    }
+  };
+
+  const handleUserModified = (updated: UserItem) => {
+    setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+    setModifyUser(null);
   };
 
   if (authLoading) {
@@ -800,7 +807,7 @@ export function AdminDashboardPage() {
                       <th className="py-2.5 px-4 font-medium">Name</th>
                       <th className="py-2.5 px-4 font-medium">Email</th>
                       <th className="py-2.5 px-4 font-medium">Role</th>
-                      <th className="py-2.5 px-4 font-medium text-right">Access Level</th>
+                      <th className="py-2.5 px-4 font-medium text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -829,7 +836,27 @@ export function AdminDashboardPage() {
                           </span>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => setStatsConfirmUser(u)}
+                              className="px-2.5 py-1 rounded text-xs font-mono border border-border surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer flex items-center gap-1.5"
+                              title="View listening telemetry and stats (strict confirmation required)"
+                            >
+                              <BarChart2 className="w-3 h-3 text-accent" />
+                              <span>Stats</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setModifyUser(u)}
+                              className="px-2.5 py-1 rounded text-xs font-mono border border-border surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer flex items-center gap-1.5"
+                              title="Modify user profile and role (strict confirmation required)"
+                            >
+                              <Edit2 className="w-3 h-3 text-muted" />
+                              <span>Modify</span>
+                            </button>
+
                             <button
                               type="button"
                               onClick={() => handleGenerateResetLink(u)}
@@ -847,21 +874,16 @@ export function AdminDashboardPage() {
 
                             <button
                               type="button"
-                              onClick={() => handleToggleUserRole(u)}
-                              disabled={updatingUserId === u.id || u.id === user?.id}
-                              className={`px-3 py-1 rounded text-xs font-mono border transition-colors cursor-pointer ${
-                                u.role === "admin"
-                                  ? "border-border text-muted hover:text-rose-400 hover:border-rose-400/50"
-                                  : "border-accent/40 text-accent hover:bg-accent-bg"
-                              } disabled:opacity-30 disabled:cursor-not-allowed`}
+                              onClick={() => setDeleteUser(u)}
+                              disabled={u.id === user?.id}
+                              className="p-1.5 rounded text-xs font-mono border border-border surface-card text-muted hover:text-rose-400 hover:border-rose-400/50 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                              title={
+                                u.id === user?.id
+                                  ? "Cannot delete current admin session"
+                                  : "Delete user account (strict confirmation required)"
+                              }
                             >
-                              {updatingUserId === u.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : u.role === "admin" ? (
-                                "Demote to Listener"
-                              ) : (
-                                "Promote to Admin"
-                              )}
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </td>
@@ -873,6 +895,59 @@ export function AdminDashboardPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Strict Confirm Modal: View Telemetry Stats */}
+      {statsConfirmUser && (
+        <StrictConfirmModal
+          isOpen={!!statsConfirmUser}
+          onClose={() => setStatsConfirmUser(null)}
+          onConfirm={() => {
+            setStatsUserToView(statsConfirmUser);
+            setStatsConfirmUser(null);
+          }}
+          title="Confirm View Telemetry"
+          description={`Accessing detailed listening history and playback telemetry for ${statsConfirmUser.name} (${statsConfirmUser.email}). This listener data is strictly immutable and read-only.`}
+          requiredPhrase="VIEW"
+          confirmButtonText="Unlock Stats"
+        />
+      )}
+
+      {/* User Stats Telemetry Modal */}
+      {statsUserToView && (
+        <UserStatsModal
+          isOpen={!!statsUserToView}
+          onClose={() => setStatsUserToView(null)}
+          userId={statsUserToView.id}
+          userName={statsUserToView.name}
+          userEmail={statsUserToView.email}
+        />
+      )}
+
+      {/* Modify User Modal */}
+      {modifyUser && (
+        <ModifyUserModal
+          isOpen={!!modifyUser}
+          onClose={() => setModifyUser(null)}
+          user={modifyUser}
+          currentAdminId={user?.id}
+          onSuccess={handleUserModified}
+        />
+      )}
+
+      {/* Strict Confirm Modal: Irreversible Delete User */}
+      {deleteUser && (
+        <StrictConfirmModal
+          isOpen={!!deleteUser}
+          onClose={() => setDeleteUser(null)}
+          onConfirm={handleDeleteUserConfirm}
+          title="Confirm Irreversible Account Deletion"
+          description={`Permanently delete ${deleteUser.name} (${deleteUser.email}). All session records, bookmarks, audio clips, and listening progress will be permanently purged. This action cannot be undone.`}
+          requiredPhrase={`DELETE ${deleteUser.email}`}
+          confirmButtonText="Permanently Delete User"
+          danger={true}
+          isPending={isDeletingUser}
+        />
       )}
     </div>
   );

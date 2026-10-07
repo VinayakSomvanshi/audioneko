@@ -18,7 +18,7 @@ export function parseSender(fromStr?: string): { name: string; email: string } {
     return { name: "audioneko", email: "vinzyzk@gmail.com" };
   }
   const match = fromStr.match(/^(.*?)\s*<([^>]+)>$/);
-  if (match) {
+  if (match && match[1] !== undefined && match[2] !== undefined) {
     return { name: match[1].trim() || "audioneko", email: match[2].trim() };
   }
   return { name: "audioneko", email: fromStr.trim() };
