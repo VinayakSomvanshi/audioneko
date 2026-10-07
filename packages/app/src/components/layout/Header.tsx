@@ -1,14 +1,15 @@
 import { Link } from "@tanstack/react-router";
-import { Moon, Search, ShieldCheck, Sun, User as UserIcon } from "lucide-react";
+import { Menu, Moon, Search, ShieldCheck, Sun, User as UserIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { signOut, useCurrentUser } from "../../lib/auth-client";
 import { NekoIcon } from "../icons/NekoIcon";
 
 interface HeaderProps {
   onSearchClick?: () => void;
+  onMenuClick?: () => void;
 }
 
-export function Header({ onSearchClick }: HeaderProps) {
+export function Header({ onSearchClick, onMenuClick }: HeaderProps) {
   const { user, isAdmin } = useCurrentUser();
   const [isDark, setIsDark] = useState(true);
 
@@ -45,18 +46,31 @@ export function Header({ onSearchClick }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-40 min-h-14 h-auto pt-[env(safe-area-inset-top,0px)] border-b border-border bg-bg/95 backdrop-blur-sm px-3.5 sm:px-4 md:px-6 flex items-center justify-between transition-colors">
-      {/* Brand logo */}
-      <Link
-        to="/"
-        className="flex items-center gap-2 font-mono text-sm md:text-base font-medium tracking-tight text-text hover:text-accent transition-colors group"
-      >
-        <NekoIcon className="w-5 h-5 text-accent shrink-0 transition-transform duration-200 group-hover:scale-110" />
-        <span>audioneko</span>
-        <span className="text-[10px] uppercase tracking-widest text-muted border border-border px-1.5 py-0.5 rounded font-mono hidden sm:inline-block">
-          beta
-        </span>
-      </Link>
+    <header className="sticky top-0 z-40 min-h-14 h-auto pt-[env(safe-area-inset-top,0px)] border-b border-border bg-bg/95 backdrop-blur-sm px-3 sm:px-4 md:px-6 flex items-center justify-between transition-colors">
+      <div className="flex items-center gap-2">
+        {/* Mobile menu drawer trigger */}
+        <button
+          type="button"
+          onClick={onMenuClick}
+          className="p-1.5 md:hidden surface-card text-muted hover:text-text hover:border-accent transition-colors cursor-pointer"
+          aria-label="Open navigation menu"
+          title="Open menu"
+        >
+          <Menu className="w-4 h-4 text-accent" />
+        </button>
+
+        {/* Brand logo */}
+        <Link
+          to="/"
+          className="flex items-center gap-2 font-mono text-sm md:text-base font-medium tracking-tight text-text hover:text-accent transition-colors group"
+        >
+          <NekoIcon className="w-5 h-5 text-accent shrink-0 transition-transform duration-200 group-hover:scale-110" />
+          <span>audioneko</span>
+          <span className="text-[10px] uppercase tracking-widest text-muted border border-border px-1.5 py-0.5 rounded font-mono hidden sm:inline-block">
+            beta
+          </span>
+        </Link>
+      </div>
 
       {/* Center / Search bar trigger */}
       <div className="flex-1 max-w-md mx-4 hidden md:block">
@@ -107,7 +121,7 @@ export function Header({ onSearchClick }: HeaderProps) {
             {isAdmin && (
               <Link
                 to="/admin"
-                className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-accent-bg text-accent border border-accent/40 hover:border-accent transition-colors font-medium"
+                className="hidden md:flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-accent-bg text-accent border border-accent/40 hover:border-accent transition-colors font-medium"
                 title="Curator Admin Control Plane"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
@@ -118,7 +132,7 @@ export function Header({ onSearchClick }: HeaderProps) {
             <button
               type="button"
               onClick={() => signOut()}
-              className="text-xs font-mono px-2.5 py-1 surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer"
+              className="hidden md:inline-block text-xs font-mono px-2.5 py-1 surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer"
             >
               Sign out
             </button>

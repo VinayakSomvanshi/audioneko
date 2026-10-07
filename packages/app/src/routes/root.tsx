@@ -2,6 +2,8 @@ import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { BottomNav } from "../components/layout/BottomNav";
 import { Header } from "../components/layout/Header";
+import { MobileNavDrawer } from "../components/layout/MobileNavDrawer";
+import { MobileQuickNav } from "../components/layout/MobileQuickNav";
 import { Sidebar } from "../components/layout/Sidebar";
 import { MiniPlayer } from "../components/player/MiniPlayer";
 import { SearchPaletteModal } from "../components/search/SearchPaletteModal";
@@ -9,9 +11,28 @@ import { useCurrentUser } from "../lib/auth-client";
 
 export function RootLayout() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isDark, setIsDark] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoading } = useCurrentUser();
+
+  useEffect(() => {
+    const isDarkTheme = document.documentElement.classList.contains("dark");
+    setIsDark(isDarkTheme);
+  }, []);
+
+  const handleToggleTheme = () => {
+    const nextDark = !isDark;
+    setIsDark(nextDark);
+    if (nextDark) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("audioneko-theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("audioneko-theme", "light");
+    }
+  };
 
   // Safeguard: If landing with invite ?token= on any route outside /join, redirect to /join
   useEffect(() => {
@@ -78,7 +99,13 @@ export function RootLayout() {
 
   return (
     <div className="h-screen h-dvh bg-bg text-text flex flex-col antialiased selection:bg-accent-bg selection:text-accent overflow-hidden">
-      <Header onSearchClick={() => setIsSearchOpen(true)} />
+      <Header
+        onSearchClick={() => setIsSearchOpen(true)}
+        onMenuClick={() => setIsDrawerOpen(true)}
+      />
+
+      {/* Mobile Horizontal Quick Navigation Bar */}
+      <MobileQuickNav />
 
       <div className="flex-1 flex overflow-hidden min-h-0">
         <Sidebar />
@@ -91,7 +118,19 @@ export function RootLayout() {
       </div>
 
       <MiniPlayer />
-      <BottomNav onSearchClick={() => setIsSearchOpen(true)} />
+      <BottomNav
+        onSearchClick={() => setIsSearchOpen(true)}
+        onMenuClick={() => setIsDrawerOpen(true)}
+      />
+
+      {/* Mobile Slide-Out Navigation Drawer with full collection options */}
+      <MobileNavDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        onSearchClick={() => setIsSearchOpen(true)}
+        isDark={isDark}
+        onToggleTheme={handleToggleTheme}
+      />
 
       {/* Instant Client-Side Search Palette */}
       <SearchPaletteModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
