@@ -158,43 +158,7 @@ export async function dispatchPasswordResetEmail(
 
   const fromAddress = env.EMAIL_FROM || "audioneko <onboarding@resend.dev>";
 
-  // 1. Check Resend (Standard)
-  if (env.RESEND_API_KEY) {
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: fromAddress,
-          to: [to],
-          subject: emailSubject,
-          html: emailHtml,
-        }),
-      });
-
-      if (res.ok) {
-        console.log(`[email] Successfully dispatched password reset to ${to} via Resend`);
-        return { sent: true, provider: "resend" };
-      }
-
-      const errorText = await res.text();
-      if (res.status === 403) {
-        console.warn(
-          `[email] Resend sandbox restriction: Emails can only be sent to the Resend account owner until a custom domain is verified at resend.com/domains: ${errorText}. Falling back to secondary provider.`,
-        );
-      } else {
-        console.error(`[email] Resend delivery failed for ${to}:`, res.status, errorText);
-      }
-      // If Resend failed (e.g. sandbox restriction 403), fall through to Brevo if available
-    } catch (err) {
-      console.error(`[email] Resend network error for ${to}:`, err);
-    }
-  }
-
-  // 2. Check Brevo (Sendinblue)
+  // 1. Check Brevo (Sendinblue) - primary when configured (no sandbox recipient restriction)
   if (env.BREVO_API_KEY) {
     try {
       const parsedSender = parseSender(env.BREVO_SENDER_EMAIL || env.EMAIL_FROM);
@@ -219,12 +183,47 @@ export async function dispatchPasswordResetEmail(
 
       const errorText = await res.text();
       console.error(`[email] Brevo delivery failed for ${to}:`, res.status, errorText);
-      return { sent: false, provider: "brevo", error: errorText };
     } catch (err) {
       console.error(`[email] Brevo network error for ${to}:`, err);
+    }
+  }
+
+  // 2. Check Resend
+  if (env.RESEND_API_KEY) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: fromAddress,
+          to: [to],
+          subject: emailSubject,
+          html: emailHtml,
+        }),
+      });
+
+      if (res.ok) {
+        console.log(`[email] Successfully dispatched password reset to ${to} via Resend`);
+        return { sent: true, provider: "resend" };
+      }
+
+      const errorText = await res.text();
+      if (res.status === 403) {
+        console.warn(
+          `[email] Resend sandbox restriction: Emails can only be sent to the Resend account owner until a custom domain is verified at resend.com/domains: ${errorText}`,
+        );
+      } else {
+        console.error(`[email] Resend delivery failed for ${to}:`, res.status, errorText);
+      }
+      return { sent: false, provider: "resend", error: errorText };
+    } catch (err) {
+      console.error(`[email] Resend network error for ${to}:`, err);
       return {
         sent: false,
-        provider: "brevo",
+        provider: "resend",
         error: err instanceof Error ? err.message : String(err),
       };
     }
@@ -410,40 +409,7 @@ export async function dispatchWelcomeEmail(
 
   const fromAddress = env.EMAIL_FROM || "audioneko <onboarding@resend.dev>";
 
-  if (env.RESEND_API_KEY) {
-    try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: fromAddress,
-          to: [to],
-          subject: emailSubject,
-          html: emailHtml,
-        }),
-      });
-
-      if (res.ok) {
-        console.log(`[email] Successfully dispatched welcome email to ${to} via Resend`);
-        return { sent: true, provider: "resend" };
-      }
-      const errorText = await res.text();
-      if (res.status === 403) {
-        console.warn(
-          `[email] Resend sandbox restriction: Emails can only be sent to the Resend account owner until a custom domain is verified at resend.com/domains: ${errorText}. Falling back to secondary provider.`,
-        );
-      } else {
-        console.error(`[email] Resend welcome delivery failed for ${to}:`, res.status, errorText);
-      }
-      // If Resend failed (e.g. sandbox restriction 403), fall through to Brevo
-    } catch (err) {
-      console.error(`[email] Resend welcome network error for ${to}:`, err);
-    }
-  }
-
+  // 1. Check Brevo (primary when configured)
   if (env.BREVO_API_KEY) {
     try {
       const parsedSender = parseSender(env.BREVO_SENDER_EMAIL || env.EMAIL_FROM);
@@ -468,10 +434,48 @@ export async function dispatchWelcomeEmail(
 
       const errorText = await res.text();
       console.error(`[email] Brevo welcome delivery failed for ${to}:`, res.status, errorText);
-      return { sent: false, provider: "brevo", error: errorText };
     } catch (err) {
       console.error(`[email] Brevo welcome network error for ${to}:`, err);
-      return { sent: false, provider: "brevo", error: String(err) };
+    }
+  }
+
+  // 2. Check Resend
+  if (env.RESEND_API_KEY) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: fromAddress,
+          to: [to],
+          subject: emailSubject,
+          html: emailHtml,
+        }),
+      });
+
+      if (res.ok) {
+        console.log(`[email] Successfully dispatched welcome email to ${to} via Resend`);
+        return { sent: true, provider: "resend" };
+      }
+      const errorText = await res.text();
+      if (res.status === 403) {
+        console.warn(
+          `[email] Resend sandbox restriction: Emails can only be sent to the Resend account owner until a custom domain is verified at resend.com/domains: ${errorText}`,
+        );
+      } else {
+        console.error(`[email] Resend welcome delivery failed for ${to}:`, res.status, errorText);
+      }
+      return { sent: false, provider: "resend", error: errorText };
+    } catch (err) {
+      console.error(`[email] Resend welcome network error for ${to}:`, err);
+      return {
+        sent: false,
+        provider: "resend",
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
   }
 
