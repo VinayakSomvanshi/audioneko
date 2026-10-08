@@ -43,8 +43,8 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
   }, [onSearchClick, showSearch, toggleMode]);
 
   return (
-    <header className="sticky top-0 z-40 shrink-0 min-h-14 h-auto pt-[env(safe-area-inset-top,0px)] border-b border-border bg-bg/95 backdrop-blur-sm px-3 sm:px-4 md:px-6 flex items-center justify-between transition-colors">
-      <div className="flex items-center gap-2">
+    <header className="sticky top-0 z-40 shrink-0 min-h-14 h-auto pt-[env(safe-area-inset-top,0px)] border-b border-border bg-bg/95 backdrop-blur-sm px-2.5 sm:px-4 md:px-6 flex items-center justify-between transition-colors">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {/* Mobile menu drawer trigger */}
         {user && onMenuClick && (
           <button
@@ -61,9 +61,9 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
         {/* Brand logo */}
         <Link
           to="/"
-          className="flex items-center gap-2 font-mono text-sm md:text-base font-medium tracking-tight text-text hover:text-accent transition-colors group"
+          className="flex items-center gap-1.5 font-mono text-xs sm:text-sm md:text-base font-medium tracking-tight text-text hover:text-accent transition-colors group"
         >
-          <NekoIcon className="w-5 h-5 text-accent shrink-0 transition-transform duration-200 group-hover:scale-110" />
+          <NekoIcon className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-accent shrink-0 transition-transform duration-200 group-hover:scale-110" />
           <span>audioneko</span>
           <span className="text-[10px] uppercase tracking-widest text-muted border border-border px-1.5 py-0.5 rounded font-mono hidden sm:inline-block">
             beta
@@ -99,12 +99,12 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
       )}
 
       {/* Right controls: Theme toggle & Auth status */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         {showSearch && (
           <button
             type="button"
             onClick={onSearchClick}
-            className="p-2 md:hidden surface-card text-muted hover:text-text cursor-pointer"
+            className="p-1.5 sm:p-2 md:hidden surface-card text-muted hover:text-text cursor-pointer shrink-0"
             aria-label="Search"
           >
             <Search className="w-4 h-4" />
@@ -114,11 +114,11 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
         {/* Theme Palette Popover Selector */}
         <ThemeSelector />
 
-        {/* Quick Light/Dark Toggle */}
+        {/* Quick Light/Dark Toggle (on desktop; mobile toggle is inside ThemeSelector) */}
         <button
           type="button"
           onClick={toggleMode}
-          className="p-2 surface-card text-muted hover:text-accent hover:border-accent transition-all cursor-pointer"
+          className="hidden sm:flex p-2 surface-card text-muted hover:text-accent hover:border-accent transition-all cursor-pointer shrink-0"
           aria-label="Toggle light/dark mode"
           title="Toggle light/dark mode (T)"
         >
@@ -126,11 +126,11 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
         </button>
 
         {user ? (
-          <div className="flex items-center gap-2 pl-1">
+          <div className="flex items-center gap-1 sm:gap-2 pl-0.5 sm:pl-1 shrink-0">
             {isAdmin && (
               <Link
                 to="/admin"
-                className="hidden md:flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-accent-bg text-accent border border-accent/40 hover:border-accent transition-colors font-medium"
+                className="hidden md:flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-accent-bg text-accent border border-accent/40 hover:border-accent transition-colors font-medium shrink-0"
                 title="Curator Admin Control Plane"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
@@ -140,11 +140,11 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
             <button
               type="button"
               onClick={onProfileClick}
-              className="flex items-center gap-1.5 px-2 py-1 rounded surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer text-xs font-mono group"
+              className="flex items-center gap-1 sm:gap-1.5 px-2 py-1 rounded surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer text-xs font-mono group shrink-0"
               title="Profile and Playback Preferences"
             >
-              <UserIcon className="w-3.5 h-3.5 text-accent" />
-              <span className="font-medium group-hover:underline truncate max-w-[120px]">
+              <UserIcon className="w-3.5 h-3.5 text-accent shrink-0" />
+              <span className="font-medium group-hover:underline truncate max-w-[70px] sm:max-w-[120px]">
                 {user.name}
               </span>
             </button>
@@ -155,17 +155,17 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
                 setIsSigningOut(true);
                 performSignOut();
               }}
-              className="text-xs font-mono px-2.5 py-1 surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer disabled:opacity-50"
+              className="text-[11px] sm:text-xs font-mono px-2 sm:px-2.5 py-1 surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer shrink-0 disabled:opacity-50"
               title="Sign out directly to login"
             >
-              {isSigningOut ? "Signing out..." : "Sign out"}
+              {isSigningOut ? "..." : "Sign out"}
             </button>
           </div>
         ) : (
           pathname !== "/login" && (
             <Link
               to="/login"
-              className="flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 surface-card hover:border-accent hover:text-accent transition-colors"
+              className="flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 surface-card hover:border-accent hover:text-accent transition-colors shrink-0"
             >
               <UserIcon className="w-3.5 h-3.5" />
               <span>Sign in</span>
