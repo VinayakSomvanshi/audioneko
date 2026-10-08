@@ -281,12 +281,6 @@ export function BookDetailPage() {
               <span className="text-muted">Length: </span>
               <span>{formatSeconds(book.durationSeconds)}</span>
             </div>
-            {Boolean(book.narrator) && (
-              <div className="hidden sm:inline-block">
-                <span className="text-muted">Narrator: </span>
-                <span className="text-text">{book.narrator}</span>
-              </div>
-            )}
             {book.fileSizeBytes > 0 && (
               <div>
                 <span className="text-muted">Size: </span>
