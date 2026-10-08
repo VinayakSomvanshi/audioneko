@@ -240,16 +240,23 @@ export function BookDetailPage() {
             </h1>
             <p className="text-sm font-mono text-muted">
               By{" "}
-              <a
-                href={`/authors?author=${encodeURIComponent(book.author)}`}
+              <Link
+                to="/authors"
+                search={{ author: book.author }}
                 className="text-text font-medium hover:text-accent hover:underline transition-colors"
               >
                 {book.author}
-              </a>
+              </Link>
             </p>
             {Boolean(book.series) && (
               <p className="text-xs font-mono text-accent/80">
-                {book.series}
+                <Link
+                  to="/series"
+                  search={{ series: book.series ?? undefined }}
+                  className="hover:underline hover:text-accent transition-colors"
+                >
+                  {book.series}
+                </Link>
                 {book.seriesIndex != null && (
                   <span className="text-subtle"> #{book.seriesIndex}</span>
                 )}

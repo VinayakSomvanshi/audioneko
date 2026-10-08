@@ -1,8 +1,8 @@
 import type { Book } from "@audioneko/shared";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, BookOpen, ChevronRight, Clock, Layers, Play, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
 
@@ -18,14 +18,38 @@ interface SeriesItem {
 
 export function SeriesPage() {
   const { playBook, currentBook, isPlaying } = useAudio();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedSeriesName, setSelectedSeriesName] = useState<string | null>(() => {
+
+  const seriesParamFromUrl = useMemo(() => {
+    const searchObj = location.search as Record<string, unknown> | undefined;
+    if (typeof searchObj?.series === "string" && searchObj.series) {
+      return searchObj.series;
+    }
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       return params.get("series");
     }
     return null;
-  });
+  }, [location.search]);
+
+  const [selectedSeriesName, setSelectedSeriesName] = useState<string | null>(seriesParamFromUrl);
+
+  // Synchronize state when route location changes
+  useEffect(() => {
+    setSelectedSeriesName(seriesParamFromUrl);
+  }, [seriesParamFromUrl]);
+
+  // Direct window popstate listener for instant swipe gesture responsiveness
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setSelectedSeriesName(params.get("series"));
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const { data: seriesData, isLoading: isSeriesLoading } = useQuery({
     queryKey: ["series"],
@@ -92,14 +116,17 @@ export function SeriesPage() {
 
   const selectSeries = (name: string | null) => {
     setSelectedSeriesName(name);
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      if (name) {
-        url.searchParams.set("series", name);
-      } else {
-        url.searchParams.delete("series");
-      }
-      window.history.pushState({}, "", url.toString());
+    navigate({
+      to: "/series",
+      search: name ? { series: name } : {},
+    });
+  };
+
+  const handleBackToAllSeries = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    } else {
+      selectSeries(null);
     }
   };
 
@@ -150,7 +177,7 @@ export function SeriesPage() {
         <div>
           <button
             type="button"
-            onClick={() => selectSeries(null)}
+            onClick={handleBackToAllSeries}
             className="inline-flex items-center gap-2 text-xs font-mono text-muted hover:text-text transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />

@@ -67,12 +67,18 @@ const analyticsRoute = createRoute({
 const seriesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/series",
+  validateSearch: (search: Record<string, unknown>): { series?: string } => ({
+    series: typeof search.series === "string" ? search.series : undefined,
+  }),
   component: SeriesPage,
 });
 
 const authorsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/authors",
+  validateSearch: (search: Record<string, unknown>): { author?: string } => ({
+    author: typeof search.author === "string" ? search.author : undefined,
+  }),
   component: AuthorsPage,
 });
 

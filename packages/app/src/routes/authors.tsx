@@ -1,8 +1,8 @@
 import type { Book } from "@audioneko/shared";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, BookOpen, ChevronRight, Play, Search, User, Users } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BlinkingNeko } from "../components/icons/NekoIcon";
 import { useAudio } from "../context/audio-context";
 import { getAuthorPhotoUrl } from "../lib/author-photos";
@@ -57,14 +57,38 @@ interface AuthorItem {
 
 export function AuthorsPage() {
   const { playBook, currentBook, isPlaying } = useAudio();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedAuthorName, setSelectedAuthorName] = useState<string | null>(() => {
+
+  const authorParamFromUrl = useMemo(() => {
+    const searchObj = location.search as Record<string, unknown> | undefined;
+    if (typeof searchObj?.author === "string" && searchObj.author) {
+      return searchObj.author;
+    }
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       return params.get("author");
     }
     return null;
-  });
+  }, [location.search]);
+
+  const [selectedAuthorName, setSelectedAuthorName] = useState<string | null>(authorParamFromUrl);
+
+  // Synchronize state when route location changes
+  useEffect(() => {
+    setSelectedAuthorName(authorParamFromUrl);
+  }, [authorParamFromUrl]);
+
+  // Direct window popstate listener for instant swipe gesture responsiveness
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      setSelectedAuthorName(params.get("author"));
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const { data: authorsData, isLoading: isAuthorsLoading } = useQuery({
     queryKey: ["authors"],
@@ -135,14 +159,17 @@ export function AuthorsPage() {
 
   const selectAuthor = (name: string | null) => {
     setSelectedAuthorName(name);
-    if (typeof window !== "undefined") {
-      const url = new URL(window.location.href);
-      if (name) {
-        url.searchParams.set("author", name);
-      } else {
-        url.searchParams.delete("author");
-      }
-      window.history.pushState({}, "", url.toString());
+    navigate({
+      to: "/authors",
+      search: name ? { author: name } : {},
+    });
+  };
+
+  const handleBackToAllAuthors = () => {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    } else {
+      selectAuthor(null);
     }
   };
 
@@ -198,7 +225,7 @@ export function AuthorsPage() {
         <div>
           <button
             type="button"
-            onClick={() => selectAuthor(null)}
+            onClick={handleBackToAllAuthors}
             className="inline-flex items-center gap-2 text-xs font-mono text-muted hover:text-text transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -271,14 +298,8 @@ export function AuthorsPage() {
                 </div>
                 <Link
                   to="/series"
+                  search={{ series: seriesName }}
                   className="text-xs font-mono text-accent hover:underline flex items-center gap-1"
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      const url = new URL(`${window.location.origin}/series`);
-                      url.searchParams.set("series", seriesName);
-                      window.history.pushState({}, "", url.toString());
-                    }
-                  }}
                 >
                   <span>Series view</span>
                   <ChevronRight className="w-3.5 h-3.5" />
