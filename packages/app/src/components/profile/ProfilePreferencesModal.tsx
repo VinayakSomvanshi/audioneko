@@ -1,11 +1,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
+  Check,
   CheckCircle2,
   KeyRound,
   Loader2,
   LogOut,
   Moon,
+  Palette,
   Sliders,
   Sun,
   User,
@@ -19,6 +21,7 @@ import {
   useCurrentUser,
 } from "../../lib/auth-client";
 import { EQUALIZER_PRESETS, type EqualizerPresetId } from "../../lib/equalizer";
+import { THEME_PALETTES, useTheme } from "../../lib/theme";
 import {
   DEFAULT_USER_PREFERENCES,
   type UserPreferences,
@@ -29,8 +32,8 @@ import {
 interface ProfilePreferencesModalProps {
   isOpen: boolean;
   onClose: () => void;
-  isDark: boolean;
-  onToggleTheme: () => void;
+  isDark?: boolean;
+  onToggleTheme?: () => void;
 }
 
 type TabKey = "profile" | "password" | "playback" | "appearance";
@@ -38,13 +41,20 @@ type TabKey = "profile" | "password" | "playback" | "appearance";
 export function ProfilePreferencesModal({
   isOpen,
   onClose,
-  isDark,
-  onToggleTheme,
+  isDark: _isDark,
+  onToggleTheme: _onToggleTheme,
 }: ProfilePreferencesModalProps) {
   const { user, isAdmin } = useCurrentUser();
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
+  const {
+    palette: currentPalette,
+    setPalette,
+    mode: currentMode,
+    setMode,
+    isDark,
+  } = useTheme();
 
   // Profile Name Form State
   const [name, setName] = useState(user?.name || "");
@@ -623,24 +633,91 @@ export function ProfilePreferencesModal({
           {/* TAB 4: APPEARANCE & SESSION */}
           {activeTab === "appearance" && (
             <div className="space-y-4">
-              <div className="surface-card p-4 border border-border rounded space-y-3">
-                <div className="text-xs font-mono text-text font-medium">Application Theme</div>
-                <div className="flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={onToggleTheme}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded border border-border bg-surface text-xs font-mono text-text hover:border-accent transition-colors cursor-pointer"
-                  >
-                    {isDark ? (
-                      <Sun className="w-4 h-4 text-accent" />
-                    ) : (
-                      <Moon className="w-4 h-4 text-accent" />
-                    )}
-                    <span>Switch to {isDark ? "Light Mode" : "Dark Mode"}</span>
-                  </button>
+              <div className="surface-card p-4 border border-border rounded space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Palette className="w-4 h-4 text-accent" />
+                    <span className="text-xs font-mono text-text font-medium">Color Palette</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-muted uppercase tracking-wider">
+                    6 Curated Themes
+                  </span>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {THEME_PALETTES.map((p) => {
+                    const isSelected = currentPalette === p.id;
+                    const swatchColor = currentMode === "dark" ? p.swatchDark : p.swatchLight;
+
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setPalette(p.id)}
+                        className={`flex items-start gap-3 p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? "border-accent bg-accent-bg/40 shadow-sm"
+                            : "border-border hover:border-accent/50 bg-surface/40 hover:bg-surface"
+                        }`}
+                      >
+                        <div
+                          className="w-4 h-4 rounded-full mt-0.5 shrink-0 border border-black/20 dark:border-white/20 shadow-xs"
+                          style={{ backgroundColor: swatchColor }}
+                          aria-hidden="true"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1">
+                            <span
+                              className={`text-xs font-mono font-medium ${
+                                isSelected ? "text-accent" : "text-text"
+                              }`}
+                            >
+                              {p.name}
+                            </span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-accent shrink-0" />}
+                          </div>
+                          <p className="text-[10px] font-mono text-muted truncate mt-0.5">
+                            {p.subtitle}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="pt-2 border-t border-border/60">
+                  <div className="text-[11px] font-mono text-muted mb-2">Display Mode</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setMode("dark")}
+                      className={`flex items-center justify-center gap-2 py-2 px-3 rounded border text-xs font-mono transition-colors cursor-pointer ${
+                        currentMode === "dark"
+                          ? "border-accent bg-accent-bg text-accent font-medium"
+                          : "border-border bg-surface text-muted hover:text-text hover:border-accent/40"
+                      }`}
+                    >
+                      <Moon className="w-3.5 h-3.5" />
+                      <span>Dark Mode</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMode("light")}
+                      className={`flex items-center justify-center gap-2 py-2 px-3 rounded border text-xs font-mono transition-colors cursor-pointer ${
+                        currentMode === "light"
+                          ? "border-accent bg-accent-bg text-accent font-medium"
+                          : "border-border bg-surface text-muted hover:text-text hover:border-accent/40"
+                      }`}
+                    >
+                      <Sun className="w-3.5 h-3.5" />
+                      <span>Light Mode</span>
+                    </button>
+                  </div>
+                </div>
+
                 <p className="text-[11px] font-mono text-muted">
-                  audioneko is optimized for nighttime listening with deep dark sober tones.
+                  All palettes are tuned with balanced contrast for day and night reading without
+                  harsh eye strain.
                 </p>
               </div>
 

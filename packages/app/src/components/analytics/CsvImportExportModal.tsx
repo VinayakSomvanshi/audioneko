@@ -1,12 +1,5 @@
 import { type Book, type BookProgressRecord, isPlaybackCompleted } from "@audioneko/shared";
-import {
-  BookCheck,
-  CheckCircle2,
-  Download,
-  FileSpreadsheet,
-  Upload,
-  X,
-} from "lucide-react";
+import { BookCheck, CheckCircle2, Download, FileSpreadsheet, Upload, X } from "lucide-react";
 import { type ChangeEvent, useState } from "react";
 import {
   type ParsedCsvRecord,

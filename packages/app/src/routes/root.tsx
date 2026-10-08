@@ -9,32 +9,16 @@ import { MiniPlayer } from "../components/player/MiniPlayer";
 import { ProfilePreferencesModal } from "../components/profile/ProfilePreferencesModal";
 import { SearchPaletteModal } from "../components/search/SearchPaletteModal";
 import { useCurrentUser } from "../lib/auth-client";
+import { useTheme } from "../lib/theme";
 
 export function RootLayout() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isDark, setIsDark] = useState(true);
+  const { isDark, toggleMode } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoading } = useCurrentUser();
-
-  useEffect(() => {
-    const isDarkTheme = document.documentElement.classList.contains("dark");
-    setIsDark(isDarkTheme);
-  }, []);
-
-  const handleToggleTheme = () => {
-    const nextDark = !isDark;
-    setIsDark(nextDark);
-    if (nextDark) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("audioneko-theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("audioneko-theme", "light");
-    }
-  };
 
   // Safeguard: If landing with invite ?token= on root or library, redirect to /join.
   // Never redirect when on /login or when query indicates a password reset.
@@ -137,7 +121,7 @@ export function RootLayout() {
         onSearchClick={() => setIsSearchOpen(true)}
         onProfileClick={() => setIsProfileOpen(true)}
         isDark={isDark}
-        onToggleTheme={handleToggleTheme}
+        onToggleTheme={toggleMode}
       />
 
       {/* Profile & Playback Preferences Dialog */}
@@ -145,7 +129,7 @@ export function RootLayout() {
         isOpen={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
         isDark={isDark}
-        onToggleTheme={handleToggleTheme}
+        onToggleTheme={toggleMode}
       />
 
       {/* Instant Client-Side Search Palette */}

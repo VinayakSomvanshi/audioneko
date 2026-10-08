@@ -1,8 +1,4 @@
-import {
-  type Book,
-  type BookProgressRecord,
-  isPlaybackCompleted,
-} from "@audioneko/shared";
+import { type Book, type BookProgressRecord, isPlaybackCompleted } from "@audioneko/shared";
 
 /**
  * audioneko: StoryGraph & Goodreads CSV Sync Engine
@@ -95,10 +91,7 @@ export function exportGoodreadsCsv(
   for (const book of books) {
     const progress = progressMap[book.id];
     const isFinished = progress
-      ? isPlaybackCompleted(
-          progress.currentTime,
-          progress.duration || book.durationSeconds,
-        )
+      ? isPlaybackCompleted(progress.currentTime, progress.duration || book.durationSeconds)
       : false;
     const isStarted = progress && progress.currentTime > 60;
 
@@ -171,10 +164,7 @@ export function exportStoryGraphCsv(
   for (const book of books) {
     const progress = progressMap[book.id];
     const isFinished = progress
-      ? isPlaybackCompleted(
-          progress.currentTime,
-          progress.duration || book.durationSeconds,
-        )
+      ? isPlaybackCompleted(progress.currentTime, progress.duration || book.durationSeconds)
       : false;
     const isStarted = progress && progress.currentTime > 60;
 

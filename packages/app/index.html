@@ -4,16 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     
-    <!-- Anti-flashbang dark mode setup -->
+    <!-- Anti-flashbang theme and dark mode setup -->
     <script>
       (function() {
         try {
-          const stored = localStorage.getItem('audioneko-theme');
-          if (stored === 'light') {
+          const storedMode = localStorage.getItem('audioneko-theme-mode') || localStorage.getItem('audioneko-theme');
+          if (storedMode === 'light') {
             document.documentElement.classList.remove('dark');
           } else {
             document.documentElement.classList.add('dark');
           }
+          const storedPalette = localStorage.getItem('audioneko-theme-palette') || 'crimson';
+          document.documentElement.setAttribute('data-theme', storedPalette);
         } catch (_) {}
       })();
     </script>

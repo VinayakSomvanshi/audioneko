@@ -2,7 +2,9 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Menu, Moon, Search, ShieldCheck, Sun, User as UserIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { performSignOut, useCurrentUser } from "../../lib/auth-client";
+import { useTheme } from "../../lib/theme";
 import { NekoIcon } from "../icons/NekoIcon";
+import { ThemeSelector } from "../theme/ThemeSelector";
 
 interface HeaderProps {
   onSearchClick?: () => void;
@@ -12,7 +14,7 @@ interface HeaderProps {
 
 export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderProps) {
   const { user, isAdmin } = useCurrentUser();
-  const [isDark, setIsDark] = useState(true);
+  const { isDark, toggleMode } = useTheme();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -20,13 +22,10 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
   const showSearch = Boolean(user && !isAuthPage && onSearchClick);
 
   useEffect(() => {
-    const isDarkTheme = document.documentElement.classList.contains("dark");
-    setIsDark(isDarkTheme);
-
     const handleKeyDown = (e: KeyboardEvent) => {
       // Toggle theme with 't' when not focused in an input
       if (e.key === "t" && !["INPUT", "TEXTAREA"].includes((e.target as HTMLElement).tagName)) {
-        toggleTheme();
+        toggleMode();
       }
       // Trigger search with '/'
       if (
@@ -41,19 +40,7 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onSearchClick, showSearch]);
-
-  const toggleTheme = () => {
-    const nextDark = !isDark;
-    setIsDark(nextDark);
-    if (nextDark) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("audioneko-theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("audioneko-theme", "light");
-    }
-  };
+  }, [onSearchClick, showSearch, toggleMode]);
 
   return (
     <header className="sticky top-0 z-40 min-h-14 h-auto pt-[env(safe-area-inset-top,0px)] border-b border-border bg-bg/95 backdrop-blur-sm px-3 sm:px-4 md:px-6 flex items-center justify-between transition-colors">
@@ -124,12 +111,16 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
           </button>
         )}
 
+        {/* Theme Palette Popover Selector */}
+        <ThemeSelector />
+
+        {/* Quick Light/Dark Toggle */}
         <button
           type="button"
-          onClick={toggleTheme}
+          onClick={toggleMode}
           className="p-2 surface-card text-muted hover:text-accent hover:border-accent transition-all cursor-pointer"
-          aria-label="Toggle theme"
-          title="Toggle light/dark theme (T)"
+          aria-label="Toggle light/dark mode"
+          title="Toggle light/dark mode (T)"
         >
           {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
         </button>

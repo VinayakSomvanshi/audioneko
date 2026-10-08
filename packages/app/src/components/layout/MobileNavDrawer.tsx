@@ -6,6 +6,7 @@ import {
   HardDriveDownload,
   Library,
   Moon,
+  Palette,
   Search,
   ShieldCheck,
   Sliders,
@@ -17,6 +18,7 @@ import {
 import { useEffect, useState } from "react";
 import { performSignOut, useCurrentUser } from "../../lib/auth-client";
 import { useDownloads } from "../../lib/download-manager";
+import { THEME_PALETTES, useTheme } from "../../lib/theme";
 import { BlinkingNeko, NekoIcon } from "../icons/NekoIcon";
 
 interface MobileNavDrawerProps {
@@ -24,8 +26,8 @@ interface MobileNavDrawerProps {
   onClose: () => void;
   onSearchClick?: () => void;
   onProfileClick?: () => void;
-  isDark: boolean;
-  onToggleTheme: () => void;
+  isDark?: boolean;
+  onToggleTheme?: () => void;
 }
 
 export function MobileNavDrawer({
@@ -33,12 +35,13 @@ export function MobileNavDrawer({
   onClose,
   onSearchClick,
   onProfileClick,
-  isDark,
-  onToggleTheme,
+  isDark: _isDark,
+  onToggleTheme: _onToggleTheme,
 }: MobileNavDrawerProps) {
   const location = useLocation();
   const { user, isAdmin } = useCurrentUser();
   const { activeCount } = useDownloads();
+  const { palette: currentPalette, setPalette, mode: currentMode, setMode } = useTheme();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Close drawer on escape key and prevent background scroll
@@ -204,14 +207,55 @@ export function MobileNavDrawer({
             </button>
           )}
 
+          {/* Theme Palette Chips */}
+          <div className="p-2.5 rounded-lg border border-border bg-surface/60 space-y-2">
+            <div className="flex items-center justify-between text-[10px] font-mono text-muted uppercase tracking-wider">
+              <span className="flex items-center gap-1.5">
+                <Palette className="w-3 h-3 text-accent" />
+                <span>Theme Palette</span>
+              </span>
+              <span className="text-accent font-medium">
+                {THEME_PALETTES.find((p) => p.id === currentPalette)?.name}
+              </span>
+            </div>
+            <div className="grid grid-cols-6 gap-1.5">
+              {THEME_PALETTES.map((p) => {
+                const isSelected = currentPalette === p.id;
+                const swatch = currentMode === "dark" ? p.swatchDark : p.swatchLight;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPalette(p.id)}
+                    title={`${p.name} - ${p.subtitle}`}
+                    className={`h-7 rounded flex items-center justify-center border transition-all cursor-pointer ${
+                      isSelected
+                        ? "border-accent ring-1 ring-accent bg-accent-bg"
+                        : "border-border hover:border-accent/40 bg-surface"
+                    }`}
+                  >
+                    <div
+                      className="w-3.5 h-3.5 rounded-full shadow-xs"
+                      style={{ backgroundColor: swatch }}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={onToggleTheme}
+              onClick={() => setMode(currentMode === "dark" ? "light" : "dark")}
               className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-border bg-surface text-xs font-mono text-muted hover:text-accent hover:border-accent transition-colors cursor-pointer"
             >
-              {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-              <span>{isDark ? "Light Mode" : "Dark Mode"}</span>
+              {currentMode === "dark" ? (
+                <Sun className="w-3.5 h-3.5" />
+              ) : (
+                <Moon className="w-3.5 h-3.5" />
+              )}
+              <span>{currentMode === "dark" ? "Light Mode" : "Dark Mode"}</span>
             </button>
 
             {user ? (
