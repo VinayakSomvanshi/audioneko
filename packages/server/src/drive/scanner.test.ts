@@ -118,4 +118,44 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(da3.series).toBe("Red Rising");
     expect(da3.seriesIndex).toBe(5.3);
   });
+
+  it("parses Sarah J. Maas Throne of Glass series books accurately", () => {
+    const tog1 = parseBookInfo("01 - Throne of Glass.m4b");
+    expect(tog1.title).toBe("Throne of Glass");
+    expect(tog1.author).toBe("Sarah J. Maas");
+    expect(tog1.series).toBe("Throne of Glass");
+    expect(tog1.seriesIndex).toBe(1);
+    expect(tog1.narrator).toBe("Elizabeth Evans");
+
+    const ab3 = parseBookInfo("03 - The Assassin's Blade.m4b");
+    expect(ab3.title).toBe("The Assassin's Blade");
+    expect(ab3.author).toBe("Sarah J. Maas");
+    expect(ab3.series).toBe("Throne of Glass");
+    expect(ab3.seriesIndex).toBe(3);
+
+    const hof4 = parseBookInfo("04 - Heir of Fire.m4b");
+    expect(hof4.title).toBe("Heir of Fire");
+    expect(hof4.author).toBe("Sarah J. Maas");
+    expect(hof4.series).toBe("Throne of Glass");
+    expect(hof4.seriesIndex).toBe(4);
+    expect(hof4.narrator).toBe("Elizabeth Evans");
+
+    const qos5 = parseBookInfo("05 - Queen of Shadows.m4b");
+    expect(qos5.title).toBe("Queen of Shadows");
+    expect(qos5.author).toBe("Sarah J. Maas");
+    expect(qos5.series).toBe("Throne of Glass");
+    expect(qos5.seriesIndex).toBe(5);
+
+    const tod7 = parseBookInfo("07 - Tower of Dawn.m4b");
+    expect(tod7.title).toBe("Tower of Dawn");
+    expect(tod7.author).toBe("Sarah J. Maas");
+    expect(tod7.series).toBe("Throne of Glass");
+    expect(tod7.seriesIndex).toBe(7);
+
+    const koa8 = parseBookInfo("08 - Kingdom of Ash.m4b");
+    expect(koa8.title).toBe("Kingdom of Ash");
+    expect(koa8.author).toBe("Sarah J. Maas");
+    expect(koa8.series).toBe("Throne of Glass");
+    expect(koa8.seriesIndex).toBe(8);
+  });
 });

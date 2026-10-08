@@ -69,6 +69,15 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     } else if (parentFolderName.toLowerCase().includes("crescent city")) {
       series = "Crescent City";
       author = "Sarah J. Maas";
+    } else if (
+      parentFolderName.toLowerCase().includes("throne of glass") ||
+      /\btog\b/i.test(parentFolderName)
+    ) {
+      series = "Throne of Glass";
+      author = "Sarah J. Maas";
+      narrator = "Elizabeth Evans";
+    } else if (parentFolderName.toLowerCase().includes("sarah j")) {
+      author = "Sarah J. Maas";
     } else if (parentFolderName.toLowerCase().includes("addicted")) {
       series = "Addicted";
       const byMatch = parentFolderName.match(/by\s+(.+)$/i);
@@ -172,6 +181,7 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
 
   // Known series heuristics for Rebecca Yarros The Empyrean books
   const lowerTitle = title.toLowerCase();
+  const lowerClean = cleanName.toLowerCase();
   if (
     lowerTitle.includes("fourth wing") ||
     lowerTitle.includes("iron flame") ||
@@ -196,8 +206,49 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     }
   }
 
+  // Known series heuristics for Sarah J. Maas Throne of Glass books
+  if (
+    lowerTitle.includes("throne of glass") ||
+    lowerTitle.includes("crown of midnight") ||
+    lowerTitle.includes("heir of fire") ||
+    lowerTitle.includes("queen of shadows") ||
+    lowerTitle.includes("empire of storms") ||
+    lowerTitle.includes("tower of dawn") ||
+    lowerTitle.includes("kingdom of ash") ||
+    lowerTitle.includes("assassin's blade") ||
+    lowerClean.includes("assassin's blade")
+  ) {
+    if (!author || author === "Unknown Author") {
+      author = "Sarah J. Maas";
+    }
+    if (!series) {
+      series = "Throne of Glass";
+    }
+    if (!narrator) {
+      narrator = "Elizabeth Evans";
+    }
+    if (seriesIndex === undefined) {
+      if (lowerTitle.includes("throne of glass")) {
+        seriesIndex = 1;
+      } else if (lowerTitle.includes("crown of midnight")) {
+        seriesIndex = 2;
+      } else if (lowerTitle.includes("assassin's blade") || lowerClean.includes("assassin's blade")) {
+        seriesIndex = 3;
+      } else if (lowerTitle.includes("heir of fire")) {
+        seriesIndex = 4;
+      } else if (lowerTitle.includes("queen of shadows")) {
+        seriesIndex = 5;
+      } else if (lowerTitle.includes("empire of storms")) {
+        seriesIndex = 6;
+      } else if (lowerTitle.includes("tower of dawn")) {
+        seriesIndex = 7;
+      } else if (lowerTitle.includes("kingdom of ash")) {
+        seriesIndex = 8;
+      }
+    }
+  }
+
   // Known series heuristics for Pierce Brown Red Rising books
-  const lowerClean = cleanName.toLowerCase();
   if (
     lowerTitle.includes("red rising") ||
     lowerTitle.includes("golden son") ||
@@ -589,7 +640,10 @@ export async function scanDriveLibrary(
           author: enrichedAuthor,
           seriesId,
           seriesIndex: parsed.seriesIndex ?? null,
-          narrator: null,
+          narrator:
+            parsed.narrator ??
+            existingBook[0]?.narrator ??
+            (parsed.series === "Throne of Glass" ? "Elizabeth Evans" : null),
           description: enrichedDescription,
           publishedYear: enrichedPublishedYear ?? existingBook[0].publishedYear,
           durationSeconds,
@@ -608,7 +662,9 @@ export async function scanDriveLibrary(
         author: enrichedAuthor,
         seriesId,
         seriesIndex: parsed.seriesIndex ?? null,
-        narrator: null,
+        narrator:
+          parsed.narrator ??
+          (parsed.series === "Throne of Glass" ? "Elizabeth Evans" : null),
         description: enrichedDescription,
         coverR2Key: finalCoverKey,
         durationSeconds,

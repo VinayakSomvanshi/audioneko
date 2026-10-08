@@ -19,6 +19,8 @@ const CURATED_AUTHOR_PHOTOS: Record<string, string> = {
   "rosie danan":
     "https://images.squarespace-cdn.com/content/v1/5cdc348cebfc7f30af34bbe6/2d91a297-2d29-4f0b-afef-036cf45e6a71/Rosie_+Danan_portraits_21.jpg",
   "pierce brown": "https://covers.openlibrary.org/a/id/14852667-L.jpg",
+  "sarah j. maas": "https://images.gr-assets.com/authors/1628169225p8/3433047.jpg",
+  "sarah j maas": "https://images.gr-assets.com/authors/1628169225p8/3433047.jpg",
 };
 
 const CURATED_AUTHOR_BIOS: Record<string, { bio: string; birthDate: string; topWork: string }> = {
@@ -26,6 +28,16 @@ const CURATED_AUTHOR_BIOS: Record<string, { bio: string; birthDate: string; topW
     bio: "Pierce Brown (born January 28, 1988) is an American science fiction author best known for his acclaimed Red Rising saga, consisting of Red Rising (2014), Golden Son (2015), Morning Star (2016), Iron Gold (2018), Dark Age (2019), and Light Bringer (2023).",
     birthDate: "28 January 1988",
     topWork: "Red Rising",
+  },
+  "sarah j. maas": {
+    bio: "Sarah J. Maas (born March 5, 1986) is a #1 New York Times and internationally bestselling author of the Crescent City, A Court of Thorns and Roses, and Throne of Glass series. Her books have sold over 40 million copies worldwide in thirty-eight languages.",
+    birthDate: "5 March 1986",
+    topWork: "Throne of Glass",
+  },
+  "sarah j maas": {
+    bio: "Sarah J. Maas (born March 5, 1986) is a #1 New York Times and internationally bestselling author of the Crescent City, A Court of Thorns and Roses, and Throne of Glass series. Her books have sold over 40 million copies worldwide in thirty-eight languages.",
+    birthDate: "5 March 1986",
+    topWork: "Throne of Glass",
   },
 };
 
