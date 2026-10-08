@@ -134,7 +134,7 @@
 
 ### Future Scope & Backlog (Deferred per User Request)
 - **Passkeys / WebAuthn**: Passwordless hardware/biometric authentication (FIDO2)
-- **Workers AI Whisper Transcription**: On-demand clip transcription and quote bookmarking
+- **Workers AI Whisper Transcription & Dialogue Quotes**: Dual-field bookmarking with timestamp range (start and end audio points), automated speech extraction of character dialogue and paragraphs via Whisper, and separate personal listener reflections
 - **Workers AI Narrative Recaps**: Llama 3.3 70B story recap generation when resuming after inactivity
 - **Vectorize Semantic Search**: 768-dimension embedding vector search for natural language queries
 
