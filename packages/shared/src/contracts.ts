@@ -247,3 +247,42 @@ export interface AuthorItem {
   topWork?: string | null;
   openLibraryKey?: string | null;
 }
+
+export interface LibraryVisibility {
+  hiddenBooks: string[];
+  hiddenSeries: string[];
+  hiddenAuthors: string[];
+}
+
+export interface VisibilityTogglePayload {
+  type: "book" | "series" | "author";
+  target: string;
+  hidden: boolean;
+}
+
+export interface AdminVisibilityResponse {
+  visibility: LibraryVisibility;
+  books: Array<{
+    id: string;
+    title: string;
+    author: string;
+    series?: string;
+    coverR2Key?: string | null;
+    isHidden: boolean;
+    hiddenReason?: "direct" | "series" | "author";
+  }>;
+  series: Array<{
+    id: string;
+    name: string;
+    bookCount: number;
+    primaryAuthor: string;
+    isHidden: boolean;
+  }>;
+  authors: Array<{
+    name: string;
+    bookCount: number;
+    seriesCount: number;
+    isHidden: boolean;
+  }>;
+}
+

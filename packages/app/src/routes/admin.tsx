@@ -6,8 +6,10 @@ import {
   Copy,
   Edit2,
   Edit3,
+  Eye,
   FolderSync,
   KeyRound,
+  Layers,
   Library,
   Loader2,
   Plus,
@@ -19,7 +21,8 @@ import {
   UserCheck,
   Users,
 } from "lucide-react";
-import { type FormEvent, useCallback, useEffect, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import type { AdminVisibilityResponse } from "@audioneko/shared";
 import {
   type EditableBookMetadata,
   MetadataFixerModal,
@@ -29,6 +32,42 @@ import { StrictConfirmModal } from "../components/admin/StrictConfirmModal";
 import { UserStatsModal } from "../components/admin/UserStatsModal";
 import { useCurrentUser } from "../lib/auth-client";
 import { getBookCoverUrl } from "../lib/covers";
+
+function ToggleSwitch({
+  checked,
+  onChange,
+  disabled = false,
+  label,
+  id,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+  label?: string;
+  id?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      id={id}
+      disabled={disabled}
+      onClick={onChange}
+      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+        checked ? "bg-accent" : "bg-border hover:bg-subtle/40"
+      } ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+    >
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+          checked ? "translate-x-4" : "translate-x-0"
+        }`}
+      />
+    </button>
+  );
+}
 
 interface InviteItem {
   id: string;
@@ -66,11 +105,51 @@ interface ScanResult {
 
 export function AdminDashboardPage() {
   const { user, isAdmin, isLoading: authLoading } = useCurrentUser();
-  const [activeTab, setActiveTab] = useState<"scanner" | "invites" | "users" | "books">("scanner");
+  const [activeTab, setActiveTab] = useState<
+    "scanner" | "invites" | "users" | "books" | "visibility"
+  >("scanner");
 
   // Stats state
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+
+  // Visibility state
+  const [visibilityData, setVisibilityData] = useState<AdminVisibilityResponse | null>(null);
+  const [visibilityLoading, setVisibilityLoading] = useState(false);
+  const [visibilityFilter, setVisibilityFilter] = useState<
+    "all" | "books" | "series" | "authors"
+  >("all");
+  const [visibilitySearch, setVisibilitySearch] = useState("");
+  const [togglingKey, setTogglingKey] = useState<string | null>(null);
+
+  const searchLower = visibilitySearch.trim().toLowerCase();
+
+  const filteredSeries = useMemo(() => {
+    if (!visibilityData?.series) return [];
+    if (!searchLower) return visibilityData.series;
+    return visibilityData.series.filter(
+      (s) =>
+        s.name.toLowerCase().includes(searchLower) ||
+        s.primaryAuthor.toLowerCase().includes(searchLower),
+    );
+  }, [visibilityData?.series, searchLower]);
+
+  const filteredAuthors = useMemo(() => {
+    if (!visibilityData?.authors) return [];
+    if (!searchLower) return visibilityData.authors;
+    return visibilityData.authors.filter((a) => a.name.toLowerCase().includes(searchLower));
+  }, [visibilityData?.authors, searchLower]);
+
+  const filteredBooks = useMemo(() => {
+    if (!visibilityData?.books) return [];
+    if (!searchLower) return visibilityData.books;
+    return visibilityData.books.filter(
+      (b) =>
+        b.title.toLowerCase().includes(searchLower) ||
+        b.author.toLowerCase().includes(searchLower) ||
+        (b.series && b.series.toLowerCase().includes(searchLower)),
+    );
+  }, [visibilityData?.books, searchLower]);
 
   // Books Catalog state
   const [catalogBooks, setCatalogBooks] = useState<EditableBookMetadata[]>([]);
@@ -175,19 +254,66 @@ export function AdminDashboardPage() {
     }
   }, []);
 
+  const fetchVisibilityData = useCallback(async () => {
+    setVisibilityLoading(true);
+    try {
+      const res = await fetch("/api/admin/visibility");
+      if (res.ok) {
+        const data = (await res.json()) as AdminVisibilityResponse;
+        setVisibilityData(data);
+      }
+    } catch (err) {
+      console.error("Failed to load visibility settings:", err);
+    } finally {
+      setVisibilityLoading(false);
+    }
+  }, []);
+
+  const handleToggleVisibility = async (
+    type: "book" | "series" | "author",
+    target: string,
+    currentHidden: boolean,
+  ) => {
+    const key = `${type}:${target}`;
+    setTogglingKey(key);
+    const newHidden = !currentHidden;
+    try {
+      const res = await fetch("/api/admin/visibility/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, target, hidden: newHidden }),
+      });
+      if (res.ok) {
+        await fetchVisibilityData();
+        fetchStats();
+      }
+    } catch (err) {
+      console.error("Failed to toggle visibility:", err);
+    } finally {
+      setTogglingKey(null);
+    }
+  };
+
   useEffect(() => {
     if (isAdmin) {
       fetchStats();
       fetchInvites();
       fetchUsers();
+      fetchVisibilityData();
     }
-  }, [isAdmin, fetchStats, fetchInvites, fetchUsers]);
+  }, [isAdmin, fetchStats, fetchInvites, fetchUsers, fetchVisibilityData]);
 
   useEffect(() => {
     if (isAdmin && activeTab === "books" && catalogBooks.length === 0) {
       fetchCatalogBooks();
     }
   }, [isAdmin, activeTab, catalogBooks.length, fetchCatalogBooks]);
+
+  useEffect(() => {
+    if (isAdmin && activeTab === "visibility" && !visibilityData) {
+      fetchVisibilityData();
+    }
+  }, [isAdmin, activeTab, visibilityData, fetchVisibilityData]);
 
   // Handle trigger drive scan
   const handleTriggerScan = async (e?: FormEvent) => {
@@ -485,6 +611,22 @@ export function AdminDashboardPage() {
         >
           <BookOpen className="w-4 h-4" />
           <span>Catalog & Metadata Fixer</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("visibility");
+            fetchVisibilityData();
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-mono border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "visibility"
+              ? "border-accent text-accent font-semibold bg-accent-bg/20"
+              : "border-transparent text-muted hover:text-text hover:border-border"
+          }`}
+        >
+          <Eye className="w-4 h-4" />
+          <span>Library Visibility</span>
         </button>
       </div>
 
@@ -1065,81 +1207,501 @@ export function AdminDashboardPage() {
                       <th className="py-2.5 px-4 font-medium">Title & Author</th>
                       <th className="py-2.5 px-4 font-medium">Series</th>
                       <th className="py-2.5 px-4 font-medium">Format / Specs</th>
+                      <th className="py-2.5 px-4 font-medium text-center">Visibility</th>
                       <th className="py-2.5 px-4 font-medium text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {catalogBooks.map((b) => (
-                      <tr key={b.id} className="hover:bg-elevated/40 transition-colors">
-                        <td className="py-3 px-4">
-                          <div className="w-10 h-10 rounded border border-border bg-surface overflow-hidden flex items-center justify-center shrink-0">
-                            {b.coverR2Key ? (
-                              <img
-                                src={getBookCoverUrl(b)}
-                                alt=""
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = "none";
-                                }}
-                              />
-                            ) : (
-                              <span className="text-[10px] font-bold text-subtle uppercase">
-                                {b.format || "m4b"}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="space-y-0.5">
-                            <a
-                              href={`/book/${b.id}`}
-                              className="font-semibold text-text hover:text-accent transition-colors block line-clamp-1"
-                            >
-                              {b.title}
-                            </a>
-                            <div className="text-muted text-[11px] line-clamp-1">By {b.author}</div>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          {b.seriesName ? (
-                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-elevated border border-border text-[11px] text-accent">
-                              <span>{b.seriesName}</span>
-                              {b.seriesIndex != null && (
-                                <span className="text-subtle">#{b.seriesIndex}</span>
+                    {catalogBooks.map((b) => {
+                      const isDirectlyHidden =
+                        visibilityData?.visibility.hiddenBooks.includes(b.id) ?? false;
+                      const isParentSeriesHidden = Boolean(
+                        b.seriesName &&
+                          visibilityData?.visibility.hiddenSeries.some(
+                            (s) => s.toLowerCase() === b.seriesName!.toLowerCase(),
+                          ),
+                      );
+                      const isParentAuthorHidden = Boolean(
+                        b.author &&
+                          visibilityData?.visibility.hiddenAuthors.some(
+                            (a) => a.toLowerCase() === b.author.toLowerCase(),
+                          ),
+                      );
+                      const isEffectiveHidden =
+                        isDirectlyHidden || isParentSeriesHidden || isParentAuthorHidden;
+
+                      return (
+                        <tr key={b.id} className="hover:bg-elevated/40 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="w-10 h-10 rounded border border-border bg-surface overflow-hidden flex items-center justify-center shrink-0">
+                              {b.coverR2Key ? (
+                                <img
+                                  src={getBookCoverUrl(b)}
+                                  alt=""
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = "none";
+                                  }}
+                                />
+                              ) : (
+                                <span className="text-[10px] font-bold text-subtle uppercase">
+                                  {b.format || "m4b"}
+                                </span>
                               )}
                             </div>
-                          ) : (
-                            <span className="text-subtle text-[11px]">—</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2 text-[11px]">
-                            <span className="px-1.5 py-0.5 rounded uppercase font-bold text-[10px] bg-accent-bg text-accent border border-accent/30">
-                              {b.format || "m4b"}
-                            </span>
-                            {b.publishedYear && (
-                              <span className="text-subtle">{b.publishedYear}</span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="space-y-0.5">
+                              <a
+                                href={`/book/${b.id}`}
+                                className="font-semibold text-text hover:text-accent transition-colors block line-clamp-1"
+                              >
+                                {b.title}
+                              </a>
+                              <div className="text-muted text-[11px] line-clamp-1">By {b.author}</div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            {b.seriesName ? (
+                              <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-elevated border border-border text-[11px] text-accent">
+                                <span>{b.seriesName}</span>
+                                {b.seriesIndex != null && (
+                                  <span className="text-subtle">#{b.seriesIndex}</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-subtle text-[11px]">—</span>
                             )}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setEditingMetadataBook(b)}
-                            className="px-3 py-1.5 rounded text-xs font-mono border border-border surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer inline-flex items-center gap-1.5"
-                            title="Edit book and track metadata tags"
-                          >
-                            <Edit3 className="w-3.5 h-3.5 text-accent" />
-                            <span>Fix Metadata</span>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2 text-[11px]">
+                              <span className="px-1.5 py-0.5 rounded uppercase font-bold text-[10px] bg-accent-bg text-accent border border-accent/30">
+                                {b.format || "m4b"}
+                              </span>
+                              {b.publishedYear && (
+                                <span className="text-subtle">{b.publishedYear}</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="inline-flex items-center gap-2">
+                              <ToggleSwitch
+                                checked={!isEffectiveHidden}
+                                disabled={togglingKey === `book:${b.id}`}
+                                onChange={() =>
+                                  handleToggleVisibility("book", b.id, isEffectiveHidden)
+                                }
+                                label={`Toggle visibility for ${b.title}`}
+                              />
+                              <span
+                                className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                                  !isEffectiveHidden
+                                    ? "bg-accent-bg/30 text-accent border-accent/30"
+                                    : isDirectlyHidden
+                                      ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                      : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                }`}
+                              >
+                                {!isEffectiveHidden
+                                  ? "Visible"
+                                  : isDirectlyHidden
+                                    ? "Hidden"
+                                    : isParentSeriesHidden
+                                      ? "Series Off"
+                                      : "Author Off"}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={() => setEditingMetadataBook(b)}
+                              className="px-3 py-1.5 rounded text-xs font-mono border border-border surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                              title="Edit book and track metadata tags"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-accent" />
+                              <span>Fix Metadata</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* TAB 5: LIBRARY VISIBILITY CONTROLS */}
+      {activeTab === "visibility" && (
+        <div className="space-y-6">
+          {/* Header Card */}
+          <div className="surface-card p-6 border border-border space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-semibold text-text flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-accent" />
+                  <span>Library Visibility & Catalog Display</span>
+                </h3>
+                <p className="text-xs font-mono text-muted mt-1">
+                  Control which series, authors, and audiobooks appear in library and listener catalogs.
+                  Hiding a series or author automatically hides all their audiobooks.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => fetchVisibilityData()}
+                disabled={visibilityLoading}
+                className="px-3 py-1.5 rounded border border-border surface-card hover:border-accent text-xs font-mono flex items-center gap-1.5 text-muted hover:text-text transition-colors cursor-pointer self-start sm:self-auto shrink-0"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${visibilityLoading ? "animate-spin text-accent" : ""}`}
+                />
+                <span>Refresh</span>
+              </button>
+            </div>
+
+            {/* Quick Metrics */}
+            {visibilityData && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                <div className="p-3 rounded bg-elevated/50 border border-border/60">
+                  <div className="text-[11px] font-mono text-muted">Audiobooks</div>
+                  <div className="text-lg font-bold font-mono text-text mt-0.5">
+                    {visibilityData.books.filter((b) => !b.isHidden).length} /{" "}
+                    {visibilityData.books.length}
+                  </div>
+                  <div className="text-[10px] font-mono text-accent">Visible in catalog</div>
+                </div>
+
+                <div className="p-3 rounded bg-elevated/50 border border-border/60">
+                  <div className="text-[11px] font-mono text-muted">Series Sagas</div>
+                  <div className="text-lg font-bold font-mono text-text mt-0.5">
+                    {visibilityData.series.filter((s) => !s.isHidden).length} /{" "}
+                    {visibilityData.series.length}
+                  </div>
+                  <div className="text-[10px] font-mono text-accent">Visible series</div>
+                </div>
+
+                <div className="p-3 rounded bg-elevated/50 border border-border/60">
+                  <div className="text-[11px] font-mono text-muted">Authors</div>
+                  <div className="text-lg font-bold font-mono text-text mt-0.5">
+                    {visibilityData.authors.filter((a) => !a.isHidden).length} /{" "}
+                    {visibilityData.authors.length}
+                  </div>
+                  <div className="text-[10px] font-mono text-accent">Visible authors</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Filtering and Search Controls */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 p-1 rounded-lg bg-surface border border-border overflow-x-auto">
+              {(["all", "series", "authors", "books"] as const).map((filterKey) => (
+                <button
+                  key={filterKey}
+                  type="button"
+                  onClick={() => setVisibilityFilter(filterKey)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-mono capitalize transition-colors cursor-pointer whitespace-nowrap ${
+                    visibilityFilter === filterKey
+                      ? "bg-accent text-bg font-semibold"
+                      : "text-muted hover:text-text hover:bg-elevated/50"
+                  }`}
+                >
+                  {filterKey === "all"
+                    ? "All Categories"
+                    : `${filterKey} (${
+                        filterKey === "books"
+                          ? visibilityData?.books.length ?? 0
+                          : filterKey === "series"
+                            ? visibilityData?.series.length ?? 0
+                            : visibilityData?.authors.length ?? 0
+                      })`}
+                </button>
+              ))}
+            </div>
+
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-subtle" />
+              <input
+                type="text"
+                value={visibilitySearch}
+                onChange={(e) => setVisibilitySearch(e.target.value)}
+                placeholder="Search items..."
+                className="w-full pl-9 pr-3 py-1.5 rounded bg-surface border border-border text-xs font-mono text-text placeholder:text-subtle focus:outline-none focus:border-accent"
+              />
+            </div>
+          </div>
+
+          {visibilityLoading && !visibilityData ? (
+            <div className="surface-card p-12 text-center text-xs font-mono text-muted border border-border flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin text-accent" />
+              <span>Loading visibility rules...</span>
+            </div>
+          ) : !visibilityData ? (
+            <div className="surface-card p-8 text-center text-xs font-mono text-muted border border-border">
+              No visibility rules loaded.
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* SECTION 1: SERIES VISIBILITY */}
+              {(visibilityFilter === "all" || visibilityFilter === "series") && (
+                <div className="surface-card border border-border rounded overflow-hidden">
+                  <div className="p-4 bg-elevated/40 border-b border-border flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-accent" />
+                      <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-text">
+                        Series Sagas ({filteredSeries.length})
+                      </h4>
+                    </div>
+                    <span className="text-[11px] font-mono text-subtle">
+                      Hiding a series hides all its books automatically
+                    </span>
+                  </div>
+
+                  {filteredSeries.length === 0 ? (
+                    <div className="p-8 text-center text-xs font-mono text-subtle">
+                      No series found matching filter.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs font-mono">
+                        <thead className="bg-elevated/70 text-subtle border-b border-border">
+                          <tr>
+                            <th className="py-2.5 px-4 font-medium">Series Name</th>
+                            <th className="py-2.5 px-4 font-medium">Primary Author</th>
+                            <th className="py-2.5 px-4 font-medium">Books Count</th>
+                            <th className="py-2.5 px-4 font-medium text-center">Status</th>
+                            <th className="py-2.5 px-4 font-medium text-right">Visibility Toggle</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {filteredSeries.map((s) => (
+                            <tr key={s.id} className="hover:bg-elevated/40 transition-colors">
+                              <td className="py-3 px-4 font-semibold text-text">
+                                {s.name}
+                              </td>
+                              <td className="py-3 px-4 text-muted">
+                                {s.primaryAuthor}
+                              </td>
+                              <td className="py-3 px-4 text-subtle">
+                                <span className="px-2 py-0.5 rounded bg-elevated text-accent font-medium">
+                                  {s.bookCount} audiobooks
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[11px] font-medium border ${
+                                    !s.isHidden
+                                      ? "bg-accent-bg/30 text-accent border-accent/30"
+                                      : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                  }`}
+                                >
+                                  {!s.isHidden ? "Visible" : "Hidden"}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <ToggleSwitch
+                                  checked={!s.isHidden}
+                                  disabled={togglingKey === `series:${s.name}`}
+                                  onChange={() =>
+                                    handleToggleVisibility("series", s.name, s.isHidden)
+                                  }
+                                  label={`Toggle visibility for series ${s.name}`}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SECTION 2: AUTHORS VISIBILITY */}
+              {(visibilityFilter === "all" || visibilityFilter === "authors") && (
+                <div className="surface-card border border-border rounded overflow-hidden">
+                  <div className="p-4 bg-elevated/40 border-b border-border flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-accent" />
+                      <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-text">
+                        Authors ({filteredAuthors.length})
+                      </h4>
+                    </div>
+                    <span className="text-[11px] font-mono text-subtle">
+                      Hiding an author hides their catalog and audiobooks
+                    </span>
+                  </div>
+
+                  {filteredAuthors.length === 0 ? (
+                    <div className="p-8 text-center text-xs font-mono text-subtle">
+                      No authors found matching filter.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs font-mono">
+                        <thead className="bg-elevated/70 text-subtle border-b border-border">
+                          <tr>
+                            <th className="py-2.5 px-4 font-medium">Author Name</th>
+                            <th className="py-2.5 px-4 font-medium">Catalog Stats</th>
+                            <th className="py-2.5 px-4 font-medium text-center">Status</th>
+                            <th className="py-2.5 px-4 font-medium text-right">Visibility Toggle</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {filteredAuthors.map((a) => (
+                            <tr key={a.name} className="hover:bg-elevated/40 transition-colors">
+                              <td className="py-3 px-4 font-semibold text-text">
+                                {a.name}
+                              </td>
+                              <td className="py-3 px-4 text-muted">
+                                <span>{a.bookCount} audiobooks</span>
+                                {a.seriesCount > 0 && (
+                                  <span className="text-subtle">
+                                    {" "}
+                                    • {a.seriesCount} series
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[11px] font-medium border ${
+                                    !a.isHidden
+                                      ? "bg-accent-bg/30 text-accent border-accent/30"
+                                      : "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                  }`}
+                                >
+                                  {!a.isHidden ? "Visible" : "Hidden"}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <ToggleSwitch
+                                  checked={!a.isHidden}
+                                  disabled={togglingKey === `author:${a.name}`}
+                                  onChange={() =>
+                                    handleToggleVisibility("author", a.name, a.isHidden)
+                                  }
+                                  label={`Toggle visibility for author ${a.name}`}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* SECTION 3: BOOKS VISIBILITY */}
+              {(visibilityFilter === "all" || visibilityFilter === "books") && (
+                <div className="surface-card border border-border rounded overflow-hidden">
+                  <div className="p-4 bg-elevated/40 border-b border-border flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-accent" />
+                      <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-text">
+                        Individual Audiobooks ({filteredBooks.length})
+                      </h4>
+                    </div>
+                    <span className="text-[11px] font-mono text-subtle">
+                      Toggle individual audiobook visibility
+                    </span>
+                  </div>
+
+                  {filteredBooks.length === 0 ? (
+                    <div className="p-8 text-center text-xs font-mono text-subtle">
+                      No audiobooks found matching filter.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs font-mono">
+                        <thead className="bg-elevated/70 text-subtle border-b border-border">
+                          <tr>
+                            <th className="py-2.5 px-4 font-medium w-12">Cover</th>
+                            <th className="py-2.5 px-4 font-medium">Title & Author</th>
+                            <th className="py-2.5 px-4 font-medium">Series</th>
+                            <th className="py-2.5 px-4 font-medium text-center">Status</th>
+                            <th className="py-2.5 px-4 font-medium text-right">Visibility Toggle</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {filteredBooks.map((b) => (
+                            <tr key={b.id} className="hover:bg-elevated/40 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="w-10 h-10 rounded border border-border bg-surface overflow-hidden flex items-center justify-center shrink-0">
+                                  {b.coverR2Key ? (
+                                    <img
+                                      src={getBookCoverUrl(b as any)}
+                                      alt=""
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = "none";
+                                      }}
+                                    />
+                                  ) : (
+                                    <BookOpen className="w-4 h-4 text-muted" />
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="font-semibold text-text line-clamp-1">
+                                  {b.title}
+                                </div>
+                                <div className="text-muted text-[11px] line-clamp-1">
+                                  By {b.author}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4">
+                                {b.series ? (
+                                  <span className="px-1.5 py-0.5 rounded bg-elevated border border-border text-[11px] text-accent">
+                                    {b.series}
+                                  </span>
+                                ) : (
+                                  <span className="text-subtle text-[11px]">—</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[11px] font-medium border ${
+                                    !b.isHidden
+                                      ? "bg-accent-bg/30 text-accent border-accent/30"
+                                      : b.hiddenReason === "direct"
+                                        ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
+                                        : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                                  }`}
+                                >
+                                  {!b.isHidden
+                                    ? "Visible"
+                                    : b.hiddenReason === "series"
+                                      ? "Series Hidden"
+                                      : b.hiddenReason === "author"
+                                        ? "Author Hidden"
+                                        : "Hidden Directly"}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <ToggleSwitch
+                                  checked={!b.isHidden}
+                                  disabled={togglingKey === `book:${b.id}`}
+                                  onChange={() =>
+                                    handleToggleVisibility("book", b.id, b.isHidden)
+                                  }
+                                  label={`Toggle visibility for ${b.title}`}
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

@@ -12,6 +12,14 @@ import * as schema from "../db/schema";
 import { scanDriveLibrary } from "../drive/scanner";
 import { evictLruBooks, getActiveShelfStatus } from "../shelf/active-shelf";
 import type { Env } from "../types";
+import {
+  getBookHiddenStatus,
+  getVisibility,
+  isAuthorHidden,
+  isSeriesHidden,
+  setVisibilityRule,
+} from "./visibility";
+import type { AdminVisibilityResponse } from "@audioneko/shared";
 
 export const adminRoutes = new Hono<{
   Bindings: Env;
@@ -582,3 +590,135 @@ adminRoutes.patch("/books/:id", requireAuth, requireAdmin, async (c) => {
 
   return c.json({ success: true, book: updatedBooks[0] });
 });
+
+/**
+ * Admin: Get visibility status for all books, series, and authors
+ */
+adminRoutes.get("/visibility", requireAuth, requireAdmin, async (c) => {
+  const db = createDb(c.env.DB);
+  const visibility = await getVisibility(c.env);
+
+  const allBooks = await db
+    .select({
+      id: schema.books.id,
+      title: schema.books.title,
+      author: schema.books.author,
+      seriesId: schema.books.seriesId,
+      seriesIndex: schema.books.seriesIndex,
+      coverR2Key: schema.books.coverR2Key,
+      seriesName: schema.series.name,
+    })
+    .from(schema.books)
+    .leftJoin(schema.series, eq(schema.books.seriesId, schema.series.id))
+    .orderBy(asc(schema.books.title));
+
+  const allSeries = await db.select().from(schema.series).orderBy(asc(schema.series.name));
+
+  // Compute books with visibility
+  const booksWithVisibility = allBooks.map((b) => {
+    const status = getBookHiddenStatus(b, visibility);
+    return {
+      id: b.id,
+      title: b.title,
+      author: b.author,
+      series: b.seriesName || undefined,
+      coverR2Key: b.coverR2Key,
+      isHidden: status.isHidden,
+      hiddenReason: status.reason,
+    };
+  });
+
+  // Series map to calculate book counts and primary author
+  const seriesMap = new Map<
+    string,
+    { id: string; name: string; bookCount: number; primaryAuthor: string }
+  >();
+  for (const s of allSeries) {
+    seriesMap.set(s.name.toLowerCase(), {
+      id: s.id,
+      name: s.name,
+      bookCount: 0,
+      primaryAuthor: "",
+    });
+  }
+
+  // Author map
+  const authorMap = new Map<string, { name: string; bookCount: number; seriesSet: Set<string> }>();
+
+  for (const b of allBooks) {
+    const aName = b.author?.trim() || "Unknown Author";
+    if (!authorMap.has(aName.toLowerCase())) {
+      authorMap.set(aName.toLowerCase(), {
+        name: aName,
+        bookCount: 0,
+        seriesSet: new Set(),
+      });
+    }
+    const aEntry = authorMap.get(aName.toLowerCase())!;
+    aEntry.bookCount++;
+    if (b.seriesName) {
+      aEntry.seriesSet.add(b.seriesName);
+      const sKey = b.seriesName.toLowerCase();
+      if (!seriesMap.has(sKey)) {
+        seriesMap.set(sKey, {
+          id: b.seriesId || sKey,
+          name: b.seriesName,
+          bookCount: 0,
+          primaryAuthor: b.author,
+        });
+      }
+      const sEntry = seriesMap.get(sKey)!;
+      sEntry.bookCount++;
+      if (!sEntry.primaryAuthor && b.author) {
+        sEntry.primaryAuthor = b.author;
+      }
+    }
+  }
+
+  const seriesWithVisibility = Array.from(seriesMap.values())
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      bookCount: s.bookCount,
+      primaryAuthor: s.primaryAuthor || "Unknown Author",
+      isHidden: isSeriesHidden(s.name, visibility) || isSeriesHidden(s.id, visibility),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const authorsWithVisibility = Array.from(authorMap.values())
+    .map((a) => ({
+      name: a.name,
+      bookCount: a.bookCount,
+      seriesCount: a.seriesSet.size,
+      isHidden: isAuthorHidden(a.name, visibility),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const response: AdminVisibilityResponse = {
+    visibility,
+    books: booksWithVisibility,
+    series: seriesWithVisibility,
+    authors: authorsWithVisibility,
+  };
+
+  return c.json(response);
+});
+
+/**
+ * Admin: Toggle visibility of a book, series, or author
+ */
+adminRoutes.post("/visibility/toggle", requireAuth, requireAdmin, async (c) => {
+  const body = await c.req.json<{
+    type: "book" | "series" | "author";
+    target: string;
+    hidden: boolean;
+  }>();
+
+  if (!body.type || !body.target || typeof body.hidden !== "boolean") {
+    return c.json({ error: "Invalid payload: type, target, and hidden required" }, 400);
+  }
+
+  const updatedVisibility = await setVisibilityRule(c.env, body.type, body.target, body.hidden);
+  return c.json({ success: true, visibility: updatedVisibility });
+});
+

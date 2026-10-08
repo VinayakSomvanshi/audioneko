@@ -4,6 +4,12 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { absRoutes } from "./abs/routes";
 import { adminRoutes } from "./admin/routes";
+import {
+  getBookHiddenStatus,
+  getVisibility,
+  isAuthorHidden,
+  isSeriesHidden,
+} from "./admin/visibility";
 import { createAuth } from "./auth";
 import { type AuthContextVariables, requireAdmin, requireAuth } from "./auth/middleware";
 import { inviteRoutes } from "./auth/routes";
@@ -188,6 +194,10 @@ app.on("HEAD", "/api/stream/:fileId", requireAuth, async (c) => {
 // Library Books API - Protected by requireAuth
 app.get("/api/books", requireAuth, async (c) => {
   const db = createDb(c.env.DB);
+  const user = c.get("user");
+  const includeHidden = c.req.query("includeHidden") === "true" && user?.role === "admin";
+  const visibility = await getVisibility(c.env);
+
   const allBooks = await db
     .select({
       id: schema.books.id,
@@ -211,10 +221,16 @@ app.get("/api/books", requireAuth, async (c) => {
     .from(schema.books)
     .leftJoin(schema.series, eq(schema.books.seriesId, schema.series.id));
 
-  const mapped = allBooks.map((b) => ({
-    ...b,
-    series: b.seriesName || undefined,
-  }));
+  const mapped = allBooks
+    .map((b) => ({
+      ...b,
+      series: b.seriesName || undefined,
+    }))
+    .filter((b) => {
+      if (includeHidden) return true;
+      return !getBookHiddenStatus(b, visibility).isHidden;
+    });
+
   return c.json({ books: mapped });
 });
 
@@ -224,6 +240,13 @@ app.get("/api/books/:id", requireAuth, async (c) => {
   const bookList = await db.select().from(schema.books).where(eq(schema.books.id, id)).limit(1);
 
   if (!bookList[0]) {
+    return c.json({ error: "Book not found" }, 404);
+  }
+
+  const user = c.get("user");
+  const isAdmin = user?.role === "admin";
+  const visibility = await getVisibility(c.env);
+  if (!isAdmin && getBookHiddenStatus(bookList[0], visibility).isHidden) {
     return c.json({ error: "Book not found" }, 404);
   }
 
@@ -279,6 +302,7 @@ app.get("/api/books/:id", requireAuth, async (c) => {
 // Series API: Returns all series with their books in chronological order - Protected by requireAuth
 app.get("/api/series", requireAuth, async (c) => {
   const db = createDb(c.env.DB);
+  const visibility = await getVisibility(c.env);
   const allSeries = await db.select().from(schema.series);
   const allBooks = await db
     .select({
@@ -312,6 +336,9 @@ app.get("/api/series", requireAuth, async (c) => {
   >();
 
   for (const s of allSeries) {
+    if (isSeriesHidden(s.name, visibility) || isSeriesHidden(s.id, visibility)) {
+      continue;
+    }
     seriesMap.set(s.id, {
       id: s.id,
       name: s.name,
@@ -324,6 +351,9 @@ app.get("/api/series", requireAuth, async (c) => {
   }
 
   for (const b of allBooks) {
+    if (getBookHiddenStatus(b, visibility).isHidden) {
+      continue;
+    }
     const mappedBook = { ...b, series: b.seriesName || undefined };
     if (b.seriesId && seriesMap.has(b.seriesId)) {
       const entry = seriesMap.get(b.seriesId)!;
@@ -351,6 +381,7 @@ app.get("/api/series", requireAuth, async (c) => {
 // Authors API: Returns all authors with their books and series information - Protected by requireAuth
 app.get("/api/authors", requireAuth, async (c) => {
   const db = createDb(c.env.DB);
+  const visibility = await getVisibility(c.env);
   const allBooks = await db
     .select({
       id: schema.books.id,
@@ -383,6 +414,12 @@ app.get("/api/authors", requireAuth, async (c) => {
 
   for (const b of allBooks) {
     const authorName = b.author?.trim() || "Unknown Author";
+    if (isAuthorHidden(authorName, visibility)) {
+      continue;
+    }
+    if (getBookHiddenStatus(b, visibility).isHidden) {
+      continue;
+    }
     const mappedBook = { ...b, series: b.seriesName || undefined };
     if (!authorMap.has(authorName)) {
       authorMap.set(authorName, {
@@ -404,28 +441,30 @@ app.get("/api/authors", requireAuth, async (c) => {
   }
 
   const authorsList = await Promise.all(
-    Array.from(authorMap.values()).map(async (a) => {
-      a.seriesCount = a.seriesNames.length;
-      // Sort books: first by series name, then by seriesIndex, then title
-      a.books.sort((x, y) => {
-        if (x.seriesName && y.seriesName && x.seriesName === y.seriesName) {
-          return (x.seriesIndex ?? 9999) - (y.seriesIndex ?? 9999);
-        }
-        if (x.seriesName && !y.seriesName) return -1;
-        if (!x.seriesName && y.seriesName) return 1;
-        return x.title.localeCompare(y.title);
-      });
+    Array.from(authorMap.values())
+      .filter((a) => a.books.length > 0)
+      .map(async (a) => {
+        a.seriesCount = a.seriesNames.length;
+        // Sort books: first by series name, then by seriesIndex, then title
+        a.books.sort((x, y) => {
+          if (x.seriesName && y.seriesName && x.seriesName === y.seriesName) {
+            return (x.seriesIndex ?? 9999) - (y.seriesIndex ?? 9999);
+          }
+          if (x.seriesName && !y.seriesName) return -1;
+          if (!x.seriesName && y.seriesName) return 1;
+          return x.title.localeCompare(y.title);
+        });
 
-      const meta = await enrichAuthorMetadata(a.name, c.env);
-      return {
-        ...a,
-        photoUrl: meta.photoUrl,
-        bio: meta.bio,
-        birthDate: meta.birthDate,
-        topWork: meta.topWork,
-        openLibraryKey: meta.openLibraryKey,
-      };
-    }),
+        const meta = await enrichAuthorMetadata(a.name, c.env);
+        return {
+          ...a,
+          photoUrl: meta.photoUrl,
+          bio: meta.bio,
+          birthDate: meta.birthDate,
+          topWork: meta.topWork,
+          openLibraryKey: meta.openLibraryKey,
+        };
+      }),
   );
 
   authorsList.sort((a, b) => a.name.localeCompare(b.name));
