@@ -5,21 +5,32 @@
  */
 
 const KNOWN_AUTHOR_PHOTOS: Record<string, string> = {
-  "ali hazelwood": "https://covers.openlibrary.org/a/olid/OL9096427A-M.jpg",
-  "elsie silver": "https://covers.openlibrary.org/a/olid/OL10103214A-M.jpg",
+  "ali hazelwood":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Ali_Hazelwood_2025_Texas_Book_Festival.jpg/500px-Ali_Hazelwood_2025_Texas_Book_Festival.jpg",
+  "elsie silver":
+    "https://images.squarespace-cdn.com/content/v1/6904ff34eb46bd478b74d219/a96d7cb6-21f6-444f-ad98-0934e52c5b4b/194A1682.jpg",
   "krista ritchie":
+    "https://static.wixstatic.com/media/bf6fdf_9e881b463379418d95688c942acfbf95~mv2.jpg/v1/fill/w_488,h_524,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/Krista%20and%20Becca%20-%20Author%20Photo%202%20-%20Square.jpg",
+  "becca ritchie":
     "https://static.wixstatic.com/media/bf6fdf_9e881b463379418d95688c942acfbf95~mv2.jpg/v1/fill/w_488,h_524,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/Krista%20and%20Becca%20-%20Author%20Photo%202%20-%20Square.jpg",
   "krista ritchie & becca ritchie":
     "https://static.wixstatic.com/media/bf6fdf_9e881b463379418d95688c942acfbf95~mv2.jpg/v1/fill/w_488,h_524,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/Krista%20and%20Becca%20-%20Author%20Photo%202%20-%20Square.jpg",
   "lana ferguson": "https://freshfiction.com/images/authors/48886.jpeg",
-  "liz tomforde": "https://covers.openlibrary.org/a/olid/OL10324088A-M.jpg",
-  "meghan quinn": "https://images.gr-assets.com/authors/1778858370p8/7360513.jpg",
-  "rebecca yarros": "https://covers.openlibrary.org/a/olid/OL7825177A-M.jpg",
-  "rebecca yaros": "https://covers.openlibrary.org/a/olid/OL7825177A-M.jpg",
+  "liz tomforde": "https://static.showit.co/1200/LeiNY5tERxiHZOKslq26Xw/214378/img_1283.jpg",
+  "meghan quinn":
+    "https://authormeghanquinn.com/cdn/shop/files/mq_1200x628_9d5d22dd-2ba3-4ea6-8993-24d829ff4ed3.png",
+  "pierce brown":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Pierce_Brown_by_Gage_Skidmore.jpg/500px-Pierce_Brown_by_Gage_Skidmore.jpg",
+  "rebecca yarros":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/NBF2024-rebecca-yarros.jpg/500px-NBF2024-rebecca-yarros.jpg",
+  "rebecca yaros":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/NBF2024-rebecca-yarros.jpg/500px-NBF2024-rebecca-yarros.jpg",
   "rosie danan":
     "https://images.squarespace-cdn.com/content/v1/5cdc348cebfc7f30af34bbe6/2d91a297-2d29-4f0b-afef-036cf45e6a71/Rosie_+Danan_portraits_21.jpg",
-  "sarah j. maas": "https://covers.openlibrary.org/a/olid/OL7115219A-M.jpg",
-  "sarah j maas": "https://covers.openlibrary.org/a/olid/OL7115219A-M.jpg",
+  "sarah j. maas":
+    "https://sarahjmaas.com/wp-content/uploads/2025/03/240117_Today_SarahJMaas_216_resized.jpg",
+  "sarah j maas":
+    "https://sarahjmaas.com/wp-content/uploads/2025/03/240117_Today_SarahJMaas_216_resized.jpg",
 };
 
 /**

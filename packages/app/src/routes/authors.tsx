@@ -75,9 +75,16 @@ export function AuthorsPage() {
 
   const [selectedAuthorName, setSelectedAuthorName] = useState<string | null>(authorParamFromUrl);
 
-  // Synchronize state when route location changes
+  // Synchronize state and reset scroll position when route location changes
   useEffect(() => {
     setSelectedAuthorName(authorParamFromUrl);
+    const main = document.getElementById("main-scroll-container");
+    if (main) {
+      main.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
   }, [authorParamFromUrl]);
 
   // Direct window popstate listener for instant swipe gesture responsiveness
@@ -159,6 +166,13 @@ export function AuthorsPage() {
 
   const selectAuthor = (name: string | null) => {
     setSelectedAuthorName(name);
+    const main = document.getElementById("main-scroll-container");
+    if (main) {
+      main.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
     navigate({
       to: "/authors",
       search: name ? { author: name } : {},
@@ -166,6 +180,13 @@ export function AuthorsPage() {
   };
 
   const handleBackToAllAuthors = () => {
+    const main = document.getElementById("main-scroll-container");
+    if (main) {
+      main.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
     if (typeof window !== "undefined" && window.history.length > 1) {
       window.history.back();
     } else {

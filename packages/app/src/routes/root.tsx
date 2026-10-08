@@ -1,5 +1,5 @@
 import { Outlet, useLocation, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BottomNav } from "../components/layout/BottomNav";
 import { Header } from "../components/layout/Header";
 import { MobileNavDrawer } from "../components/layout/MobileNavDrawer";
@@ -19,6 +19,7 @@ export function RootLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isLoading } = useCurrentUser();
+  const mainScrollRef = useRef<HTMLElement>(null);
 
   // Safeguard: If landing with invite ?token= on root or library, redirect to /join.
   // Never redirect when on /login or when query indicates a password reset.
@@ -56,6 +57,16 @@ export function RootLayout() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Scroll Restoration: Reset main content scroll container and window on route change or search param change
+  useEffect(() => {
+    if (mainScrollRef.current) {
+      mainScrollRef.current.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+  }, [location.pathname, location.search]);
 
   // For unauthenticated users on /login or /join: render clean auth view without library navigation & miniplayer
   const isAuthPage = location.pathname === "/login" || location.pathname === "/join";
@@ -101,7 +112,11 @@ export function RootLayout() {
       <div className="flex-1 flex overflow-hidden min-h-0">
         <Sidebar />
 
-        <main className="flex-1 overflow-y-auto min-h-0 p-3.5 sm:p-4 md:p-8 pb-12 sm:pb-16">
+        <main
+          ref={mainScrollRef}
+          id="main-scroll-container"
+          className="flex-1 overflow-y-auto min-h-0 p-3.5 sm:p-4 md:p-8 pb-12 sm:pb-16"
+        >
           <div className="max-w-7xl mx-auto">
             <Outlet />
           </div>

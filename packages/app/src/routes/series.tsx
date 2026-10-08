@@ -36,9 +36,16 @@ export function SeriesPage() {
 
   const [selectedSeriesName, setSelectedSeriesName] = useState<string | null>(seriesParamFromUrl);
 
-  // Synchronize state when route location changes
+  // Synchronize state and reset scroll position when route location changes
   useEffect(() => {
     setSelectedSeriesName(seriesParamFromUrl);
+    const main = document.getElementById("main-scroll-container");
+    if (main) {
+      main.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
   }, [seriesParamFromUrl]);
 
   // Direct window popstate listener for instant swipe gesture responsiveness
@@ -116,6 +123,13 @@ export function SeriesPage() {
 
   const selectSeries = (name: string | null) => {
     setSelectedSeriesName(name);
+    const main = document.getElementById("main-scroll-container");
+    if (main) {
+      main.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
     navigate({
       to: "/series",
       search: name ? { series: name } : {},
@@ -123,6 +137,13 @@ export function SeriesPage() {
   };
 
   const handleBackToAllSeries = () => {
+    const main = document.getElementById("main-scroll-container");
+    if (main) {
+      main.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    }
     if (typeof window !== "undefined" && window.history.length > 1) {
       window.history.back();
     } else {

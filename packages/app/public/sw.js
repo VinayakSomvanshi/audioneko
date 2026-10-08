@@ -1,5 +1,6 @@
-// audioneko Service Worker — Offline Range Streaming & PWA Shell Cache
+// audioneko Service Worker — Offline Range Streaming, Image Cache & PWA Shell
 const CACHE_NAME = "audioneko-shell-v1";
+const IMAGE_CACHE_NAME = "audioneko-images-v1";
 const OPFS_ROOT_DIR = "audioneko_books";
 const AUDIO_FILE_NAME = "audio.bin";
 
@@ -28,7 +29,11 @@ self.addEventListener("activate", (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))),
+        Promise.all(
+          keys
+            .filter((key) => key !== CACHE_NAME && key !== IMAGE_CACHE_NAME)
+            .map((key) => caches.delete(key)),
+        ),
       )
       .then(() => self.clients.claim()),
   );
@@ -137,40 +142,65 @@ async function handleAudioStreamFetch(request) {
 }
 
 /**
- * Intercepts cover image requests and serves from OPFS if downloaded.
+ * Intercepts image and book cover requests (Covers, author portraits, artwork).
+ * Uses Cache-First with Network fallback and automatic CacheStorage insertion.
+ * Falls back to OPFS offline cover if network is unavailable.
  */
-async function handleCoverFetch(request) {
+async function handleImageFetch(request) {
+  const cache = await caches.open(IMAGE_CACHE_NAME);
+
+  // 1. Check Image Cache first (Instant load from CacheStorage)
   try {
-    const netRes = await fetch(request);
-    if (netRes && (netRes.status === 200 || netRes.status === 302 || netRes.status === 304)) {
-      return netRes;
+    const cachedResponse = await cache.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
     }
-  } catch (_e) {
-    // Network failed, fall through to OPFS
+  } catch (_cacheReadErr) {
+    // Continue to network
   }
 
+  // 2. Fetch from Network and cache
+  try {
+    const netRes = await fetch(request);
+    if (netRes && (netRes.status === 200 || netRes.status === 304 || netRes.type === "opaque")) {
+      // Put in image cache (cloned)
+      cache.put(request, netRes.clone()).catch(() => {});
+      return netRes;
+    }
+    if (netRes && (netRes.status === 301 || netRes.status === 302)) {
+      return netRes;
+    }
+  } catch (_netErr) {
+    // Network failed or offline
+  }
+
+  // 3. Fallback to OPFS offline cover if it's a book cover request
   try {
     const url = new URL(request.url);
-    const bookId = url.pathname.slice("/api/covers/".length).split("?")[0];
-    if (navigator.storage && navigator.storage.getDirectory) {
-      const root = await navigator.storage.getDirectory();
-      const booksDir = await root.getDirectoryHandle(OPFS_ROOT_DIR);
-      const bookDir = await booksDir.getDirectoryHandle(bookId);
-      const coverHandle = await bookDir.getFileHandle("cover.jpg");
-      const coverFile = await coverHandle.getFile();
-      if (coverFile.size > 0) {
-        return new Response(coverFile, {
-          status: 200,
-          headers: {
-            "Content-Type": coverFile.type || "image/jpeg",
-            "Cache-Control": "public, max-age=604800",
-            "X-Audioneko-Source": "OPFS-Offline-Cover",
-          },
-        });
+    if (url.pathname.startsWith("/api/covers/")) {
+      const bookId = url.pathname.slice("/api/covers/".length).split("?")[0];
+      if (navigator.storage && navigator.storage.getDirectory) {
+        const root = await navigator.storage.getDirectory();
+        const booksDir = await root.getDirectoryHandle(OPFS_ROOT_DIR);
+        const bookDir = await booksDir.getDirectoryHandle(bookId);
+        const coverHandle = await bookDir.getFileHandle("cover.jpg");
+        const coverFile = await coverHandle.getFile();
+        if (coverFile.size > 0) {
+          const opfsRes = new Response(coverFile, {
+            status: 200,
+            headers: {
+              "Content-Type": coverFile.type || "image/jpeg",
+              "Cache-Control": "public, max-age=31536000",
+              "X-Audioneko-Source": "OPFS-Offline-Cover",
+            },
+          });
+          cache.put(request, opfsRes.clone()).catch(() => {});
+          return opfsRes;
+        }
       }
     }
-  } catch (_err) {
-    // Fallback
+  } catch (_opfsErr) {
+    // OPFS cover not available
   }
 
   return new Response(null, { status: 404 });
@@ -185,9 +215,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // 2. Cover image interceptor with OPFS offline fallback
-  if (url.pathname.startsWith("/api/covers/")) {
-    event.respondWith(handleCoverFetch(event.request));
+  // 2. Image and Cover interceptor (Covers, author portraits, artwork)
+  const isImageRequest =
+    url.pathname.startsWith("/api/covers/") ||
+    event.request.destination === "image" ||
+    /\.(jpg|jpeg|png|webp|svg|gif|avif)$/i.test(url.pathname);
+
+  if (isImageRequest && event.request.method === "GET") {
+    event.respondWith(handleImageFetch(event.request));
     return;
   }
 
