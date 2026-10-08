@@ -3,21 +3,19 @@ import {
   AlertCircle,
   ArrowLeft,
   BookOpen,
-  CheckCircle2,
   HardDriveDownload,
   Pause,
   Play,
-  RotateCcw,
   Search,
-  SlidersHorizontal,
   Trash2,
   X,
+  Zap,
 } from "lucide-react";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BlinkingNeko } from "../components/icons/NekoIcon";
 import { useAudio } from "../context/audio-context";
 import { getBookCoverUrl } from "../lib/covers";
-import { type DownloadTask, useDownloads } from "../lib/download-manager";
+import { useDownloads } from "../lib/download-manager";
 import {
   type OfflineBookMeta,
   type StorageEstimateResult,
@@ -28,6 +26,11 @@ import {
   getStorageEstimate,
   isOpfsSupported,
 } from "../lib/opfs";
+import {
+  type PrecacheNetworkPreference,
+  getPredictivePrecacheSetting,
+  setPredictivePrecacheSetting,
+} from "../lib/predictive-precache";
 
 function formatBytes(bytes: number): string {
   if (!bytes || bytes <= 0) return "0 B";
@@ -138,6 +141,14 @@ export function OfflinePage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<"recent" | "title" | "size" | "duration">("recent");
+  const [precacheSetting, setPrecacheSettingState] = useState<PrecacheNetworkPreference>(
+    getPredictivePrecacheSetting(),
+  );
+
+  const handleUpdatePrecacheSetting = (val: PrecacheNetworkPreference) => {
+    setPredictivePrecacheSetting(val);
+    setPrecacheSettingState(val);
+  };
 
   const supported = isOpfsSupported();
 
@@ -284,6 +295,90 @@ export function OfflinePage() {
           </div>
         )}
       </div>
+
+      {/* Predictive Offline Pre-caching Control Banner */}
+      {supported && (
+        <div className="surface-card border border-border rounded-xl p-4 sm:p-5 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-border pb-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div className="p-2 rounded-lg bg-accent-bg border border-accent/30 text-accent shrink-0 mt-0.5">
+                <Zap className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-sm font-semibold text-text tracking-tight">
+                    Predictive Offline Pre-caching
+                  </h2>
+                  <span
+                    className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                      precacheSetting === "all"
+                        ? "bg-accent-bg text-accent border-accent/40 font-bold"
+                        : precacheSetting === "wifi"
+                          ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                          : "bg-elevated text-muted border-border"
+                    }`}
+                  >
+                    {precacheSetting === "all"
+                      ? "Cellular & Wi-Fi Active"
+                      : precacheSetting === "wifi"
+                        ? "Wi-Fi Only"
+                        : "Disabled"}
+                  </span>
+                </div>
+                <p className="text-xs font-mono text-muted mt-0.5">
+                  Proactively downloads currently playing audiobooks in the background for
+                  zero-stutter playback anywhere.
+                </p>
+              </div>
+            </div>
+
+            {/* Network mode selector pills */}
+            <div className="flex items-center gap-1 bg-elevated p-1 rounded-lg border border-border shrink-0 text-xs font-mono self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => handleUpdatePrecacheSetting("all")}
+                className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  precacheSetting === "all"
+                    ? "bg-accent text-bg font-bold shadow-xs"
+                    : "text-muted hover:text-text"
+                }`}
+                title="Precache on both mobile cellular data and Wi-Fi"
+              >
+                Cellular & Wi-Fi
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUpdatePrecacheSetting("wifi")}
+                className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  precacheSetting === "wifi"
+                    ? "bg-accent text-bg font-bold shadow-xs"
+                    : "text-muted hover:text-text"
+                }`}
+                title="Only precache when connected to Wi-Fi"
+              >
+                Wi-Fi Only
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUpdatePrecacheSetting("off")}
+                className={`px-2.5 py-1 rounded transition-colors cursor-pointer ${
+                  precacheSetting === "off"
+                    ? "bg-accent text-bg font-bold shadow-xs"
+                    : "text-muted hover:text-text"
+                }`}
+                title="Disable automatic predictive precaching"
+              >
+                Off
+              </button>
+            </div>
+          </div>
+
+          <p className="text-[11px] font-mono text-subtle">
+            When you play an audiobook, audioneko pre-caches audio files to OPFS so subways,
+            flights, and cellular dead zones never pause your story.
+          </p>
+        </div>
+      )}
 
       {/* Active & Queued Downloads Section */}
       {supported && activeTasks.length > 0 && (

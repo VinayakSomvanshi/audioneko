@@ -1,4 +1,8 @@
-import type { Book, BookProgressRecord } from "@audioneko/shared";
+import {
+  type Book,
+  type BookProgressRecord,
+  isPlaybackCompleted,
+} from "@audioneko/shared";
 
 /**
  * audioneko: StoryGraph & Goodreads CSV Sync Engine
@@ -90,7 +94,12 @@ export function exportGoodreadsCsv(
 
   for (const book of books) {
     const progress = progressMap[book.id];
-    const isFinished = progress?.isFinished || false;
+    const isFinished = progress
+      ? isPlaybackCompleted(
+          progress.currentTime,
+          progress.duration || book.durationSeconds,
+        )
+      : false;
     const isStarted = progress && progress.currentTime > 60;
 
     let exclusiveShelf = "to-read";
@@ -121,7 +130,7 @@ export function exportGoodreadsCsv(
       "", // Original Publication Year
       escapeCsv(dateRead),
       escapeCsv(dateAdded),
-      escapeCsv(book.series ? book.series.name : ""), // Bookshelves
+      escapeCsv(book.series ? String(book.series) : ""), // Bookshelves
       "", // Bookshelves with positions
       escapeCsv(exclusiveShelf),
       "", // My Review
@@ -161,7 +170,12 @@ export function exportStoryGraphCsv(
 
   for (const book of books) {
     const progress = progressMap[book.id];
-    const isFinished = progress?.isFinished || false;
+    const isFinished = progress
+      ? isPlaybackCompleted(
+          progress.currentTime,
+          progress.duration || book.durationSeconds,
+        )
+      : false;
     const isStarted = progress && progress.currentTime > 60;
 
     let readStatus = "to-read";
@@ -185,7 +199,7 @@ export function exportStoryGraphCsv(
       escapeCsv(lastDateRead),
       escapeCsv(isFinished ? 5 : ""),
       "",
-      escapeCsv(book.series ? `Series: ${book.series.name}` : ""),
+      escapeCsv(book.series ? `Series: ${book.series}` : ""),
     ];
 
     rows.push(row.join(","));
@@ -260,7 +274,9 @@ export function parseReadingCsv(csvContent: string): ParsedCsvRecord[] {
   const rows = parseCsvRows(csvContent);
   if (rows.length < 2) return [];
 
-  const rawHeaders = rows[0].map((h) => h.toLowerCase().trim());
+  const headerRow = rows[0];
+  if (!headerRow) return [];
+  const rawHeaders = headerRow.map((h) => h.toLowerCase().trim());
   const headerMap: Record<string, number> = {};
   rawHeaders.forEach((h, idx) => {
     headerMap[h] = idx;
@@ -274,11 +290,12 @@ export function parseReadingCsv(csvContent: string): ParsedCsvRecord[] {
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
-    if (row.length === 0) continue;
+    if (!row || row.length === 0) continue;
+    const currentRow = row;
 
     const rowObj: Record<string, string> = {};
     rawHeaders.forEach((h, idx) => {
-      rowObj[h] = row[idx] || "";
+      rowObj[h] = currentRow[idx] || "";
     });
 
     let title = "";
@@ -312,8 +329,8 @@ export function parseReadingCsv(csvContent: string): ParsedCsvRecord[] {
       if (r > 0) rating = r;
     } else {
       // Generic fallback
-      title = rowObj.title || rowObj.book || row[0] || "";
-      author = rowObj.author || rowObj.authors || row[1] || "";
+      title = rowObj.title || rowObj.book || currentRow[0] || "";
+      author = rowObj.author || rowObj.authors || currentRow[1] || "";
       const status = (rowObj.status || "").toLowerCase();
       if (status.includes("read")) readStatus = "read";
       else if (status.includes("current")) readStatus = "currently-reading";

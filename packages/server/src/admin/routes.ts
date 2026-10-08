@@ -1,4 +1,4 @@
-import { count, countDistinct, desc, eq, sum } from "drizzle-orm";
+import { asc, count, countDistinct, desc, eq, like, or, sum } from "drizzle-orm";
 import { Hono } from "hono";
 import { deleteInvite } from "../auth/invites";
 import {
@@ -420,4 +420,165 @@ adminRoutes.delete("/users/:id", requireAuth, requireAdmin, async (c) => {
     deletedUserId: targetUserId,
     deletedEmail: targetUser.email,
   });
+});
+
+/**
+ * Admin: Get library catalog books with metadata & search filter
+ */
+adminRoutes.get("/books", requireAuth, requireAdmin, async (c) => {
+  const db = createDb(c.env.DB);
+  const q = c.req.query("q")?.trim() || "";
+
+  const baseQuery = db
+    .select({
+      id: schema.books.id,
+      driveFolderId: schema.books.driveFolderId,
+      title: schema.books.title,
+      author: schema.books.author,
+      narrator: schema.books.narrator,
+      seriesId: schema.books.seriesId,
+      seriesName: schema.series.name,
+      seriesIndex: schema.books.seriesIndex,
+      description: schema.books.description,
+      coverR2Key: schema.books.coverR2Key,
+      durationSeconds: schema.books.durationSeconds,
+      publishedYear: schema.books.publishedYear,
+      format: schema.books.format,
+      fileSizeBytes: schema.books.fileSizeBytes,
+      isActiveShelf: schema.books.isActiveShelf,
+      createdAt: schema.books.createdAt,
+      updatedAt: schema.books.updatedAt,
+    })
+    .from(schema.books)
+    .leftJoin(schema.series, eq(schema.books.seriesId, schema.series.id));
+
+  const results = q
+    ? await baseQuery
+        .where(
+          or(
+            like(schema.books.title, `%${q}%`),
+            like(schema.books.author, `%${q}%`),
+            like(schema.books.narrator, `%${q}%`),
+          ),
+        )
+        .orderBy(asc(schema.books.title))
+        .limit(100)
+    : await baseQuery.orderBy(asc(schema.books.title)).limit(100);
+
+  return c.json({ books: results });
+});
+
+/**
+ * Admin: Edit and fix metadata for a specific audiobook
+ */
+adminRoutes.patch("/books/:id", requireAuth, requireAdmin, async (c) => {
+  const bookId = c.req.param("id");
+  const body = await c.req.json<{
+    title?: string;
+    author?: string;
+    narrator?: string | null;
+    seriesName?: string | null;
+    seriesIndex?: number | null;
+    publishedYear?: number | null;
+    description?: string | null;
+    format?: "m4b" | "mp3" | "m4a" | "flac" | "opus";
+  }>();
+
+  const db = createDb(c.env.DB);
+
+  // Check if target book exists
+  const existingBooks = await db
+    .select()
+    .from(schema.books)
+    .where(eq(schema.books.id, bookId))
+    .limit(1);
+
+  const existingBook = existingBooks[0];
+  if (!existingBook) {
+    return c.json({ error: "Audiobook not found" }, 404);
+  }
+
+  const updates: Partial<typeof schema.books.$inferInsert> = {
+    updatedAt: Math.floor(Date.now() / 1000),
+  };
+
+  if (body.title?.trim()) {
+    updates.title = body.title.trim();
+  }
+  if (body.author?.trim()) {
+    updates.author = body.author.trim();
+  }
+  if (body.narrator !== undefined) {
+    updates.narrator = body.narrator?.trim() || null;
+  }
+  if (body.description !== undefined) {
+    updates.description = body.description?.trim() || null;
+  }
+  if (body.publishedYear !== undefined) {
+    updates.publishedYear =
+      body.publishedYear && body.publishedYear > 0 ? Number(body.publishedYear) : null;
+  }
+  if (body.format && ["m4b", "mp3", "m4a", "flac", "opus"].includes(body.format)) {
+    updates.format = body.format;
+  }
+
+  // Handle series association
+  if (body.seriesName !== undefined) {
+    const trimmedSeries = body.seriesName?.trim() || "";
+    if (trimmedSeries) {
+      const existingSeries = await db
+        .select()
+        .from(schema.series)
+        .where(eq(schema.series.name, trimmedSeries))
+        .limit(1);
+
+      let targetSeriesId: string;
+      if (existingSeries[0]) {
+        targetSeriesId = existingSeries[0].id;
+      } else {
+        targetSeriesId = `series_${crypto.randomUUID()}`;
+        await db.insert(schema.series).values({
+          id: targetSeriesId,
+          name: trimmedSeries,
+          bookCount: 1,
+        });
+      }
+      updates.seriesId = targetSeriesId;
+      updates.seriesIndex =
+        body.seriesIndex !== undefined && body.seriesIndex !== null
+          ? Number(body.seriesIndex)
+          : null;
+    } else {
+      updates.seriesId = null;
+      updates.seriesIndex = null;
+    }
+  } else if (body.seriesIndex !== undefined) {
+    updates.seriesIndex = body.seriesIndex !== null ? Number(body.seriesIndex) : null;
+  }
+
+  await db.update(schema.books).set(updates).where(eq(schema.books.id, bookId));
+
+  const updatedBooks = await db
+    .select({
+      id: schema.books.id,
+      title: schema.books.title,
+      author: schema.books.author,
+      narrator: schema.books.narrator,
+      seriesId: schema.books.seriesId,
+      seriesName: schema.series.name,
+      seriesIndex: schema.books.seriesIndex,
+      description: schema.books.description,
+      coverR2Key: schema.books.coverR2Key,
+      durationSeconds: schema.books.durationSeconds,
+      publishedYear: schema.books.publishedYear,
+      format: schema.books.format,
+      fileSizeBytes: schema.books.fileSizeBytes,
+      updatedAt: schema.books.updatedAt,
+    })
+    .from(schema.books)
+    .leftJoin(schema.series, eq(schema.books.seriesId, schema.series.id))
+    .where(eq(schema.books.id, bookId))
+    .limit(1);
+
+  return c.json({ success: true, book: updatedBooks[0] });
 });

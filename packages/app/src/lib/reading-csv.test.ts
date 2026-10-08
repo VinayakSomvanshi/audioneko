@@ -10,27 +10,29 @@ import {
 const mockBooks: Book[] = [
   {
     id: "book-1",
-    driveFileId: "drive-1",
+    driveFolderId: "drive-folder-1",
     title: "Project Hail Mary",
     author: "Andy Weir",
     narrator: "Ray Porter",
-    duration: 57600,
-    fileSize: 500000000,
-    mimeType: "audio/mp4",
-    path: "/books/project-hail-mary.m4b",
-    updatedAt: 1700000000000,
+    durationSeconds: 57600,
+    fileSizeBytes: 500000000,
+    format: "m4b",
+    isActiveShelf: true,
+    createdAt: 1700000000,
+    updatedAt: 1700000000,
   },
   {
     id: "book-2",
-    driveFileId: "drive-2",
+    driveFolderId: "drive-folder-2",
     title: "The Way of Kings: The Stormlight Archive",
     author: "Brandon Sanderson",
     narrator: "Michael Kramer, Kate Reading",
-    duration: 162000,
-    fileSize: 1200000000,
-    mimeType: "audio/mp4",
-    path: "/books/way-of-kings.m4b",
-    updatedAt: 1700000000000,
+    durationSeconds: 162000,
+    fileSizeBytes: 1200000000,
+    format: "m4b",
+    isActiveShelf: true,
+    createdAt: 1700000000,
+    updatedAt: 1700000000,
   },
 ];
 
@@ -38,20 +40,22 @@ const mockProgress: Record<string, BookProgressRecord> = {
   "book-1": {
     bookId: "book-1",
     currentTime: 57600,
-    progress: 1.0,
-    isFinished: true,
-    lastPlayedAt: 1705000000000,
-    deviceInfo: "Test Device",
-    syncVersion: 1,
+    duration: 57600,
+    playbackRate: 1.0,
+    isPlaying: false,
+    hlc: { timeMs: 1705000000000, counter: 0, nodeId: "node-1" },
+    deviceId: "dev-1",
+    updatedAt: 1705000000,
   },
   "book-2": {
     bookId: "book-2",
     currentTime: 40000,
-    progress: 0.247,
-    isFinished: false,
-    lastPlayedAt: 1706000000000,
-    deviceInfo: "Test Device",
-    syncVersion: 2,
+    duration: 162000,
+    playbackRate: 1.0,
+    isPlaying: false,
+    hlc: { timeMs: 1706000000000, counter: 0, nodeId: "node-1" },
+    deviceId: "dev-1",
+    updatedAt: 1706000000,
   },
 };
 
@@ -82,14 +86,14 @@ describe("Reading CSV Export & Import Engine", () => {
 `;
     const records = parseReadingCsv(sampleCsv);
     expect(records.length).toBe(2);
-    expect(records[0].title).toBe("Project Hail Mary");
-    expect(records[0].author).toBe("Andy Weir");
-    expect(records[0].readStatus).toBe("read");
-    expect(records[0].rating).toBe(5);
-    expect(records[0].source).toBe("goodreads");
+    expect(records[0]!.title).toBe("Project Hail Mary");
+    expect(records[0]!.author).toBe("Andy Weir");
+    expect(records[0]!.readStatus).toBe("read");
+    expect(records[0]!.rating).toBe(5);
+    expect(records[0]!.source).toBe("goodreads");
 
-    expect(records[1].title).toBe("Dune");
-    expect(records[1].readStatus).toBe("to-read");
+    expect(records[1]!.title).toBe("Dune");
+    expect(records[1]!.readStatus).toBe("to-read");
   });
 
   it("parses StoryGraph CSV format with custom headers", () => {
@@ -98,10 +102,10 @@ describe("Reading CSV Export & Import Engine", () => {
 `;
     const records = parseReadingCsv(sgCsv);
     expect(records.length).toBe(1);
-    expect(records[0].title).toBe("The Way of Kings");
-    expect(records[0].author).toBe("Brandon Sanderson");
-    expect(records[0].readStatus).toBe("currently-reading");
-    expect(records[0].source).toBe("storygraph");
+    expect(records[0]!.title).toBe("The Way of Kings");
+    expect(records[0]!.author).toBe("Brandon Sanderson");
+    expect(records[0]!.readStatus).toBe("currently-reading");
+    expect(records[0]!.source).toBe("storygraph");
   });
 
   it("matches imported CSV records against library books fuzzy logic", () => {
@@ -132,9 +136,9 @@ describe("Reading CSV Export & Import Engine", () => {
 
     const matchResult = matchCsvWithLibrary(records, mockBooks);
     expect(matchResult.matched.length).toBe(2);
-    expect(matchResult.matched[0].book.id).toBe("book-1");
-    expect(matchResult.matched[1].book.id).toBe("book-2");
+    expect(matchResult.matched[0]!.book.id).toBe("book-1");
+    expect(matchResult.matched[1]!.book.id).toBe("book-2");
     expect(matchResult.unmatchedRecords.length).toBe(1);
-    expect(matchResult.unmatchedRecords[0].title).toBe("Nonexistent Sci-Fi Odyssey");
+    expect(matchResult.unmatchedRecords[0]!.title).toBe("Nonexistent Sci-Fi Odyssey");
   });
 });

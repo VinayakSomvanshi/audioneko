@@ -1,11 +1,9 @@
-import type { Book, BookProgressRecord } from "@audioneko/shared";
+import { type Book, type BookProgressRecord, isPlaybackCompleted } from "@audioneko/shared";
 import {
-  AlertCircle,
   BookCheck,
   CheckCircle2,
   Download,
   FileSpreadsheet,
-  FileText,
   Upload,
   X,
 } from "lucide-react";
@@ -42,10 +40,18 @@ export function CsvImportExportModal({
   if (!isOpen) return null;
 
   // Compute library stats
-  const finishedCount = books.filter((b) => progressMap[b.id]?.isFinished).length;
-  const inProgressCount = books.filter(
-    (b) => !progressMap[b.id]?.isFinished && (progressMap[b.id]?.currentTime || 0) > 60,
-  ).length;
+  const finishedCount = books.filter((b) => {
+    const p = progressMap[b.id];
+    return p ? isPlaybackCompleted(p.currentTime, p.duration || b.durationSeconds) : false;
+  }).length;
+  const inProgressCount = books.filter((b) => {
+    const p = progressMap[b.id];
+    return (
+      p &&
+      !isPlaybackCompleted(p.currentTime, p.duration || b.durationSeconds) &&
+      (p.currentTime || 0) > 60
+    );
+  }).length;
 
   const handleDownload = (format: "goodreads" | "storygraph") => {
     const csv =

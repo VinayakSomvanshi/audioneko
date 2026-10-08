@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { AlertCircle, CheckCircle2, KeyRound, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { NekoIcon } from "../components/icons/NekoIcon";
 

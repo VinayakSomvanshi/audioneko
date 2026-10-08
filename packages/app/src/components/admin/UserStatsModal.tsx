@@ -1,6 +1,5 @@
 import {
   BarChart2,
-  BookOpen,
   Bookmark,
   CheckCircle2,
   Clock,

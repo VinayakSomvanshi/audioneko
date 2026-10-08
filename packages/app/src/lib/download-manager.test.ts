@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type DownloadTask, downloadManager } from "./download-manager";
+import { downloadManager } from "./download-manager";
 import type { OfflineBookMeta } from "./opfs";
 
 describe("Download Manager Engine", () => {

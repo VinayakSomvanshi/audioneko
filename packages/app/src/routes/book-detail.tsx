@@ -5,13 +5,26 @@ import {
   isPlaybackCompleted,
   isPlaybackInProgress,
 } from "@audioneko/shared";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
-import { ArrowLeft, BookOpen, Check, ListMusic, Loader2, Play, RotateCcw, X } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  Check,
+  Edit3,
+  ListMusic,
+  Loader2,
+  Play,
+  RotateCcw,
+  X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
+import { MetadataFixerModal } from "../components/admin/MetadataFixerModal";
+import { AudioFidelityBadges } from "../components/audio/AudioFidelityBadges";
 import { BlinkingNeko } from "../components/icons/NekoIcon";
 import { DownloadButton } from "../components/storage/DownloadButton";
 import { useAudio } from "../context/audio-context";
+import { useCurrentUser } from "../lib/auth-client";
 import { getBookCoverUrl } from "../lib/covers";
 
 export function BookDetailPage() {
@@ -26,7 +39,10 @@ export function BookDetailPage() {
     resetProgress,
     currentTime,
   } = useAudio();
+  const queryClient = useQueryClient();
+  const { isAdmin } = useCurrentUser();
   const [showStartOverModal, setShowStartOverModal] = useState(false);
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
 
   // Close modal on Escape
   useEffect(() => {
@@ -388,9 +404,25 @@ export function BookDetailPage() {
 
             {/* Offline Download Button */}
             <DownloadButton book={book} />
+
+            {/* Admin: Fix Metadata Button */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowMetadataModal(true)}
+                className="px-3.5 sm:px-4 py-2.5 rounded border border-border bg-surface text-muted font-mono text-xs flex items-center gap-2 hover:bg-elevated hover:text-accent hover:border-accent/40 transition-colors cursor-pointer"
+                title="Admin: Fix metadata tags in database"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-accent" />
+                <span>Fix Metadata</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Audio Fidelity & Technical Specs Badges */}
+      <AudioFidelityBadges book={book} chapters={chapters} />
 
       {/* Chapters Section */}
       <div className="space-y-4">
@@ -531,6 +563,32 @@ export function BookDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Admin Metadata Fixer Modal */}
+      {isAdmin && showMetadataModal && (
+        <MetadataFixerModal
+          isOpen={showMetadataModal}
+          onClose={() => setShowMetadataModal(false)}
+          book={{
+            id: book.id,
+            title: book.title,
+            author: book.author,
+            narrator: book.narrator,
+            seriesName: book.series,
+            seriesIndex: book.seriesIndex,
+            publishedYear: book.publishedYear,
+            format: book.format,
+            description: book.description,
+            coverR2Key: book.coverR2Key,
+            durationSeconds: book.durationSeconds,
+          }}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["book", id] });
+            queryClient.invalidateQueries({ queryKey: ["books"] });
+            queryClient.invalidateQueries({ queryKey: ["library"] });
+          }}
+        />
       )}
     </div>
   );

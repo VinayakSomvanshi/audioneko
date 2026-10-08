@@ -5,12 +5,14 @@ import {
   Check,
   Copy,
   Edit2,
+  Edit3,
   FolderSync,
   KeyRound,
   Library,
   Loader2,
   Plus,
   RefreshCw,
+  Search,
   ShieldAlert,
   ShieldCheck,
   Trash2,
@@ -18,10 +20,15 @@ import {
   Users,
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import {
+  type EditableBookMetadata,
+  MetadataFixerModal,
+} from "../components/admin/MetadataFixerModal";
 import { ModifyUserModal } from "../components/admin/ModifyUserModal";
 import { StrictConfirmModal } from "../components/admin/StrictConfirmModal";
 import { UserStatsModal } from "../components/admin/UserStatsModal";
 import { useCurrentUser } from "../lib/auth-client";
+import { getBookCoverUrl } from "../lib/covers";
 
 interface InviteItem {
   id: string;
@@ -59,11 +66,17 @@ interface ScanResult {
 
 export function AdminDashboardPage() {
   const { user, isAdmin, isLoading: authLoading } = useCurrentUser();
-  const [activeTab, setActiveTab] = useState<"scanner" | "invites" | "users">("scanner");
+  const [activeTab, setActiveTab] = useState<"scanner" | "invites" | "users" | "books">("scanner");
 
   // Stats state
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+
+  // Books Catalog state
+  const [catalogBooks, setCatalogBooks] = useState<EditableBookMetadata[]>([]);
+  const [booksLoading, setBooksLoading] = useState(false);
+  const [bookSearchQuery, setBookSearchQuery] = useState("");
+  const [editingMetadataBook, setEditingMetadataBook] = useState<EditableBookMetadata | null>(null);
 
   // Scanner state
   const [folderId, setFolderId] = useState("");
@@ -144,6 +157,24 @@ export function AdminDashboardPage() {
     }
   }, []);
 
+  const fetchCatalogBooks = useCallback(async (searchQuery = "") => {
+    setBooksLoading(true);
+    try {
+      const url = searchQuery.trim()
+        ? `/api/admin/books?q=${encodeURIComponent(searchQuery.trim())}`
+        : "/api/admin/books";
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = (await res.json()) as { books: EditableBookMetadata[] };
+        setCatalogBooks(data.books || []);
+      }
+    } catch (err) {
+      console.error("Failed to load catalog books:", err);
+    } finally {
+      setBooksLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isAdmin) {
       fetchStats();
@@ -151,6 +182,12 @@ export function AdminDashboardPage() {
       fetchUsers();
     }
   }, [isAdmin, fetchStats, fetchInvites, fetchUsers]);
+
+  useEffect(() => {
+    if (isAdmin && activeTab === "books" && catalogBooks.length === 0) {
+      fetchCatalogBooks();
+    }
+  }, [isAdmin, activeTab, catalogBooks.length, fetchCatalogBooks]);
 
   // Handle trigger drive scan
   const handleTriggerScan = async (e?: FormEvent) => {
@@ -430,6 +467,24 @@ export function AdminDashboardPage() {
         >
           <Users className="w-4 h-4" />
           <span>User Management</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab("books");
+            if (catalogBooks.length === 0) {
+              fetchCatalogBooks(bookSearchQuery);
+            }
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-mono border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === "books"
+              ? "border-accent text-accent font-semibold bg-accent-bg/20"
+              : "border-transparent text-muted hover:text-text hover:border-border"
+          }`}
+        >
+          <BookOpen className="w-4 h-4" />
+          <span>Catalog & Metadata Fixer</span>
         </button>
       </div>
 
@@ -897,6 +952,202 @@ export function AdminDashboardPage() {
         </div>
       )}
 
+      {/* TAB 4: CATALOG & METADATA FIXER */}
+      {activeTab === "books" && (
+        <div className="space-y-6">
+          <div className="surface-card p-6 border border-border space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-semibold text-text flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-accent" />
+                  <span>Audio Track & Audiobook Metadata Fixer</span>
+                </h3>
+                <p className="text-xs font-mono text-muted mt-1">
+                  Surgically patch missing or incorrect metadata (title, author, narrator, series,
+                  index, year, format, and synopsis) directly in the database without re-scanning
+                  Google Drive.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => fetchCatalogBooks(bookSearchQuery)}
+                disabled={booksLoading}
+                className="px-3 py-1.5 rounded border border-border bg-surface text-muted text-xs font-mono flex items-center gap-2 hover:bg-elevated hover:text-text transition-colors cursor-pointer self-start sm:self-auto shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${booksLoading ? "animate-spin" : ""}`} />
+                <span>Refresh Catalog</span>
+              </button>
+            </div>
+
+            {/* Search Input Bar */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                fetchCatalogBooks(bookSearchQuery);
+              }}
+              className="flex items-center gap-2 pt-2"
+            >
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 text-subtle absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={bookSearchQuery}
+                  onChange={(e) => setBookSearchQuery(e.target.value)}
+                  placeholder="Filter catalog by book title, author, or narrator..."
+                  className="w-full bg-elevated border border-border rounded pl-9 pr-4 py-2 text-xs font-mono text-text placeholder:text-subtle focus:outline-none focus:border-accent"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={booksLoading}
+                className="px-4 py-2 rounded bg-accent text-bg text-xs font-mono font-semibold hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+              >
+                Search
+              </button>
+              {bookSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBookSearchQuery("");
+                    fetchCatalogBooks("");
+                  }}
+                  className="px-3 py-2 rounded border border-border bg-surface text-muted text-xs font-mono hover:text-text transition-colors cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
+            </form>
+          </div>
+
+          {/* Catalog Table */}
+          <div className="surface-card border border-border overflow-hidden">
+            <div className="p-4 border-b border-border flex items-center justify-between">
+              <span className="text-xs font-mono text-muted">
+                Showing {catalogBooks.length} audiobook{catalogBooks.length === 1 ? "" : "s"}
+              </span>
+              {booksLoading && (
+                <span className="text-xs font-mono text-accent flex items-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Loading...</span>
+                </span>
+              )}
+            </div>
+
+            {booksLoading && catalogBooks.length === 0 ? (
+              <div className="p-8 text-center text-xs font-mono text-muted flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                <span>Loading audiobooks from library...</span>
+              </div>
+            ) : catalogBooks.length === 0 ? (
+              <div className="p-12 text-center text-xs font-mono text-muted space-y-2">
+                <BookOpen className="w-8 h-8 text-subtle mx-auto opacity-50" />
+                <p>No audiobooks match your search filter.</p>
+                {bookSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBookSearchQuery("");
+                      fetchCatalogBooks("");
+                    }}
+                    className="text-accent underline cursor-pointer"
+                  >
+                    Clear search filter
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-elevated text-subtle border-b border-border">
+                    <tr>
+                      <th className="py-2.5 px-4 font-medium w-12">Cover</th>
+                      <th className="py-2.5 px-4 font-medium">Title & Author</th>
+                      <th className="py-2.5 px-4 font-medium">Series</th>
+                      <th className="py-2.5 px-4 font-medium">Format / Specs</th>
+                      <th className="py-2.5 px-4 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {catalogBooks.map((b) => (
+                      <tr key={b.id} className="hover:bg-elevated/40 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="w-10 h-10 rounded border border-border bg-surface overflow-hidden flex items-center justify-center shrink-0">
+                            {b.coverR2Key ? (
+                              <img
+                                src={getBookCoverUrl(b)}
+                                alt=""
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = "none";
+                                }}
+                              />
+                            ) : (
+                              <span className="text-[10px] font-bold text-subtle uppercase">
+                                {b.format || "m4b"}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="space-y-0.5">
+                            <a
+                              href={`/book/${b.id}`}
+                              className="font-semibold text-text hover:text-accent transition-colors block line-clamp-1"
+                            >
+                              {b.title}
+                            </a>
+                            <div className="text-muted text-[11px] line-clamp-1">
+                              By {b.author}
+                              {b.narrator && (
+                                <span className="text-subtle"> · Narrated by {b.narrator}</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {b.seriesName ? (
+                            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-elevated border border-border text-[11px] text-accent">
+                              <span>{b.seriesName}</span>
+                              {b.seriesIndex != null && (
+                                <span className="text-subtle">#{b.seriesIndex}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-subtle text-[11px]">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2 text-[11px]">
+                            <span className="px-1.5 py-0.5 rounded uppercase font-bold text-[10px] bg-accent-bg text-accent border border-accent/30">
+                              {b.format || "m4b"}
+                            </span>
+                            {b.publishedYear && (
+                              <span className="text-subtle">{b.publishedYear}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setEditingMetadataBook(b)}
+                            className="px-3 py-1.5 rounded text-xs font-mono border border-border surface-card hover:border-accent hover:text-accent transition-colors cursor-pointer inline-flex items-center gap-1.5"
+                            title="Edit book and track metadata tags"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-accent" />
+                            <span>Fix Metadata</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Strict Confirm Modal: View Telemetry Stats */}
       {statsConfirmUser && (
         <StrictConfirmModal
@@ -947,6 +1198,21 @@ export function AdminDashboardPage() {
           confirmButtonText="Permanently Delete User"
           danger={true}
           isPending={isDeletingUser}
+        />
+      )}
+
+      {/* Audio Track & Book Metadata Fixer Modal */}
+      {editingMetadataBook && (
+        <MetadataFixerModal
+          isOpen={!!editingMetadataBook}
+          onClose={() => setEditingMetadataBook(null)}
+          book={editingMetadataBook}
+          onSuccess={(updatedBook) => {
+            setCatalogBooks((prev) =>
+              prev.map((b) => (b.id === updatedBook.id ? { ...b, ...updatedBook } : b)),
+            );
+            fetchStats();
+          }}
         />
       )}
     </div>

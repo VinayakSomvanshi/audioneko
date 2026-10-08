@@ -1,4 +1,4 @@
-import { AlertTriangle, Edit2, Loader2, ShieldCheck, X } from "lucide-react";
+import { Edit2, Loader2, ShieldCheck, X } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 
 export interface UserItem {

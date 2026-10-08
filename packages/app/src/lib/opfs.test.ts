@@ -35,7 +35,7 @@ class MockFile {
   }
 
   async arrayBuffer(): Promise<ArrayBuffer> {
-    return this.content.buffer.slice(
+    return (this.content.buffer as ArrayBuffer).slice(
       this.content.byteOffset,
       this.content.byteOffset + this.content.byteLength,
     );
@@ -310,7 +310,7 @@ describe("Origin Private File System (OPFS) Download Manager", () => {
 
   it("stores and resolves book cover images in OPFS", async () => {
     const coverData = new Uint8Array([137, 80, 78, 71]); // PNG magic bytes
-    await saveBookCoverToOpfs("book_cover_test", coverData);
+    await saveBookCoverToOpfs("book_cover_test", coverData.buffer as ArrayBuffer);
 
     const blobUrl = await getBookCoverBlobUrl("book_cover_test");
     expect(blobUrl).toBe("blob:http://localhost/test-blob-url");

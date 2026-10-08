@@ -28,6 +28,7 @@ import {
   setMediaSessionPositionState,
 } from "../lib/media-session";
 import { pipManager } from "../lib/pip-visualizer";
+import { triggerPredictivePrecache } from "../lib/predictive-precache";
 import {
   PROGRESS_CHANGE_EVENT,
   clearProgress,
@@ -914,6 +915,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         album: book.seriesIndex ? `Series #${book.seriesIndex}` : "audioneko",
         artworkUrl: book.coverR2Key ? `/api/covers/${book.id}` : undefined,
       });
+
+      // Trigger predictive offline pre-caching across cellular and Wi-Fi networks
+      triggerPredictivePrecache(book, bookChapters).catch(() => {});
     },
     [],
   );

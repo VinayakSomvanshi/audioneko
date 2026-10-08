@@ -3,7 +3,6 @@ import { useState } from "react";
 import {
   DEFAULT_HEADSET_SETTINGS,
   type HeadsetRemappingSettings,
-  type HeadsetSkipAction,
 } from "../../lib/headset-remapping";
 
 interface HeadsetSettingsModalProps {
