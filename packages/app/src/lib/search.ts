@@ -5,6 +5,7 @@
  */
 
 import MiniSearch, { type SearchResult as MiniSearchResult } from "minisearch";
+import { getBookCoverUrl } from "./covers";
 
 export interface SearchableBook {
   id: string;
@@ -17,6 +18,8 @@ export interface SearchableBook {
   durationSeconds?: number;
   publishedYear?: number | null;
   coverUrl?: string | null;
+  coverR2Key?: string | null;
+  updatedAt?: number | null;
 }
 
 export interface BookSearchResult extends SearchableBook {
@@ -25,9 +28,20 @@ export interface BookSearchResult extends SearchableBook {
 }
 
 /**
+ * Normalizes a book record ensuring coverUrl is always populated
+ */
+export function normalizeSearchableBook(book: SearchableBook): SearchableBook {
+  return {
+    ...book,
+    coverUrl: book.coverUrl || getBookCoverUrl(book),
+  };
+}
+
+/**
  * Creates and initializes a MiniSearch indexing engine with weighted fields and prefix/fuzzy options
  */
 export function createMiniSearchEngine(books: SearchableBook[] = []): MiniSearch<SearchableBook> {
+  const normalizedBooks = books.map(normalizeSearchableBook);
   const miniSearch = new MiniSearch<SearchableBook>({
     idField: "id",
     fields: ["title", "author", "narrator", "series", "description"],
@@ -56,8 +70,8 @@ export function createMiniSearchEngine(books: SearchableBook[] = []): MiniSearch
     },
   });
 
-  if (books.length > 0) {
-    miniSearch.addAll(books);
+  if (normalizedBooks.length > 0) {
+    miniSearch.addAll(normalizedBooks);
   }
 
   return miniSearch;
@@ -73,8 +87,9 @@ let registeredBooks: SearchableBook[] = [];
  * Populates or refreshes the global search index
  */
 export function updateSearchIndex(books: SearchableBook[]): MiniSearch<SearchableBook> {
-  registeredBooks = books;
-  globalEngine = createMiniSearchEngine(books);
+  const normalizedBooks = books.map(normalizeSearchableBook);
+  registeredBooks = normalizedBooks;
+  globalEngine = createMiniSearchEngine(normalizedBooks);
   return globalEngine;
 }
 
@@ -120,7 +135,7 @@ export function searchBooks(
     description: r.description,
     durationSeconds: r.durationSeconds,
     publishedYear: r.publishedYear,
-    coverUrl: r.coverUrl,
+    coverUrl: r.coverUrl || getBookCoverUrl({ id: r.id }),
     score: r.score,
     match: r.match,
   }));

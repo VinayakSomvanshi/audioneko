@@ -1,7 +1,11 @@
+import type { Book } from "@audioneko/shared";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { BookOpen, Clock, Play, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAudio } from "../../context/audio-context";
+import { getAuthorPhotoUrl } from "../../lib/author-photos";
+import { getBookCoverUrl } from "../../lib/covers";
 import {
   type BookSearchResult,
   type SearchableBook,
@@ -16,6 +20,68 @@ interface SearchPaletteModalProps {
   books?: SearchableBook[];
 }
 
+function SearchBookThumbnail({ book }: { book: BookSearchResult }) {
+  const [imgError, setImgError] = useState(false);
+  const coverUrl = book.coverUrl || getBookCoverUrl(book as unknown as Book);
+
+  return (
+    <div className="w-11 h-11 rounded border border-border bg-[#18181b] flex items-center justify-center shrink-0 overflow-hidden relative shadow-sm">
+      {coverUrl && !imgError ? (
+        <img
+          src={coverUrl}
+          alt={book.title}
+          onError={() => setImgError(true)}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <BookOpen className="w-5 h-5 text-subtle" />
+      )}
+    </div>
+  );
+}
+
+function SearchAuthorAvatar({ name, photoUrl }: { name: string; photoUrl?: string | null }) {
+  const [imgError, setImgError] = useState(false);
+  const resolvedPhoto = photoUrl || getAuthorPhotoUrl(name);
+
+  return (
+    <div className="w-10 h-10 rounded-full border border-border bg-[#18181b] flex items-center justify-center shrink-0 overflow-hidden relative text-accent font-bold font-mono text-xs shadow-sm">
+      {resolvedPhoto && !imgError ? (
+        <img
+          src={resolvedPhoto}
+          alt={name}
+          onError={() => setImgError(true)}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <span>{name.charAt(0)}</span>
+      )}
+    </div>
+  );
+}
+
+function SearchSeriesThumbnail({ title, coverUrl }: { title: string; coverUrl?: string }) {
+  const [imgError, setImgError] = useState(false);
+
+  return (
+    <div className="w-10 h-10 rounded border border-border bg-[#18181b] flex items-center justify-center shrink-0 overflow-hidden relative shadow-sm">
+      {coverUrl && !imgError ? (
+        <img
+          src={coverUrl}
+          alt={title}
+          onError={() => setImgError(true)}
+          className="w-full h-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        <BookOpen className="w-4 h-4 text-subtle" />
+      )}
+    </div>
+  );
+}
+
 export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPaletteModalProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -23,6 +89,29 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
   const resultsContainerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { playBook } = useAudio();
+
+  // Fetch books from cache/server so search always has complete catalog
+  const { data: booksData } = useQuery<{ books: Book[] }>({
+    queryKey: ["books"],
+    queryFn: async () => {
+      const res = await fetch("/api/books");
+      if (!res.ok) return { books: [] };
+      return (await res.json()) as { books: Book[] };
+    },
+    staleTime: 60_000,
+  });
+
+  const allBooks = useMemo<SearchableBook[]>(() => {
+    if (books.length > 0) return books;
+    return (booksData?.books ?? []) as unknown as SearchableBook[];
+  }, [books, booksData?.books]);
+
+  // Sync catalog to search index
+  useEffect(() => {
+    if (allBooks.length > 0) {
+      updateSearchIndex(allBooks);
+    }
+  }, [allBooks]);
 
   // Focus input when modal opens
   useEffect(() => {
@@ -32,6 +121,48 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [isOpen]);
+
+  // Extract author and series directories with respective images
+  const { authorCatalog, seriesCatalog } = useMemo(() => {
+    const authorMap = new Map<string, { name: string; bookCount: number; photoUrl: string | null }>();
+    const seriesMap = new Map<string, { name: string; author: string; bookCount: number; coverUrl: string }>();
+
+    for (const b of allBooks) {
+      const author = b.author?.trim();
+      if (author && author !== "Unknown Author") {
+        const existing = authorMap.get(author);
+        if (existing) {
+          existing.bookCount++;
+        } else {
+          authorMap.set(author, {
+            name: author,
+            bookCount: 1,
+            photoUrl: getAuthorPhotoUrl(author),
+          });
+        }
+      }
+
+      const s = b.series?.trim();
+      if (s) {
+        const existing = seriesMap.get(s);
+        if (existing) {
+          existing.bookCount++;
+        } else {
+          seriesMap.set(s, {
+            name: s,
+            author: b.author,
+            bookCount: 1,
+            coverUrl: b.coverUrl || getBookCoverUrl(b as unknown as Book),
+          });
+        }
+      }
+    }
+
+    return {
+      authorCatalog: Array.from(authorMap.values()),
+      seriesCatalog: Array.from(seriesMap.values()),
+    };
+  }, [allBooks]);
 
   // Execute instant client-side search with microsecond duration tracking
   const { results, searchDurationMs } = useMemo(() => {
@@ -44,12 +175,42 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
     };
   }, [query]);
 
-  // Sync books prop to search index if provided
-  useEffect(() => {
-    if (books.length > 0) {
-      updateSearchIndex(books);
+  // Matching Authors & Series when a query is provided
+  const matchingAuthors = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || q.length < 2) return [];
+    return authorCatalog
+      .filter((a) => a.name.toLowerCase().includes(q))
+      .slice(0, 3);
+  }, [query, authorCatalog]);
+
+  const matchingSeries = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || q.length < 2) return [];
+    return seriesCatalog
+      .filter((s) => s.name.toLowerCase().includes(q) || s.author.toLowerCase().includes(q))
+      .slice(0, 3);
+  }, [query, seriesCatalog]);
+
+  // Unified items list for keyboard navigation and rendering
+  type NavigationItem =
+    | { type: "author"; id: string; name: string; bookCount: number; photoUrl: string | null }
+    | { type: "series"; id: string; name: string; author: string; bookCount: number; coverUrl: string }
+    | { type: "book"; id: string; book: BookSearchResult };
+
+  const navigationItems = useMemo<NavigationItem[]>(() => {
+    const items: NavigationItem[] = [];
+    for (const a of matchingAuthors) {
+      items.push({ type: "author", id: `author-${a.name}`, ...a });
     }
-  }, [books]);
+    for (const s of matchingSeries) {
+      items.push({ type: "series", id: `series-${s.name}`, ...s });
+    }
+    for (const b of results) {
+      items.push({ type: "book", id: `book-${b.id}`, book: b });
+    }
+    return items;
+  }, [matchingAuthors, matchingSeries, results]);
 
   // Format seconds to compact duration (e.g. 14h 20m)
   const formatDuration = (secs?: number) => {
@@ -59,12 +220,41 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
     return `${hours}h ${mins}m`;
   };
 
+  const handleSelectAuthor = useCallback(
+    (name: string) => {
+      onClose();
+      navigate({ to: "/authors", search: { author: name } });
+    },
+    [onClose, navigate],
+  );
+
+  const handleSelectSeries = useCallback(
+    (name: string) => {
+      onClose();
+      navigate({ to: "/series", search: { series: name } });
+    },
+    [onClose, navigate],
+  );
+
   const handleSelectBook = useCallback(
     (book: BookSearchResult) => {
       onClose();
       navigate({ to: "/book/$id", params: { id: book.id } });
     },
     [onClose, navigate],
+  );
+
+  const handleExecuteItem = useCallback(
+    (item: NavigationItem) => {
+      if (item.type === "author") {
+        handleSelectAuthor(item.name);
+      } else if (item.type === "series") {
+        handleSelectSeries(item.name);
+      } else if (item.type === "book") {
+        handleSelectBook(item.book);
+      }
+    },
+    [handleSelectAuthor, handleSelectSeries, handleSelectBook],
   );
 
   const handlePlayBook = (e: React.MouseEvent, book: BookSearchResult) => {
@@ -95,21 +285,25 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
         onClose();
       } else if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex((prev) => (results.length > 0 ? (prev + 1) % results.length : 0));
+        setSelectedIndex((prev) =>
+          navigationItems.length > 0 ? (prev + 1) % navigationItems.length : 0,
+        );
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         setSelectedIndex((prev) =>
-          results.length > 0 ? (prev - 1 + results.length) % results.length : 0,
+          navigationItems.length > 0
+            ? (prev - 1 + navigationItems.length) % navigationItems.length
+            : 0,
         );
-      } else if (e.key === "Enter" && results[selectedIndex]) {
+      } else if (e.key === "Enter" && navigationItems[selectedIndex]) {
         e.preventDefault();
-        handleSelectBook(results[selectedIndex]);
+        handleExecuteItem(navigationItems[selectedIndex]);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, results, selectedIndex, onClose, handleSelectBook]);
+  }, [isOpen, navigationItems, selectedIndex, onClose, handleExecuteItem]);
 
   // Scroll active item into view
   useEffect(() => {
@@ -176,7 +370,7 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
         <div className="px-4 py-2 bg-[#121214] border-b border-border flex items-center justify-between text-[11px] font-mono text-subtle">
           <div className="flex items-center gap-2">
             <span>
-              {results.length} {results.length === 1 ? "result" : "results"}
+              {navigationItems.length} {navigationItems.length === 1 ? "result" : "results"}
             </span>
             {query.trim() && (
               <span className="text-muted truncate max-w-[200px]">for "{query}"</span>
@@ -196,20 +390,99 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
           ref={resultsContainerRef}
           className="flex-1 overflow-y-auto divide-y divide-border/60 max-h-[55vh] scrollbar-thin"
         >
-          {results.length === 0 ? (
+          {navigationItems.length === 0 ? (
             <div className="py-12 px-4 text-center">
               <BookOpen className="w-8 h-8 text-subtle mx-auto mb-2 opacity-50" />
-              <p className="text-sm text-muted font-medium">No audiobooks found</p>
+              <p className="text-sm text-muted font-medium">No audiobooks or authors found</p>
               <p className="text-xs text-subtle mt-1">
-                Try searching by author name or series title
+                Try searching by book title, author name, or series
               </p>
             </div>
           ) : (
-            results.map((book, idx) => {
+            navigationItems.map((item, idx) => {
               const isSelected = idx === selectedIndex;
+
+              if (item.type === "author") {
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelectAuthor(item.name)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        handleSelectAuthor(item.name);
+                      }
+                    }}
+                    onMouseEnter={() => setSelectedIndex(idx)}
+                    className={`w-full text-left p-3.5 flex items-center justify-between gap-4 transition-colors cursor-pointer ${
+                      isSelected ? "bg-surface border-l-2 border-l-accent" : "hover:bg-surface/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      <SearchAuthorAvatar name={item.name} photoUrl={item.photoUrl} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-text truncate">{item.name}</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 border border-border rounded bg-elevated text-accent shrink-0">
+                            Author
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted truncate mt-0.5">
+                          <span>
+                            {item.bookCount} {item.bookCount === 1 ? "Audiobook" : "Audiobooks"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 text-subtle text-xs font-mono">
+                      <span>View Author</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (item.type === "series") {
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelectSeries(item.name)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        handleSelectSeries(item.name);
+                      }
+                    }}
+                    onMouseEnter={() => setSelectedIndex(idx)}
+                    className={`w-full text-left p-3.5 flex items-center justify-between gap-4 transition-colors cursor-pointer ${
+                      isSelected ? "bg-surface border-l-2 border-l-accent" : "hover:bg-surface/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      <SearchSeriesThumbnail title={item.name} coverUrl={item.coverUrl} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-text truncate">{item.name}</span>
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 border border-border rounded bg-elevated text-accent shrink-0">
+                            Series
+                          </span>
+                        </div>
+                        <div className="text-xs text-muted truncate mt-0.5">
+                          <span>
+                            {item.author} • {item.bookCount}{" "}
+                            {item.bookCount === 1 ? "Audiobook" : "Audiobooks"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 text-subtle text-xs font-mono">
+                      <span>View Series</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              const book = item.book;
               return (
                 <div
-                  key={book.id}
+                  key={item.id}
                   onClick={() => handleSelectBook(book)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -222,25 +495,12 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
                   }`}
                 >
                   <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                    {/* Thumbnail / Book Icon */}
-                    <div className="w-11 h-11 rounded border border-border bg-[#18181b] flex items-center justify-center shrink-0 overflow-hidden">
-                      {book.coverUrl ? (
-                        <img
-                          src={book.coverUrl}
-                          alt={book.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <BookOpen className="w-5 h-5 text-subtle" />
-                      )}
-                    </div>
-
-                    {/* Book Information */}
+                    <SearchBookThumbnail book={book} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-medium text-text truncate">{book.title}</span>
                         {book.series && (
-                          <span className="text-[10px] font-mono px-1.5 py-0.2 border border-border rounded bg-elevated text-accent shrink-0">
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 border border-border rounded bg-elevated text-accent shrink-0">
                             {book.series}
                             {book.seriesIndex != null ? ` #${book.seriesIndex}` : ""}
                           </span>
