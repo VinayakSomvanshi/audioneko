@@ -48,13 +48,7 @@ export function ProfilePreferencesModal({
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<TabKey>("profile");
-  const {
-    palette: currentPalette,
-    setPalette,
-    mode: currentMode,
-    setMode,
-    isDark,
-  } = useTheme();
+  const { palette: currentPalette, setPalette, mode: currentMode, setMode, isDark } = useTheme();
 
   // Profile Name Form State
   const [name, setName] = useState(user?.name || "");

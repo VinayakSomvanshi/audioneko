@@ -9,13 +9,27 @@
       (function() {
         try {
           const storedMode = localStorage.getItem('audioneko-theme-mode') || localStorage.getItem('audioneko-theme');
-          if (storedMode === 'light') {
+          const isLight = storedMode === 'light';
+          if (isLight) {
             document.documentElement.classList.remove('dark');
           } else {
             document.documentElement.classList.add('dark');
           }
           const storedPalette = localStorage.getItem('audioneko-theme-palette') || 'crimson';
           document.documentElement.setAttribute('data-theme', storedPalette);
+
+          const bgMap = {
+            crimson: { dark: '#101012', light: '#f8f8f9' },
+            amber: { dark: '#16140e', light: '#f9f7f0' },
+            amethyst: { dark: '#140f17', light: '#f9f6fa' },
+            nordic: { dark: '#171b22', light: '#f3f6fa' },
+            emerald: { dark: '#101512', light: '#f5f8f6' },
+            rose: { dark: '#161113', light: '#f9f6f6' }
+          };
+          const colors = bgMap[storedPalette] || bgMap.crimson;
+          const metaColor = isLight ? colors.light : colors.dark;
+          const metaTag = document.querySelector('meta[name="theme-color"]');
+          if (metaTag) metaTag.setAttribute('content', metaColor);
         } catch (_) {}
       })();
     </script>

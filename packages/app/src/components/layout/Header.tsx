@@ -43,7 +43,7 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
   }, [onSearchClick, showSearch, toggleMode]);
 
   return (
-    <header className="sticky top-0 z-40 min-h-14 h-auto pt-[env(safe-area-inset-top,0px)] border-b border-border bg-bg/95 backdrop-blur-sm px-3 sm:px-4 md:px-6 flex items-center justify-between transition-colors">
+    <header className="sticky top-0 z-40 shrink-0 min-h-14 h-auto pt-[env(safe-area-inset-top,0px)] border-b border-border bg-bg/95 backdrop-blur-sm px-3 sm:px-4 md:px-6 flex items-center justify-between transition-colors">
       <div className="flex items-center gap-2">
         {/* Mobile menu drawer trigger */}
         {user && onMenuClick && (

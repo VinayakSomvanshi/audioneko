@@ -15,6 +15,8 @@ export interface PaletteInfo {
   swatchDark: string;
   swatchLight: string;
   accentHex: string;
+  bgDark: string;
+  bgLight: string;
 }
 
 export const THEME_PALETTES: PaletteInfo[] = [
@@ -25,6 +27,8 @@ export const THEME_PALETTES: PaletteInfo[] = [
     swatchDark: "#e04838",
     swatchLight: "#b83224",
     accentHex: "#e04838",
+    bgDark: "#101012",
+    bgLight: "#f8f8f9",
   },
   {
     id: "amber",
@@ -33,6 +37,8 @@ export const THEME_PALETTES: PaletteInfo[] = [
     swatchDark: "#d49727",
     swatchLight: "#99650d",
     accentHex: "#d49727",
+    bgDark: "#16140e",
+    bgLight: "#f9f7f0",
   },
   {
     id: "amethyst",
@@ -41,6 +47,8 @@ export const THEME_PALETTES: PaletteInfo[] = [
     swatchDark: "#aa6bd6",
     swatchLight: "#7836a3",
     accentHex: "#aa6bd6",
+    bgDark: "#140f17",
+    bgLight: "#f9f6fa",
   },
   {
     id: "nordic",
@@ -49,6 +57,8 @@ export const THEME_PALETTES: PaletteInfo[] = [
     swatchDark: "#7fb4ca",
     swatchLight: "#4c78a0",
     accentHex: "#7fb4ca",
+    bgDark: "#171b22",
+    bgLight: "#f3f6fa",
   },
   {
     id: "emerald",
@@ -57,6 +67,8 @@ export const THEME_PALETTES: PaletteInfo[] = [
     swatchDark: "#46b57d",
     swatchLight: "#267950",
     accentHex: "#46b57d",
+    bgDark: "#101512",
+    bgLight: "#f5f8f6",
   },
   {
     id: "rose",
@@ -65,6 +77,8 @@ export const THEME_PALETTES: PaletteInfo[] = [
     swatchDark: "#de6f8b",
     swatchLight: "#a83e5c",
     accentHex: "#de6f8b",
+    bgDark: "#161113",
+    bgLight: "#f9f6f6",
   },
 ];
 
@@ -101,6 +115,13 @@ export function applyTheme(palette: ThemePalette, mode: ThemeMode): void {
     root.classList.add("dark");
   } else {
     root.classList.remove("dark");
+  }
+
+  // Synchronize mobile PWA status bar theme-color
+  const pal = THEME_PALETTES.find((p) => p.id === palette) || THEME_PALETTES[0];
+  const metaThemeColor = document.querySelector('meta[name="theme-color"]');
+  if (metaThemeColor && pal) {
+    metaThemeColor.setAttribute("content", mode === "dark" ? pal.bgDark : pal.bgLight);
   }
 
   // Persist to storage

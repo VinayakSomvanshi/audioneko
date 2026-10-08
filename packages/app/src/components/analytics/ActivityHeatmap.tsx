@@ -49,7 +49,7 @@ export function ActivityHeatmap({ analytics }: ActivityHeatmapProps) {
       case 3:
         return "bg-accent/75 border-accent/75";
       case 4:
-        return "bg-accent border-accent shadow-[0_0_8px_rgba(224,72,56,0.4)]";
+        return "bg-accent border-accent shadow-xs";
       default:
         return "bg-surface border-border/60 hover:border-border";
     }
