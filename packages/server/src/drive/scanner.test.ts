@@ -62,7 +62,7 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(res.author).toBe("Sarah J. Maas");
     expect(res.series).toBe("Crescent City");
     expect(res.seriesIndex).toBe(1);
-    expect(res.narrator).toBe("GraphicAudio");
+    expect(res.narrator).toBeUndefined();
   });
 
   it("parses B-number prefixed titles", () => {
@@ -79,7 +79,7 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(b1.author).toBe("Rebecca Yarros");
     expect(b1.series).toBe("The Empyrean");
     expect(b1.seriesIndex).toBe(1);
-    expect(b1.narrator).toBe("Rebecca Soler, Teddy Hamilton");
+    expect(b1.narrator).toBeUndefined();
 
     const b2 = parseBookInfo("02 - Iron Flame.m4b");
     expect(b2.title).toBe("Iron Flame");
@@ -92,5 +92,30 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(b3.author).toBe("Rebecca Yarros");
     expect(b3.series).toBe("The Empyrean");
     expect(b3.seriesIndex).toBe(3);
+  });
+
+  it("parses Pierce Brown Red Rising series audiobooks accurately", () => {
+    const rr1 = parseBookInfo(
+      "Red Rising (Part 1 of 2) (Dramatized Adaptation)_ Red Rising, Book 1 [B0BVGTFDWN].m4b",
+    );
+    expect(rr1.title).toBe("Red Rising (Part 1 of 2) (Dramatized Adaptation)");
+    expect(rr1.author).toBe("Pierce Brown");
+    expect(rr1.series).toBe("Red Rising");
+    expect(rr1.seriesIndex).toBe(1.1);
+    expect(rr1.narrator).toBeUndefined();
+
+    const gs1 = parseBookInfo(
+      "Golden Son (Part 1 of 2) (Dramatized Adaptation)_ Red Rising Saga, Book 2 [B0CGFYB9ZZ].m4b",
+    );
+    expect(gs1.title).toBe("Golden Son (Part 1 of 2) (Dramatized Adaptation)");
+    expect(gs1.author).toBe("Pierce Brown");
+    expect(gs1.series).toBe("Red Rising");
+    expect(gs1.seriesIndex).toBe(2.1);
+
+    const da3 = parseBookInfo("Dark Age (3 of 3) _ Red Rising 5.m4b");
+    expect(da3.title).toBe("Dark Age (Part 3 of 3)");
+    expect(da3.author).toBe("Pierce Brown");
+    expect(da3.series).toBe("Red Rising");
+    expect(da3.seriesIndex).toBe(5.3);
   });
 });

@@ -18,6 +18,15 @@ const CURATED_AUTHOR_PHOTOS: Record<string, string> = {
   "lana ferguson": "https://freshfiction.com/images/authors/48886.jpeg",
   "rosie danan":
     "https://images.squarespace-cdn.com/content/v1/5cdc348cebfc7f30af34bbe6/2d91a297-2d29-4f0b-afef-036cf45e6a71/Rosie_+Danan_portraits_21.jpg",
+  "pierce brown": "https://covers.openlibrary.org/a/id/14852667-L.jpg",
+};
+
+const CURATED_AUTHOR_BIOS: Record<string, { bio: string; birthDate: string; topWork: string }> = {
+  "pierce brown": {
+    bio: "Pierce Brown (born January 28, 1988) is an American science fiction author best known for his acclaimed Red Rising saga, consisting of Red Rising (2014), Golden Son (2015), Morning Star (2016), Iron Gold (2018), Dark Age (2019), and Light Bringer (2023).",
+    birthDate: "28 January 1988",
+    topWork: "Red Rising",
+  },
 };
 
 /**
@@ -115,6 +124,25 @@ export async function enrichAuthorMetadata(
     try {
       const cached = (await env.KV.get(kvKey, "json")) as EnrichedAuthorMetadata | null;
       if (cached) {
+        const lowerName = authorName.toLowerCase();
+        if (!cached.photoUrl) {
+          for (const [key, photo] of Object.entries(CURATED_AUTHOR_PHOTOS)) {
+            if (lowerName === key || lowerName.includes(key)) {
+              cached.photoUrl = photo;
+              break;
+            }
+          }
+        }
+        if (!cached.bio) {
+          for (const [key, details] of Object.entries(CURATED_AUTHOR_BIOS)) {
+            if (lowerName === key || lowerName.includes(key)) {
+              cached.bio = details.bio;
+              cached.birthDate = cached.birthDate || details.birthDate;
+              cached.topWork = cached.topWork || details.topWork;
+              break;
+            }
+          }
+        }
         return cached;
       }
     } catch {
@@ -132,11 +160,19 @@ export async function enrichAuthorMetadata(
     openLibraryKey: null,
   };
 
-  // Check curated photo override
+  // Check curated photo & bio override
   const lowerName = authorName.toLowerCase();
   for (const [key, photo] of Object.entries(CURATED_AUTHOR_PHOTOS)) {
     if (lowerName === key || lowerName.includes(key)) {
       metadata.photoUrl = photo;
+      break;
+    }
+  }
+  for (const [key, details] of Object.entries(CURATED_AUTHOR_BIOS)) {
+    if (lowerName === key || lowerName.includes(key)) {
+      metadata.bio = details.bio;
+      metadata.birthDate = details.birthDate;
+      metadata.topWork = details.topWork;
       break;
     }
   }

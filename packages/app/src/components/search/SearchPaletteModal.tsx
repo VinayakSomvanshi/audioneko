@@ -147,7 +147,7 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
               setQuery(e.target.value);
               setSelectedIndex(0);
             }}
-            placeholder="Search audiobooks by title, author, narrator, series..."
+            placeholder="Search audiobooks by title, author, series..."
             className="flex-1 bg-transparent text-sm text-text placeholder:text-subtle focus:outline-none"
           />
 
@@ -201,7 +201,7 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
               <BookOpen className="w-8 h-8 text-subtle mx-auto mb-2 opacity-50" />
               <p className="text-sm text-muted font-medium">No audiobooks found</p>
               <p className="text-xs text-subtle mt-1">
-                Try searching by author name, series title, or narrator
+                Try searching by author name or series title
               </p>
             </div>
           ) : (

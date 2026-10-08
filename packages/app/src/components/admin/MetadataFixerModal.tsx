@@ -33,7 +33,6 @@ interface MetadataFixerModalProps {
 export function MetadataFixerModal({ isOpen, onClose, book, onSuccess }: MetadataFixerModalProps) {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
-  const [narrator, setNarrator] = useState("");
   const [seriesName, setSeriesName] = useState("");
   const [seriesIndex, setSeriesIndex] = useState<string>("");
   const [publishedYear, setPublishedYear] = useState<string>("");
@@ -48,7 +47,6 @@ export function MetadataFixerModal({ isOpen, onClose, book, onSuccess }: Metadat
     if (book && isOpen) {
       setTitle(book.title || "");
       setAuthor(book.author || "");
-      setNarrator(book.narrator || "");
       setSeriesName(book.seriesName || "");
       setSeriesIndex(book.seriesIndex != null ? String(book.seriesIndex) : "");
       setPublishedYear(book.publishedYear != null ? String(book.publishedYear) : "");
@@ -86,7 +84,7 @@ export function MetadataFixerModal({ isOpen, onClose, book, onSuccess }: Metadat
       const payload = {
         title: title.trim(),
         author: author.trim(),
-        narrator: narrator.trim() || null,
+        narrator: null,
         seriesName: seriesName.trim() || null,
         seriesIndex: seriesIndex ? Number.parseFloat(seriesIndex) : null,
         publishedYear: publishedYear ? Number.parseInt(publishedYear, 10) : null,
@@ -236,41 +234,24 @@ export function MetadataFixerModal({ isOpen, onClose, book, onSuccess }: Metadat
             </div>
           </div>
 
-          {/* Narrator & Format */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label htmlFor="meta-narrator" className="block text-xs font-mono text-muted">
-                Narrator
-              </label>
-              <input
-                id="meta-narrator"
-                type="text"
-                disabled={saving}
-                value={narrator}
-                onChange={(e) => setNarrator(e.target.value)}
-                placeholder="Voice narrator"
-                className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded border border-border"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label htmlFor="meta-format" className="block text-xs font-mono text-muted">
-                Audio Container Format
-              </label>
-              <select
-                id="meta-format"
-                disabled={saving}
-                value={format}
-                onChange={(e) => setFormat(e.target.value)}
-                className="w-full px-3 py-2 text-xs font-mono surface-card text-text focus:border-accent outline-none rounded border border-border"
-              >
-                <option value="m4b">M4B (Apple Audiobook / Chapters)</option>
-                <option value="mp3">MP3 (MPEG-1 Audio Layer 3)</option>
-                <option value="m4a">M4A (MPEG-4 Audio)</option>
-                <option value="flac">FLAC (Free Lossless Audio Codec)</option>
-                <option value="opus">OPUS (Ogg Opus Voice)</option>
-              </select>
-            </div>
+          {/* Audio Container Format */}
+          <div className="space-y-1">
+            <label htmlFor="meta-format" className="block text-xs font-mono text-muted">
+              Audio Container Format
+            </label>
+            <select
+              id="meta-format"
+              disabled={saving}
+              value={format}
+              onChange={(e) => setFormat(e.target.value)}
+              className="w-full px-3 py-2 text-xs font-mono surface-card text-text focus:border-accent outline-none rounded border border-border"
+            >
+              <option value="m4b">M4B (Apple Audiobook / Chapters)</option>
+              <option value="mp3">MP3 (MPEG-1 Audio Layer 3)</option>
+              <option value="m4a">M4A (MPEG-4 Audio)</option>
+              <option value="flac">FLAC (Free Lossless Audio Codec)</option>
+              <option value="opus">OPUS (Ogg Opus Voice)</option>
+            </select>
           </div>
 
           {/* Series & Index */}

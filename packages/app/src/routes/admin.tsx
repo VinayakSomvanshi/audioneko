@@ -963,9 +963,9 @@ export function AdminDashboardPage() {
                   <span>Audio Track & Audiobook Metadata Fixer</span>
                 </h3>
                 <p className="text-xs font-mono text-muted mt-1">
-                  Surgically patch missing or incorrect metadata (title, author, narrator, series,
-                  index, year, format, and synopsis) directly in the database without re-scanning
-                  Google Drive.
+                  Surgically patch missing or incorrect metadata (title, author, series, index,
+                  year, format, and synopsis) directly in the database without re-scanning Google
+                  Drive.
                 </p>
               </div>
 
@@ -994,7 +994,7 @@ export function AdminDashboardPage() {
                   type="text"
                   value={bookSearchQuery}
                   onChange={(e) => setBookSearchQuery(e.target.value)}
-                  placeholder="Filter catalog by book title, author, or narrator..."
+                  placeholder="Filter catalog by book title, author, or series..."
                   className="w-full bg-elevated border border-border rounded pl-9 pr-4 py-2 text-xs font-mono text-text placeholder:text-subtle focus:outline-none focus:border-accent"
                 />
               </div>
@@ -1097,12 +1097,7 @@ export function AdminDashboardPage() {
                             >
                               {b.title}
                             </a>
-                            <div className="text-muted text-[11px] line-clamp-1">
-                              By {b.author}
-                              {b.narrator && (
-                                <span className="text-subtle"> · Narrated by {b.narrator}</span>
-                              )}
-                            </div>
+                            <div className="text-muted text-[11px] line-clamp-1">By {b.author}</div>
                           </div>
                         </td>
                         <td className="py-3 px-4">

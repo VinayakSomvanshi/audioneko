@@ -61,12 +61,8 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
   let seriesIndex: number | undefined;
   let narrator: string | undefined;
 
-  // Derive series, author, or narrator cues from parent folder name
+  // Derive series, author cues from parent folder name
   if (parentFolderName) {
-    if (parentFolderName.toLowerCase().includes("graphicaudio")) {
-      narrator = "GraphicAudio";
-    }
-
     if (parentFolderName.toLowerCase().includes("acotar")) {
       series = "A Court of Thorns and Roses";
       author = "Sarah J. Maas";
@@ -89,6 +85,12 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     ) {
       series = "The Empyrean";
       author = "Rebecca Yarros";
+    } else if (
+      parentFolderName.toLowerCase().includes("red rising") ||
+      parentFolderName.toLowerCase().includes("pierce brown")
+    ) {
+      series = "Red Rising";
+      author = "Pierce Brown";
     }
   }
 
@@ -99,7 +101,11 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
   );
   if (bracketSeriesMatch?.[1]) {
     const candidateSeries = bracketSeriesMatch[1].trim();
-    if (!/^(unabridged|abridged|mp3|m4b|audiobook|retail|re-up|cd\s*\d+)$/i.test(candidateSeries)) {
+    if (
+      !/^(unabridged|abridged|mp3|m4b|audiobook|retail|re-up|cd\s*\d+|dramatized\s+adaptation|[a-z0-9]{10})$/i.test(
+        candidateSeries,
+      )
+    ) {
       if (!series) {
         series = candidateSeries;
       }
@@ -188,9 +194,58 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
         seriesIndex = 3;
       }
     }
-    if (!narrator) {
-      narrator = "Rebecca Soler, Teddy Hamilton";
+  }
+
+  // Known series heuristics for Pierce Brown Red Rising books
+  const lowerClean = cleanName.toLowerCase();
+  if (
+    lowerTitle.includes("red rising") ||
+    lowerTitle.includes("golden son") ||
+    lowerTitle.includes("morning star") ||
+    lowerTitle.includes("iron gold") ||
+    lowerTitle.includes("dark age") ||
+    lowerTitle.includes("light bringer") ||
+    author === "Pierce Brown" ||
+    series === "Red Rising"
+  ) {
+    author = "Pierce Brown";
+    series = "Red Rising";
+    if (lowerTitle.includes("golden son") || lowerClean.includes("golden son")) {
+      seriesIndex = 2;
+      if (lowerClean.includes("part 1") || lowerClean.includes("1 of 2")) seriesIndex = 2.1;
+      else if (lowerClean.includes("part 2") || lowerClean.includes("2 of 2")) seriesIndex = 2.2;
+    } else if (lowerTitle.includes("morning star") || lowerClean.includes("morning star")) {
+      seriesIndex = 3;
+      if (lowerClean.includes("part 1") || lowerClean.includes("1 of 2")) seriesIndex = 3.1;
+      else if (lowerClean.includes("part 2") || lowerClean.includes("2 of 2")) seriesIndex = 3.2;
+    } else if (lowerTitle.includes("iron gold") || lowerClean.includes("iron gold")) {
+      seriesIndex = 4;
+      if (lowerClean.includes("part 1") || lowerClean.includes("1 of 2")) seriesIndex = 4.1;
+      else if (lowerClean.includes("part 2") || lowerClean.includes("2 of 2")) seriesIndex = 4.2;
+    } else if (lowerTitle.includes("dark age") || lowerClean.includes("dark age")) {
+      seriesIndex = 5;
+      if (lowerClean.includes("1 of 3") || lowerClean.includes("part 1")) seriesIndex = 5.1;
+      else if (lowerClean.includes("2 of 3") || lowerClean.includes("part 2")) seriesIndex = 5.2;
+      else if (lowerClean.includes("3 of 3") || lowerClean.includes("part 3")) seriesIndex = 5.3;
+    } else if (lowerTitle.includes("light bringer") || lowerClean.includes("light bringer")) {
+      seriesIndex = 6;
+      if (lowerClean.includes("1 of 2") || lowerClean.includes("part 1")) seriesIndex = 6.1;
+      else if (lowerClean.includes("2 of 2") || lowerClean.includes("part 2")) seriesIndex = 6.2;
+    } else if (lowerTitle.includes("red rising") || lowerClean.includes("red rising")) {
+      seriesIndex = 1;
+      if (lowerClean.includes("part 1") || lowerClean.includes("1 of 2")) seriesIndex = 1.1;
+      else if (lowerClean.includes("part 2") || lowerClean.includes("2 of 2")) seriesIndex = 1.2;
     }
+
+    // Clean up trailing folder / series suffixes from title
+    title = title
+      .replace(/_\s*Red Rising\s*\d+/gi, "")
+      .replace(/_\s*Red Rising(?: Saga)?(?:,\s*Book\s*\d+)?/gi, "")
+      .replace(/\s*\(2 of 2\)/gi, " (Part 2 of 2)")
+      .replace(/\s*\(1 of 3\)/gi, " (Part 1 of 3)")
+      .replace(/\s*\(2 of 3\)/gi, " (Part 2 of 3)")
+      .replace(/\s*\(3 of 3\)/gi, " (Part 3 of 3)")
+      .trim();
   }
 
   return { title, author, series, seriesIndex, narrator, format };
@@ -534,7 +589,7 @@ export async function scanDriveLibrary(
           author: enrichedAuthor,
           seriesId,
           seriesIndex: parsed.seriesIndex ?? null,
-          narrator: parsed.narrator ?? existingBook[0].narrator,
+          narrator: null,
           description: enrichedDescription,
           publishedYear: enrichedPublishedYear ?? existingBook[0].publishedYear,
           durationSeconds,
@@ -553,7 +608,7 @@ export async function scanDriveLibrary(
         author: enrichedAuthor,
         seriesId,
         seriesIndex: parsed.seriesIndex ?? null,
-        narrator: parsed.narrator ?? null,
+        narrator: null,
         description: enrichedDescription,
         coverR2Key: finalCoverKey,
         durationSeconds,
