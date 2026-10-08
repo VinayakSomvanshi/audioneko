@@ -62,15 +62,16 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(res.author).toBe("Sarah J. Maas");
     expect(res.series).toBe("Crescent City");
     expect(res.seriesIndex).toBe(1);
-    expect(res.narrator).toBeUndefined();
+    expect(res.narrator).toBe("Elizabeth Evans");
   });
 
   it("parses B-number prefixed titles", () => {
     const res = parseBookInfo("B01 Addicted to You.mp3", "Addicted series by Krista Ritchie");
     expect(res.title).toBe("Addicted to You");
-    expect(res.author).toBe("Krista Ritchie");
+    expect(res.author).toBe("Krista Ritchie & Becca Ritchie");
     expect(res.series).toBe("Addicted");
     expect(res.seriesIndex).toBe(1);
+    expect(res.narrator).toBe("Victoria Connolly & Teddy Hamilton");
   });
 
   it("parses The Empyrean series books (Fourth Wing, Iron Flame, Onyx Storm)", () => {
@@ -79,7 +80,7 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(b1.author).toBe("Rebecca Yarros");
     expect(b1.series).toBe("The Empyrean");
     expect(b1.seriesIndex).toBe(1);
-    expect(b1.narrator).toBeUndefined();
+    expect(b1.narrator).toBe("Rebecca Soler & Teddy Hamilton");
 
     const b2 = parseBookInfo("02 - Iron Flame.m4b");
     expect(b2.title).toBe("Iron Flame");
@@ -102,14 +103,14 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(rr1.author).toBe("Pierce Brown");
     expect(rr1.series).toBe("Red Rising");
     expect(rr1.seriesIndex).toBe(1.1);
-    expect(rr1.narrator).toBeUndefined();
+    expect(rr1.narrator).toBe("GraphicAudio Full Cast");
 
     const gs1 = parseBookInfo(
       "Golden Son (Part 1 of 2) (Dramatized Adaptation)_ Red Rising Saga, Book 2 [B0CGFYB9ZZ].m4b",
     );
     expect(gs1.title).toBe("Golden Son (Part 1 of 2) (Dramatized Adaptation)");
     expect(gs1.author).toBe("Pierce Brown");
-    expect(gs1.series).toBe("Red Rising");
+    expect(rr1.series).toBe("Red Rising");
     expect(gs1.seriesIndex).toBe(2.1);
 
     const da3 = parseBookInfo("Dark Age (3 of 3) _ Red Rising 5.m4b");
@@ -157,5 +158,43 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(koa8.author).toBe("Sarah J. Maas");
     expect(koa8.series).toBe("Throne of Glass");
     expect(koa8.seriesIndex).toBe(8);
+  });
+
+  it("parses standalones and newly added series with enriched narrators and clean titles", () => {
+    const lh = parseBookInfo(
+      "The Love Hypothesis (The Love Hypothesis #1) (Updated Version).m4b",
+    );
+    expect(lh.title).toBe("The Love Hypothesis");
+    expect(lh.author).toBe("Ali Hazelwood");
+    expect(lh.narrator).toBe("Callie Dalton & Teddy Hamilton");
+
+    const fs = parseBookInfo("Fan Service.m4b");
+    expect(fs.title).toBe("Fan Service");
+    expect(fs.author).toBe("Rosie Danan");
+    expect(fs.narrator).toBe("Brittany Pressley & Aaron Shedlock");
+
+    const nanny = parseBookInfo("The Nanny.m4b");
+    expect(nanny.title).toBe("The Nanny");
+    expect(nanny.author).toBe("Lana Ferguson");
+    expect(nanny.narrator).toBe("Samantha Summers & Jameson Adams");
+
+    const rfts = parseBookInfo("Rules for the Summer.m4b");
+    expect(rfts.title).toBe("Rules for the Summer");
+    expect(rfts.author).toBe("Meghan Quinn");
+    expect(rfts.narrator).toBe("Shane East, Stella Hunter, Gary Furlong & Cassandra Medcalf");
+
+    const fd = parseBookInfo("Fever Dream.m4b");
+    expect(fd.title).toBe("Fever Dream");
+    expect(fd.author).toBe("Elsie Silver");
+    expect(fd.series).toBe("Emerald Lake");
+    expect(fd.seriesIndex).toBe(1);
+    expect(fd.narrator).toBe("Teddy Hamilton, Julia Goldani Telles & Emma Wilder");
+
+    const league = parseBookInfo("Liz Tomforde - In Her Own League.mp3");
+    expect(league.title).toBe("In Her Own League");
+    expect(league.author).toBe("Liz Tomforde");
+    expect(league.series).toBe("Windy City");
+    expect(league.seriesIndex).toBe(6);
+    expect(league.narrator).toBe("Samantha Brentmoor & Jason Clarke");
   });
 });

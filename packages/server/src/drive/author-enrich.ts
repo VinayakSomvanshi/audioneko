@@ -10,17 +10,30 @@ import type { Env } from "../types";
 export type EnrichedAuthorMetadata = AuthorProfile;
 
 const CURATED_AUTHOR_PHOTOS: Record<string, string> = {
-  "meghan quinn": "https://images.gr-assets.com/authors/1778858370p8/7360513.jpg",
+  "meghan quinn":
+    "https://authormeghanquinn.com/cdn/shop/files/mq_1200x628_9d5d22dd-2ba3-4ea6-8993-24d829ff4ed3.png",
   "krista ritchie":
+    "https://static.wixstatic.com/media/bf6fdf_9e881b463379418d95688c942acfbf95~mv2.jpg/v1/fill/w_488,h_524,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/Krista%20and%20Becca%20-%20Author%20Photo%202%20-%20Square.jpg",
+  "becca ritchie":
     "https://static.wixstatic.com/media/bf6fdf_9e881b463379418d95688c942acfbf95~mv2.jpg/v1/fill/w_488,h_524,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/Krista%20and%20Becca%20-%20Author%20Photo%202%20-%20Square.jpg",
   "krista ritchie & becca ritchie":
     "https://static.wixstatic.com/media/bf6fdf_9e881b463379418d95688c942acfbf95~mv2.jpg/v1/fill/w_488,h_524,al_c,q_80,usm_0.66_1.00_0.01,enc_avif,quality_auto/Krista%20and%20Becca%20-%20Author%20Photo%202%20-%20Square.jpg",
   "lana ferguson": "https://freshfiction.com/images/authors/48886.jpeg",
   "rosie danan":
     "https://images.squarespace-cdn.com/content/v1/5cdc348cebfc7f30af34bbe6/2d91a297-2d29-4f0b-afef-036cf45e6a71/Rosie_+Danan_portraits_21.jpg",
-  "pierce brown": "https://covers.openlibrary.org/a/id/14852667-L.jpg",
-  "sarah j. maas": "https://images.gr-assets.com/authors/1628169225p8/3433047.jpg",
-  "sarah j maas": "https://images.gr-assets.com/authors/1628169225p8/3433047.jpg",
+  "pierce brown":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Pierce_Brown_by_Gage_Skidmore.jpg/500px-Pierce_Brown_by_Gage_Skidmore.jpg",
+  "sarah j. maas":
+    "https://sarahjmaas.com/wp-content/uploads/2025/03/240117_Today_SarahJMaas_216_resized.jpg",
+  "sarah j maas":
+    "https://sarahjmaas.com/wp-content/uploads/2025/03/240117_Today_SarahJMaas_216_resized.jpg",
+  "rebecca yarros":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2f/NBF2024-rebecca-yarros.jpg/500px-NBF2024-rebecca-yarros.jpg",
+  "ali hazelwood":
+    "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Ali_Hazelwood_2025_Texas_Book_Festival.jpg/500px-Ali_Hazelwood_2025_Texas_Book_Festival.jpg",
+  "elsie silver":
+    "https://images.squarespace-cdn.com/content/v1/6904ff34eb46bd478b74d219/a96d7cb6-21f6-444f-ad98-0934e52c5b4b/194A1682.jpg",
+  "liz tomforde": "https://static.showit.co/1200/LeiNY5tERxiHZOKslq26Xw/214378/img_1283.jpg",
 };
 
 const CURATED_AUTHOR_BIOS: Record<string, { bio: string; birthDate: string; topWork: string }> = {
@@ -38,6 +51,51 @@ const CURATED_AUTHOR_BIOS: Record<string, { bio: string; birthDate: string; topW
     bio: "Sarah J. Maas (born March 5, 1986) is a #1 New York Times and internationally bestselling author of the Crescent City, A Court of Thorns and Roses, and Throne of Glass series. Her books have sold over 40 million copies worldwide in thirty-eight languages.",
     birthDate: "5 March 1986",
     topWork: "Throne of Glass",
+  },
+  "rebecca yarros": {
+    bio: "Rebecca Yarros (born April 14, 1981) is a #1 New York Times, USA Today, and Wall Street Journal bestselling author of more than fifteen novels, including Fourth Wing, Iron Flame, and Onyx Storm in the blockbuster fantasy series The Empyrean.",
+    birthDate: "14 April 1981",
+    topWork: "Fourth Wing",
+  },
+  "ali hazelwood": {
+    bio: "Ali Hazelwood (born December 11, 1989) is an Italian romance novelist, neuroscience professor, and New York Times bestselling author celebrated for romantic comedies centered on women in STEM, including The Love Hypothesis, Love on the Brain, and Love, Theoretically.",
+    birthDate: "11 December 1989",
+    topWork: "The Love Hypothesis",
+  },
+  "elsie silver": {
+    bio: "Elsie Silver is a Canadian contemporary romance author internationally recognized for creating small-town romance series full of heart and heat, including the Chestnut Springs saga and the Emerald Lake series beginning with Fever Dream.",
+    birthDate: "1988",
+    topWork: "Fever Dream",
+  },
+  "liz tomforde": {
+    bio: "Liz Tomforde writes sports romance and contemporary love stories with unforgettable banter and high emotion. A former flight attendant, she is the bestselling author behind the beloved Windy City series featuring Mile High, The Right Move, Caught Up, Play Along, Rewind It Back, and In Her Own League.",
+    birthDate: "1994",
+    topWork: "Mile High",
+  },
+  "krista ritchie": {
+    bio: "Krista & Becca Ritchie are New York Times and USA Today bestselling twin sister authors who write New Adult contemporary romance and drama, most famously known for the Addicted and Calloway Sisters series.",
+    birthDate: "1989",
+    topWork: "Addicted to You",
+  },
+  "krista ritchie & becca ritchie": {
+    bio: "Krista & Becca Ritchie are New York Times and USA Today bestselling twin sister authors who write New Adult contemporary romance and drama, most famously known for the Addicted and Calloway Sisters series.",
+    birthDate: "1989",
+    topWork: "Addicted to You",
+  },
+  "meghan quinn": {
+    bio: "Meghan Quinn is a #1 Amazon and USA Today bestselling author, wife, and adoptive mother, widely loved for her laugh-out-loud romantic comedies and heartfelt contemporary romances including Rules for the Summer.",
+    birthDate: "1986",
+    topWork: "Rules for the Summer",
+  },
+  "lana ferguson": {
+    bio: "Lana Ferguson is an American contemporary romance author who writes witty, steamy romances celebrating love, humor, and quirky found families, including The Nanny and The Fake Mate.",
+    birthDate: "1991",
+    topWork: "The Nanny",
+  },
+  "rosie danan": {
+    bio: "Rosie Danan is an acclaimed contemporary romance author whose novels, including The Roommate, The Intimacy Experiment, and Fan Service, blend smart humor, vulnerability, and modern relationships.",
+    birthDate: "1987",
+    topWork: "The Roommate",
   },
 };
 

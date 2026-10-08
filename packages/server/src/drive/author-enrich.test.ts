@@ -19,11 +19,11 @@ describe("Dynamic Author Enrichment Engine", () => {
               numFound: 1,
               docs: [
                 {
-                  key: "OL7825177A",
-                  name: "Rebecca Yarros",
-                  birth_date: "14 april 1981",
-                  top_work: "Iron Flame",
-                  work_count: 40,
+                  key: "OL22392A",
+                  name: "Brandon Sanderson",
+                  birth_date: "19 December 1975",
+                  top_work: "Mistborn",
+                  work_count: 50,
                 },
               ],
             }),
@@ -32,15 +32,15 @@ describe("Dynamic Author Enrichment Engine", () => {
         );
       }
 
-      if (url.includes("authors/OL7825177A.json")) {
+      if (url.includes("authors/OL22392A.json")) {
         return Promise.resolve(
           new Response(
             JSON.stringify({
-              key: "/authors/OL7825177A",
-              name: "Rebecca Yarros",
-              bio: { type: "/type/text", value: "Bestselling author of Fourth Wing." },
+              key: "/authors/OL22392A",
+              name: "Brandon Sanderson",
+              bio: { type: "/type/text", value: "Bestselling fantasy author." },
               photos: [15133439],
-              remote_ids: { goodreads: "7539785", wikidata: "Q121091992" },
+              remote_ids: { goodreads: "38550", wikidata: "Q457608" },
             }),
             { status: 200 },
           ),
@@ -51,19 +51,19 @@ describe("Dynamic Author Enrichment Engine", () => {
     });
 
     const res = await enrichAuthorMetadata(
-      "Rebecca Yarros",
+      "Brandon Sanderson",
       undefined,
       mockFetch as unknown as typeof fetch,
     );
 
-    expect(res.name).toBe("Rebecca Yarros");
-    expect(res.openLibraryKey).toBe("OL7825177A");
-    expect(res.birthDate).toBe("14 april 1981");
-    expect(res.topWork).toBe("Iron Flame");
-    expect(res.bio).toBe("Bestselling author of Fourth Wing.");
+    expect(res.name).toBe("Brandon Sanderson");
+    expect(res.openLibraryKey).toBe("OL22392A");
+    expect(res.birthDate).toBe("19 December 1975");
+    expect(res.topWork).toBe("Mistborn");
+    expect(res.bio).toBe("Bestselling fantasy author.");
     expect(res.photoUrl).toBe("https://covers.openlibrary.org/a/id/15133439-L.jpg");
-    expect(res.goodreadsId).toBe("7539785");
-    expect(res.wikidataId).toBe("Q121091992");
+    expect(res.goodreadsId).toBe("38550");
+    expect(res.wikidataId).toBe("Q457608");
   });
 
   it("prioritizes KV cache when available", async () => {
@@ -119,6 +119,8 @@ describe("Dynamic Author Enrichment Engine", () => {
     );
 
     expect(res.name).toBe("Meghan Quinn");
-    expect(res.photoUrl).toBe("https://images.gr-assets.com/authors/1778858370p8/7360513.jpg");
+    expect(res.photoUrl).toBe(
+      "https://authormeghanquinn.com/cdn/shop/files/mq_1200x628_9d5d22dd-2ba3-4ea6-8993-24d829ff4ed3.png",
+    );
   });
 });

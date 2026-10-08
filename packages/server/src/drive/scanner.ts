@@ -167,21 +167,64 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     }
   }
 
-  // Known series heuristics for Liz Tomforde Windy City books
-  if (author === "Liz Tomforde") {
-    if (!series) {
-      series = "Windy City";
-    }
-    if (seriesIndex === undefined) {
-      if (title.toLowerCase().includes("rewind it back")) {
-        seriesIndex = 5;
-      }
+  const lowerTitle = title.toLowerCase();
+  const lowerClean = cleanName.toLowerCase();
+
+  // Known heuristics for Liz Tomforde Windy City books
+  if (
+    author === "Liz Tomforde" ||
+    lowerTitle.includes("mile high") ||
+    lowerTitle.includes("the right move") ||
+    lowerTitle.includes("caught up") ||
+    lowerTitle.includes("play along") ||
+    lowerTitle.includes("rewind it back") ||
+    lowerTitle.includes("in her own league")
+  ) {
+    author = "Liz Tomforde";
+    series = "Windy City";
+    if (lowerTitle.includes("mile high")) {
+      seriesIndex = 1;
+      narrator = narrator || "CJ Bloom & Jason Clarke";
+    } else if (lowerTitle.includes("the right move")) {
+      seriesIndex = 2;
+      narrator = narrator || "Lucy Rivers & Alexander Cendese";
+    } else if (lowerTitle.includes("caught up")) {
+      seriesIndex = 3;
+      narrator = narrator || "Stella Hunter & Tim Paige";
+    } else if (lowerTitle.includes("play along")) {
+      seriesIndex = 4;
+      narrator = narrator || "Savannah Peachwood & Nelson Hobbs";
+    } else if (lowerTitle.includes("rewind it back")) {
+      seriesIndex = 5;
+      narrator = narrator || "Megan Wicks & Connor Crais";
+    } else if (lowerTitle.includes("in her own league")) {
+      seriesIndex = 6;
+      narrator = narrator || "Samantha Brentmoor & Jason Clarke";
     }
   }
 
+  // Known heuristics for standalones and newly added series
+  if (lowerTitle.includes("the love hypothesis")) {
+    title = "The Love Hypothesis";
+    author = "Ali Hazelwood";
+    narrator = narrator || "Callie Dalton & Teddy Hamilton";
+  } else if (lowerTitle.includes("fan service")) {
+    author = "Rosie Danan";
+    narrator = narrator || "Brittany Pressley & Aaron Shedlock";
+  } else if (lowerTitle.includes("the nanny") && (author === "Lana Ferguson" || author === "Unknown Author")) {
+    author = "Lana Ferguson";
+    narrator = narrator || "Samantha Summers & Jameson Adams";
+  } else if (lowerTitle.includes("rules for the summer")) {
+    author = "Meghan Quinn";
+    narrator = narrator || "Shane East, Stella Hunter, Gary Furlong & Cassandra Medcalf";
+  } else if (lowerTitle.includes("fever dream") && (author === "Elsie Silver" || author === "Unknown Author")) {
+    author = "Elsie Silver";
+    series = "Emerald Lake";
+    seriesIndex = 1;
+    narrator = narrator || "Teddy Hamilton, Julia Goldani Telles & Emma Wilder";
+  }
+
   // Known series heuristics for Rebecca Yarros The Empyrean books
-  const lowerTitle = title.toLowerCase();
-  const lowerClean = cleanName.toLowerCase();
   if (
     lowerTitle.includes("fourth wing") ||
     lowerTitle.includes("iron flame") ||
@@ -195,6 +238,7 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     if (!series) {
       series = "The Empyrean";
     }
+    narrator = narrator || "Rebecca Soler & Teddy Hamilton";
     if (seriesIndex === undefined) {
       if (lowerTitle.includes("fourth wing")) {
         seriesIndex = 1;
@@ -203,6 +247,52 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
       } else if (lowerTitle.includes("onyx storm")) {
         seriesIndex = 3;
       }
+    }
+  }
+
+  // Known series heuristics for Addicted series by Krista Ritchie & Becca Ritchie
+  if (
+    series === "Addicted" ||
+    lowerTitle.includes("addicted to you") ||
+    lowerTitle.includes("ricochet") ||
+    lowerTitle.includes("addicted for now") ||
+    lowerTitle.includes("thrive") ||
+    lowerTitle.includes("addicted after all")
+  ) {
+    series = "Addicted";
+    author = "Krista Ritchie & Becca Ritchie";
+    narrator = narrator || "Victoria Connolly & Teddy Hamilton";
+  }
+
+  // Known series heuristics for Sarah J. Maas Crescent City books
+  if (
+    series === "Crescent City" ||
+    lowerTitle.includes("house of earth and blood") ||
+    lowerTitle.includes("house of sky and breath") ||
+    lowerTitle.includes("house of flame and shadow")
+  ) {
+    series = "Crescent City";
+    author = "Sarah J. Maas";
+    narrator = narrator || "Elizabeth Evans";
+  }
+
+  // Known series heuristics for Sarah J. Maas ACOTAR books
+  if (
+    series === "A Court of Thorns and Roses" ||
+    lowerTitle.includes("court of thorns and roses") ||
+    lowerTitle.includes("court of mist and fury") ||
+    lowerTitle.includes("court of wings and ruin") ||
+    lowerTitle.includes("court of frost and starlight") ||
+    lowerTitle.includes("court of silver flames")
+  ) {
+    series = "A Court of Thorns and Roses";
+    author = "Sarah J. Maas";
+    if (lowerTitle.includes("court of thorns and roses")) {
+      narrator = narrator || "Jennifer Ikeda";
+    } else if (lowerTitle.includes("court of silver flames")) {
+      narrator = narrator || "Stina Nielsen";
+    } else {
+      narrator = narrator || "Amanda Leigh Cobb";
     }
   }
 
@@ -261,6 +351,7 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
   ) {
     author = "Pierce Brown";
     series = "Red Rising";
+    narrator = narrator || "GraphicAudio Full Cast";
     if (lowerTitle.includes("golden son") || lowerClean.includes("golden son")) {
       seriesIndex = 2;
       if (lowerClean.includes("part 1") || lowerClean.includes("1 of 2")) seriesIndex = 2.1;
