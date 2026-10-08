@@ -246,14 +246,14 @@ export function SeriesPage() {
           </div>
         </div>
 
-        {/* Chronological Reading Order Header */}
+        {/* Series Books Header */}
         <div className="flex items-center justify-between border-b border-border pb-3">
           <div className="space-y-0.5">
             <h2 className="text-sm font-bold text-text tracking-wide font-mono uppercase">
-              Chronological Reading Order
+              Books in this Series
             </h2>
             <p className="text-xs font-mono text-muted">
-              Listen in author recommended sequential continuity
+              Complete collection and reading sequence
             </p>
           </div>
           <span className="text-xs font-mono text-subtle">
@@ -377,7 +377,7 @@ export function SeriesPage() {
               Series Catalog
             </h1>
             <p className="text-xs font-mono text-muted mt-0.5 line-clamp-1">
-              Explore audiobook sagas and sequential universes in chronological order
+              Explore audiobook sagas, universes, and complete collections
             </p>
           </div>
         </div>
@@ -463,21 +463,39 @@ export function SeriesPage() {
                   </div>
                 </div>
 
-                {/* Chronological Preview Snippet */}
-                <div className="pt-3 border-t border-border space-y-1 text-xs font-mono">
-                  <div className="text-[10px] text-subtle uppercase tracking-wider">
-                    Sequential Order:
+                {/* Series Books Preview & Action */}
+                <div className="pt-3 border-t border-border flex items-center justify-between gap-3 text-xs font-mono">
+                  <div className="flex items-center -space-x-2 py-0.5">
+                    {series.books.slice(0, 4).map((b) => (
+                      <div
+                        key={b.id}
+                        className="w-7 h-7 rounded border border-border bg-surface shrink-0 overflow-hidden shadow-sm"
+                        title={b.title}
+                      >
+                        {b.coverR2Key ? (
+                          <img
+                            src={getBookCoverUrl(b)}
+                            alt={b.title}
+                            className="w-full h-full object-cover select-none"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-elevated flex items-center justify-center text-[9px] text-subtle font-bold">
+                            {b.title.charAt(0)}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {series.books.length > 4 && (
+                      <div className="w-7 h-7 rounded border border-border bg-elevated flex items-center justify-center text-[9px] font-mono text-muted shrink-0 shadow-sm z-10">
+                        +{series.books.length - 4}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-[11px] text-muted line-clamp-2">
-                    {series.books
-                      .map((b, i) => `#${b.seriesIndex ?? i + 1} ${b.title}`)
-                      .join("  →  ")}
-                  </div>
-                </div>
 
-                <div className="flex items-center justify-between text-xs font-mono text-accent pt-1">
-                  <span>View chronological order</span>
-                  <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  <div className="flex items-center gap-1 text-xs font-mono text-accent group-hover:text-accent-hover transition-colors shrink-0">
+                    <span>View Series</span>
+                    <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
                 </div>
               </button>
             );

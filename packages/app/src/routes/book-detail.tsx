@@ -12,6 +12,7 @@ import {
   BookOpen,
   Check,
   Edit3,
+  Headphones,
   ListMusic,
   Loader2,
   Play,
@@ -248,6 +249,13 @@ export function BookDetailPage() {
                 {book.author}
               </Link>
             </p>
+            {Boolean(book.narrator) && (
+              <p className="text-xs font-mono text-muted flex items-center gap-1.5 pt-0.5">
+                <Headphones className="w-3.5 h-3.5 text-accent/80 shrink-0" />
+                <span className="text-subtle">Narrated by</span>
+                <span className="text-text font-medium">{book.narrator}</span>
+              </p>
+            )}
             {Boolean(book.series) && (
               <p className="text-xs font-mono text-accent/80">
                 <Link
@@ -273,6 +281,12 @@ export function BookDetailPage() {
               <span className="text-muted">Length: </span>
               <span>{formatSeconds(book.durationSeconds)}</span>
             </div>
+            {Boolean(book.narrator) && (
+              <div className="hidden sm:inline-block">
+                <span className="text-muted">Narrator: </span>
+                <span className="text-text">{book.narrator}</span>
+              </div>
+            )}
             {book.fileSizeBytes > 0 && (
               <div>
                 <span className="text-muted">Size: </span>
