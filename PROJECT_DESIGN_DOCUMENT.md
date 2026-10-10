@@ -11,6 +11,7 @@
 * **Author / Architect**: Pair Programming Engineering Specification
 * **Target Audience**: Core Maintainer / Developer (Solo Execution)
 * **Classification**: Technical Project Design Document & Implementation Standard
+* **License**: [GNU Affero General Public License v3.0](file:///home/vinayak/Documents/audioneko/LICENSE) (`AGPL-3.0-or-later`)
 * **Architecture Model**: **Serverless Edge & Cloud Storage Pipeline**
 * **Target Scale**: 3–10 Active Listeners (Private Trusted Circle)
 * **Production Deployment**: `https://audioneko.greatmidoriya.workers.dev`

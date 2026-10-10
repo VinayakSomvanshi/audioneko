@@ -290,4 +290,4 @@ Live production instance:
 
 ## License
 
-Private and non-commercial personal use. All rights reserved.
+This project is licensed under the [GNU Affero General Public License v3.0](file:///home/vinayak/Documents/audioneko/LICENSE) (`AGPL-3.0-or-later`).
