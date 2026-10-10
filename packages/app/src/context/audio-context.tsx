@@ -421,6 +421,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const audio = new Audio();
     audio.preload = "auto";
+    audio.setAttribute("playsinline", "true");
+    audio.setAttribute("webkit-playsinline", "true");
+    (audio as unknown as { playsInline?: boolean }).playsInline = true;
     // NO crossOrigin="anonymous" - Drive proxy doesn't send CORS headers,
     // setting this would block playback in Chromium via CORS error
     audioRef.current = audio;

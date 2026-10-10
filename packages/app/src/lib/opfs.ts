@@ -47,7 +47,9 @@ export function isOpfsSupported(): boolean {
   return (
     typeof navigator !== "undefined" &&
     typeof navigator.storage !== "undefined" &&
-    typeof navigator.storage.getDirectory === "function"
+    typeof navigator.storage.getDirectory === "function" &&
+    (typeof FileSystemFileHandle === "undefined" ||
+      typeof FileSystemFileHandle.prototype.createWritable === "function")
   );
 }
 
