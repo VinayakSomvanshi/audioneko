@@ -68,8 +68,32 @@ async function handleAudioStreamFetch(request) {
 
     const rangeHeader = request.headers.get("Range") || request.headers.get("range");
 
-    // Determine MIME type (default to audio/mp4 for M4B)
-    const mimeType = file.type || "audio/mp4";
+    // Determine accurate MIME type from meta.json (e.g. audio/mpeg for mp3, audio/flac, audio/mp4 for m4b)
+    let mimeType = file.type;
+    if (!mimeType) {
+      try {
+        const metaHandle = await bookDir.getFileHandle("meta.json");
+        const metaFile = await metaHandle.getFile();
+        const metaText = await metaFile.text();
+        const meta = JSON.parse(metaText);
+        if (meta.mimeType) {
+          mimeType = meta.mimeType;
+        } else if (meta.format === "mp3") {
+          mimeType = "audio/mpeg";
+        } else if (meta.format === "flac") {
+          mimeType = "audio/flac";
+        } else if (meta.format === "opus") {
+          mimeType = "audio/ogg";
+        } else if (meta.format === "m4a" || meta.format === "m4b") {
+          mimeType = "audio/mp4";
+        }
+      } catch {
+        // Fallback
+      }
+    }
+    if (!mimeType) {
+      mimeType = "audio/mp4";
+    }
 
     if (!rangeHeader) {
       // Full file response
