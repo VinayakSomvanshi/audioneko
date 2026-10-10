@@ -9,6 +9,7 @@ import {
   isBookDownloaded,
   isOpfsSupported,
 } from "../../lib/opfs";
+import { AlertCircle } from "lucide-react";
 import { BlinkingNeko, NekoIcon } from "../icons/NekoIcon";
 
 interface DownloadButtonProps {
@@ -96,6 +97,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
   const isDownloading = currentTask?.status === "downloading";
   const isPaused = currentTask?.status === "paused";
   const isQueued = currentTask?.status === "queued";
+  const isError = currentTask?.status === "error";
   const progressPercent = currentTask?.progressPercent ?? 0;
 
   return (
@@ -104,29 +106,38 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
         type="button"
         onClick={handleAction}
         className={`px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
-          isDownloaded
-            ? "bg-accent-bg border-accent/40 text-accent hover:bg-accent/20"
-            : isDownloading
-              ? "bg-elevated border-accent text-text"
-              : isPaused
-                ? "bg-elevated border-amber-500/40 text-amber-400 hover:bg-elevated/80"
-                : isQueued
-                  ? "bg-surface border-border text-muted"
-                  : "bg-surface hover:bg-elevated border-border text-text"
+          isError
+            ? "bg-destructive/15 border-destructive/40 text-destructive hover:bg-destructive/25"
+            : isDownloaded
+              ? "bg-accent-bg border-accent/40 text-accent hover:bg-accent/20"
+              : isDownloading
+                ? "bg-elevated border-accent text-text"
+                : isPaused
+                  ? "bg-elevated border-amber-500/40 text-amber-400 hover:bg-elevated/80"
+                  : isQueued
+                    ? "bg-surface border-border text-muted"
+                    : "bg-surface hover:bg-elevated border-border text-text"
         }`}
         title={
-          isDownloaded
-            ? "Downloaded offline — click to remove"
-            : isDownloading
-              ? `Downloading (${progressPercent}%) — click to pause`
-              : isPaused
-                ? `Paused at ${progressPercent}% — click to resume`
-                : isQueued
-                  ? "Queued in download manager — click to cancel"
-                  : "Download for offline listening"
+          isError
+            ? `Download failed (${currentTask?.errorMessage || "Storage/Network error"}) — click to retry`
+            : isDownloaded
+              ? "Downloaded offline — click to remove"
+              : isDownloading
+                ? `Downloading (${progressPercent}%) — click to pause`
+                : isPaused
+                  ? `Paused at ${progressPercent}% — click to resume`
+                  : isQueued
+                    ? "Queued in download manager — click to cancel"
+                    : "Download for offline listening"
         }
       >
-        {isDownloaded ? (
+        {isError ? (
+          <>
+            <AlertCircle className="w-3.5 h-3.5 text-destructive shrink-0" />
+            <span>Retry Download</span>
+          </>
+        ) : isDownloaded ? (
           <>
             <svg
               className="w-3.5 h-3.5"
@@ -182,7 +193,7 @@ export const DownloadButton: React.FC<DownloadButtonProps> = ({
 
       {currentTask?.errorMessage && (
         <span
-          className="text-[10px] text-accent mt-1 max-w-[140px] truncate"
+          className="text-[10px] text-destructive/90 mt-1 max-w-[200px] truncate font-mono"
           title={currentTask.errorMessage}
         >
           {currentTask.errorMessage}

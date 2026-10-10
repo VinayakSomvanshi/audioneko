@@ -2,6 +2,7 @@ import { ChevronUp, FastForward, Moon, Pause, Play, Rewind, X, Zap } from "lucid
 import { type ChangeEvent, useState } from "react";
 import { useAudio } from "../../context/audio-context";
 import { getBookCoverUrl } from "../../lib/covers";
+import { triggerHapticFeedback } from "../../lib/haptics";
 import type { SleepTimerPreset } from "../../lib/sleep-timer";
 import { FullPlayerModal } from "./FullPlayerModal";
 import { formatScrubberTime } from "./WaveformScrubber";
@@ -150,7 +151,10 @@ export function MiniPlayer() {
           <div className="flex items-center gap-1 sm:gap-2 md:gap-3 shrink-0">
             <button
               type="button"
-              onClick={() => skipBy(-15)}
+              onClick={() => {
+                triggerHapticFeedback(10);
+                skipBy(-15);
+              }}
               className="p-1 sm:p-1.5 text-muted hover:text-text transition-colors cursor-pointer"
               aria-label="Skip back 15 seconds"
               title="Skip back 15s"
@@ -160,7 +164,10 @@ export function MiniPlayer() {
 
             <button
               type="button"
-              onClick={togglePlay}
+              onClick={() => {
+                triggerHapticFeedback(15);
+                togglePlay();
+              }}
               className="w-8 h-8 rounded-full bg-accent text-bg font-bold flex items-center justify-center hover:opacity-90 transition-opacity cursor-pointer shadow-sm"
               aria-label={isPlaying ? "Pause" : "Play"}
             >
@@ -173,7 +180,10 @@ export function MiniPlayer() {
 
             <button
               type="button"
-              onClick={() => skipBy(30)}
+              onClick={() => {
+                triggerHapticFeedback(10);
+                skipBy(30);
+              }}
               className="p-1 sm:p-1.5 text-muted hover:text-text transition-colors cursor-pointer"
               aria-label="Skip forward 30 seconds"
               title="Skip forward 30s"

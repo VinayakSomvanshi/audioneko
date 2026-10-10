@@ -88,18 +88,20 @@ function OfflineCover({
 
   useEffect(() => {
     let mounted = true;
+    let objectUrl: string | null = null;
     getBookCoverBlobUrl(bookId).then((url) => {
       if (mounted && url) {
+        objectUrl = url;
         setBlobUrl(url);
       }
     });
     return () => {
       mounted = false;
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [bookId, blobUrl]);
+  }, [bookId]);
 
   const src = blobUrl || getBookCoverUrl({ id: bookId, coverR2Key });
 

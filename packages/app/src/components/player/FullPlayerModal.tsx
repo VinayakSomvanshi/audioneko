@@ -25,18 +25,15 @@ import {
 import { useEffect, useState } from "react";
 import { useAudio } from "../../context/audio-context";
 import { getBookCoverUrl } from "../../lib/covers";
+import { triggerHapticFeedback } from "../../lib/haptics";
+import {
+  type BookmarkItem,
+  createBookmarkWithOfflineSupport,
+  deleteBookmarkWithOfflineSupport,
+  fetchBookmarksForBook,
+} from "../../lib/offline-bookmarks";
 import type { SleepTimerPreset } from "../../lib/sleep-timer";
 import { WaveformScrubber, formatScrubberTime } from "./WaveformScrubber";
-
-interface BookmarkItem {
-  id: string;
-  userId: string;
-  bookId: string;
-  positionSeconds: number;
-  chapterTitle?: string | null;
-  note?: string | null;
-  createdAt: string;
-}
 
 export function FullPlayerModal() {
   const {
@@ -92,28 +89,33 @@ export function FullPlayerModal() {
     queryKey: ["bookmarks", currentBook?.id],
     queryFn: async () => {
       if (!currentBook?.id) return { bookmarks: [] };
-      const res = await fetch(`/api/bookmarks/${currentBook.id}`);
-      if (!res.ok) throw new Error("Failed to load bookmarks");
-      return res.json();
+      const items = await fetchBookmarksForBook(currentBook.id);
+      return { bookmarks: items };
     },
     enabled: !!currentBook?.id && (showBookmarks || isFullPlayerOpen),
   });
 
+  // Re-fetch bookmarks if an offline sync completed
+  useEffect(() => {
+    const handleSynced = () => {
+      if (currentBook?.id) {
+        queryClient.invalidateQueries({ queryKey: ["bookmarks", currentBook.id] });
+      }
+    };
+    window.addEventListener("audioneko:bookmarks-synced", handleSynced);
+    return () => window.removeEventListener("audioneko:bookmarks-synced", handleSynced);
+  }, [currentBook?.id, queryClient]);
+
   const createBookmarkMutation = useMutation({
     mutationFn: async ({ note }: { note?: string }) => {
       if (!currentBook) return;
-      const res = await fetch("/api/bookmarks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bookId: currentBook.id,
-          positionSeconds: currentTime,
-          chapterTitle: currentChapter?.title || undefined,
-          note: note?.trim() || undefined,
-        }),
+      triggerHapticFeedback(15);
+      return await createBookmarkWithOfflineSupport({
+        bookId: currentBook.id,
+        positionSeconds: currentTime,
+        chapterTitle: currentChapter?.title || undefined,
+        note: note?.trim() || undefined,
       });
-      if (!res.ok) throw new Error("Failed to create bookmark");
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookmarks", currentBook?.id] });
@@ -124,11 +126,8 @@ export function FullPlayerModal() {
 
   const deleteBookmarkMutation = useMutation({
     mutationFn: async (bookmarkId: string) => {
-      const res = await fetch(`/api/bookmarks/${bookmarkId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to delete bookmark");
-      return res.json();
+      triggerHapticFeedback(10);
+      await deleteBookmarkWithOfflineSupport(bookmarkId, currentBook?.id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["bookmarks", currentBook?.id] });
@@ -322,7 +321,10 @@ export function FullPlayerModal() {
         <div className="flex items-center justify-center gap-2.5 sm:gap-4 md:gap-6">
           <button
             type="button"
-            onClick={previousChapter}
+            onClick={() => {
+              triggerHapticFeedback(12);
+              previousChapter();
+            }}
             className="p-2 sm:p-2.5 text-muted hover:text-text transition-colors cursor-pointer"
             aria-label="Previous Chapter"
             title="Previous Chapter"
@@ -332,7 +334,10 @@ export function FullPlayerModal() {
 
           <button
             type="button"
-            onClick={() => skipBy(-15)}
+            onClick={() => {
+              triggerHapticFeedback(10);
+              skipBy(-15);
+            }}
             className="p-2.5 sm:p-3 text-muted hover:text-text transition-colors cursor-pointer relative"
             aria-label="Skip back 15 seconds"
             title="Rewind 15s"
@@ -343,7 +348,10 @@ export function FullPlayerModal() {
 
           <button
             type="button"
-            onClick={togglePlay}
+            onClick={() => {
+              triggerHapticFeedback(15);
+              togglePlay();
+            }}
             className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-accent text-bg flex items-center justify-center hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-lg"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
@@ -356,7 +364,10 @@ export function FullPlayerModal() {
 
           <button
             type="button"
-            onClick={() => skipBy(30)}
+            onClick={() => {
+              triggerHapticFeedback(10);
+              skipBy(30);
+            }}
             className="p-2.5 sm:p-3 text-muted hover:text-text transition-colors cursor-pointer relative"
             aria-label="Skip forward 30 seconds"
             title="Forward 30s"
@@ -367,7 +378,10 @@ export function FullPlayerModal() {
 
           <button
             type="button"
-            onClick={nextChapter}
+            onClick={() => {
+              triggerHapticFeedback(12);
+              nextChapter();
+            }}
             className="p-2 sm:p-2.5 text-muted hover:text-text transition-colors cursor-pointer"
             aria-label="Next Chapter"
             title="Next Chapter"
