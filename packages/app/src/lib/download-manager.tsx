@@ -4,10 +4,12 @@ import { createContext, useContext, useEffect, useState } from "react";
 import {
   type OfflineBookMeta,
   downloadBookToOpfs,
+  formatDownloadErrorMessage,
   getPartialDownloadBytes,
   isBookDownloaded,
   isOpfsSupported,
   removePartialDownload,
+  requestPersistentStorage,
 } from "./opfs";
 
 export type DownloadTaskStatus = "queued" | "downloading" | "paused" | "completed" | "error";
@@ -146,6 +148,8 @@ class DownloadManager {
     if (!isOpfsSupported()) {
       throw new Error("Origin Private File System (OPFS) is not supported on this browser.");
     }
+
+    requestPersistentStorage().catch(() => {});
 
     const existing = this.tasks.get(meta.bookId);
     if (existing) {
@@ -307,6 +311,7 @@ class DownloadManager {
     };
 
     try {
+      await requestPersistentStorage().catch(() => {});
       await downloadBookToOpfs(offlineMeta, {
         signal: controller.signal,
         onProgress: (p) => {
@@ -350,7 +355,7 @@ class DownloadManager {
         task.estimatedTimeSeconds = undefined;
       } else {
         task.status = "error";
-        task.errorMessage = err instanceof Error ? err.message : "Download failed";
+        task.errorMessage = formatDownloadErrorMessage(err);
       }
       task.updatedAt = Date.now();
       this.notify();

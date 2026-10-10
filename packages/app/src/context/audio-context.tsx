@@ -466,6 +466,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       setCurrentTime(t);
       currentTimeRef.current = t;
       updateBufferedRange();
+
+      // Audio engine watchdog: verify Web Audio graph has not suspended or muted while audio element is playing
+      if (!audio.paused && audioEngine.isSuspended()) {
+        audioEngine.ensureContext().catch(() => {});
+      }
+
       setMediaSessionPositionState({
         duration: audio.duration || 0,
         playbackRate: audio.playbackRate || 1.0,
@@ -493,7 +499,12 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     const onPlay = () => {
       setIsPlaying(true);
       isPlayingRef.current = true;
+      audioEngine.ensureContext().catch(() => {});
       setMediaSessionPlaybackState("playing");
+    };
+
+    const onPlaying = () => {
+      audioEngine.ensureContext().catch(() => {});
     };
 
     const onPause = () => {
@@ -546,6 +557,23 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    // Auto-resume AudioContext when phone screen unlocks, tab changes, or app regains focus
+    const onVisibilityChange = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        const a = audioRef.current;
+        if (a && (!a.paused || isPlayingRef.current)) {
+          audioEngine.ensureContext().catch(() => {});
+        }
+      }
+    };
+
+    const onWindowFocus = () => {
+      const a = audioRef.current;
+      if (a && (!a.paused || isPlayingRef.current)) {
+        audioEngine.ensureContext().catch(() => {});
+      }
+    };
+
     // Flush position to localStorage on tab close / navigation
     const onBeforeUnload = () => {
       const book = currentBookRef.current;
@@ -555,17 +583,22 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       }
     };
     window.addEventListener("beforeunload", onBeforeUnload);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onWindowFocus);
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("durationchange", onDurationChange);
     audio.addEventListener("progress", onProgress);
     audio.addEventListener("play", onPlay);
+    audio.addEventListener("playing", onPlaying);
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onAudioError);
 
     return () => {
       window.removeEventListener("beforeunload", onBeforeUnload);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onWindowFocus);
       unsubTimer();
       timer.cancel();
       audio.pause();
@@ -574,6 +607,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener("durationchange", onDurationChange);
       audio.removeEventListener("progress", onProgress);
       audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("playing", onPlaying);
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onAudioError);

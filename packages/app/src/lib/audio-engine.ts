@@ -45,6 +45,8 @@ export class AudioEngine {
   private isSilent = false;
   private currentVolume = 1.0;
   private settings: DspSettings;
+  private pauseTimeout: ReturnType<typeof setTimeout> | null = null;
+  private attachedAudioElement: HTMLAudioElement | null = null;
 
   constructor() {
     const savedEq = loadEqualizerSettings();
@@ -73,8 +75,24 @@ export class AudioEngine {
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return;
 
+      this.attachedAudioElement = audioElement;
       this.ctx = new AudioCtx();
       this.sourceNode = this.ctx.createMediaElementSource(audioElement);
+
+      // Active watchdog: auto-resume AudioContext if suspended while audio is actively playing
+      this.ctx.onstatechange = () => {
+        if (
+          this.ctx &&
+          this.ctx.state !== "running" &&
+          this.attachedAudioElement &&
+          !this.attachedAudioElement.paused
+        ) {
+          console.warn(
+            "[audioneko DSP] AudioContext suspended during active playback - auto-resuming",
+          );
+          this.ctx.resume().catch(() => {});
+        }
+      };
 
       // 1. 5-Band Voice Equalizer Stage
       // Band 1: 80 Hz Low Shelf (low rumble / plosive reduction)
@@ -154,21 +172,38 @@ export class AudioEngine {
   }
 
   /**
-   * Resumes AudioContext if suspended by browser autoplay policy
+   * Resumes AudioContext if suspended by browser autoplay policy, backgrounding, or phone sleep
    */
   public async ensureContext(): Promise<void> {
-    if (this.ctx && this.ctx.state === "suspended") {
-      await this.ctx.resume();
+    if (this.ctx && this.ctx.state !== "running") {
+      try {
+        await this.ctx.resume();
+      } catch (e) {
+        console.warn("[audioneko DSP] Failed to resume AudioContext:", e);
+      }
     }
   }
 
   /**
-   * Zero-latency playback trigger: ensures Web Audio graph is live and unmuted
+   * Checks whether the underlying Web Audio graph is suspended or interrupted
+   */
+  public isSuspended(): boolean {
+    return Boolean(this.ctx && this.ctx.state !== "running");
+  }
+
+  /**
+   * Zero-latency playback trigger: ensures Web Audio graph is live, unmuted, and scheduled
    */
   public async playWithRamp(audioElement: HTMLAudioElement): Promise<void> {
-    if (this.ctx && this.ctx.state === "suspended") {
-      this.ctx.resume().catch(() => {});
+    this.attachedAudioElement = audioElement;
+
+    // Cancel any pending pause scheduled from a previous rapid toggle
+    if (this.pauseTimeout) {
+      clearTimeout(this.pauseTimeout);
+      this.pauseTimeout = null;
     }
+
+    await this.ensureContext();
 
     if (this.gainNode && this.ctx) {
       const now = this.ctx.currentTime;
@@ -183,15 +218,22 @@ export class AudioEngine {
    * Smooth 40ms linear gain ramp-down on pause to eliminate speaker clicks
    */
   public pauseWithRamp(audioElement: HTMLAudioElement): void {
-    if (this.gainNode && this.ctx) {
+    if (this.pauseTimeout) {
+      clearTimeout(this.pauseTimeout);
+      this.pauseTimeout = null;
+    }
+
+    if (this.gainNode && this.ctx && this.ctx.state === "running") {
       const now = this.ctx.currentTime;
       this.gainNode.gain.cancelScheduledValues(now);
       this.gainNode.gain.setValueAtTime(this.gainNode.gain.value, now);
       this.gainNode.gain.linearRampToValueAtTime(0.001, now + 0.04);
 
-      setTimeout(() => {
+      this.pauseTimeout = setTimeout(() => {
+        this.pauseTimeout = null;
         audioElement.pause();
-        if (this.gainNode && this.ctx) {
+        if (this.gainNode && this.ctx && this.ctx.state === "running") {
+          this.gainNode.gain.cancelScheduledValues(this.ctx.currentTime);
           this.gainNode.gain.setValueAtTime(this.currentVolume, this.ctx.currentTime);
         }
       }, 45);

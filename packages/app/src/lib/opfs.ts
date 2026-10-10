@@ -31,6 +31,7 @@ export interface StorageEstimateResult {
   usageBytes: number;
   quotaBytes: number;
   percentUsed: number;
+  isPersisted?: boolean;
 }
 
 export const OPFS_ROOT_DIR = "audioneko_books";
@@ -51,6 +52,59 @@ export function isOpfsSupported(): boolean {
 }
 
 /**
+ * Returns whether persistent storage has been granted to the origin.
+ */
+export async function isStoragePersisted(): Promise<boolean> {
+  if (typeof navigator !== "undefined" && navigator.storage?.persisted) {
+    try {
+      return await navigator.storage.persisted();
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Requests persistent storage from the browser to unlock high-capacity disk quota on phones / PWA.
+ */
+export async function requestPersistentStorage(): Promise<boolean> {
+  if (typeof navigator !== "undefined" && navigator.storage?.persist) {
+    try {
+      const alreadyPersisted = await isStoragePersisted();
+      if (alreadyPersisted) return true;
+      return await navigator.storage.persist();
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
+
+/**
+ * Formats low-level storage and network errors into clear, actionable advice.
+ */
+export function formatDownloadErrorMessage(err: unknown): string {
+  if (err instanceof Error) {
+    if (
+      err.name === "QuotaExceededError" ||
+      err.message.toLowerCase().includes("quota") ||
+      err.message.toLowerCase().includes("storage")
+    ) {
+      return "Device storage quota exceeded. Free up storage space on your phone or remove other downloaded audiobooks in Offline settings.";
+    }
+    if (err.name === "AbortError" || err.message.toLowerCase().includes("aborted")) {
+      return "Download paused.";
+    }
+    if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
+      return "Network connection interrupted. Check your internet connection and resume.";
+    }
+    return err.message;
+  }
+  return String(err || "Download failed");
+}
+
+/**
  * Returns disk usage and quota estimates from navigator.storage.
  */
 export async function getStorageEstimate(): Promise<StorageEstimateResult> {
@@ -59,6 +113,7 @@ export async function getStorageEstimate(): Promise<StorageEstimateResult> {
   }
 
   try {
+    const isPersisted = await isStoragePersisted();
     const estimate = await navigator.storage.estimate();
     const usage = estimate.usage ?? 0;
     const quota = estimate.quota ?? 0;
@@ -68,6 +123,7 @@ export async function getStorageEstimate(): Promise<StorageEstimateResult> {
       usageBytes: usage,
       quotaBytes: quota,
       percentUsed: Math.min(100, Math.round(percentUsed * 10) / 10),
+      isPersisted,
     };
   } catch (err) {
     console.warn("Failed to retrieve storage estimate:", err);
@@ -286,6 +342,29 @@ export async function downloadBookToOpfs(
     return;
   }
 
+  // Request persistent storage to unlock high capacity on mobile / PWA
+  await requestPersistentStorage().catch(() => {});
+
+  // Pre-flight check: verify remaining storage quota before initiating large stream
+  if (typeof navigator !== "undefined" && navigator.storage?.estimate) {
+    try {
+      const estimate = await navigator.storage.estimate();
+      const quota = estimate.quota ?? 0;
+      const usage = estimate.usage ?? 0;
+      const remainingBytes = Math.max(0, quota - usage);
+      const neededBytes = totalBytes > 0 ? Math.max(0, totalBytes - existingBytes) : 0;
+      if (quota > 0 && neededBytes > 0 && remainingBytes < neededBytes + 15 * 1024 * 1024) {
+        const quotaErr = new Error(
+          "Device storage quota exceeded. Free up storage space on your phone or remove other downloaded audiobooks in Offline settings.",
+        );
+        quotaErr.name = "QuotaExceededError";
+        throw quotaErr;
+      }
+    } catch (e: unknown) {
+      if (e instanceof Error && e.name === "QuotaExceededError") throw e;
+    }
+  }
+
   const partHandle = await bookDir.getFileHandle(PART_FILE_NAME, { create: true });
   // Open writable stream. If existing bytes exist, seek to end
   const writable = await partHandle.createWritable({
@@ -406,7 +485,7 @@ export async function downloadBookToOpfs(
       // Ignore cleanup error
     }
 
-    const errorMessage = err instanceof Error ? err.message : String(err);
+    const formattedMessage = formatDownloadErrorMessage(err);
     const isAbort =
       err instanceof Error && (err.name === "AbortError" || err.message.includes("aborted"));
 
@@ -417,7 +496,7 @@ export async function downloadBookToOpfs(
       totalBytes: totalBytes || meta.fileSizeBytes || 0,
       progressPercent:
         totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0,
-      errorMessage: isAbort ? undefined : errorMessage,
+      errorMessage: isAbort ? undefined : formattedMessage,
     });
 
     throw err;
@@ -433,21 +512,45 @@ async function finalizeDownload(
   finalSizeBytes: number,
 ): Promise<void> {
   const partHandle = await bookDir.getFileHandle(PART_FILE_NAME);
-  const partFile = await partHandle.getFile();
 
-  // Write final audio.bin
-  const audioHandle = await bookDir.getFileHandle(AUDIO_FILE_NAME, { create: true });
-  const audioWritable = await audioHandle.createWritable();
-
-  const CHUNK_SIZE = 4 * 1024 * 1024;
-  let offset = 0;
-  while (offset < partFile.size) {
-    const slice = partFile.slice(offset, offset + CHUNK_SIZE);
-    const buf = await slice.arrayBuffer();
-    await audioWritable.write(new Uint8Array(buf));
-    offset += CHUNK_SIZE;
+  // Check if native atomic move is supported (modern Chromium / Android OPFS)
+  // This avoids doubling disk usage by not having to copy 500MB from part to bin!
+  let moved = false;
+  if (
+    "move" in partHandle &&
+    typeof (partHandle as { move?: (name: string) => Promise<void> }).move === "function"
+  ) {
+    try {
+      await (partHandle as { move: (name: string) => Promise<void> }).move(AUDIO_FILE_NAME);
+      moved = true;
+    } catch {
+      moved = false;
+    }
   }
-  await audioWritable.close();
+
+  if (!moved) {
+    const partFile = await partHandle.getFile();
+    // Write final audio.bin via streaming chunks (fallback for engines without move)
+    const audioHandle = await bookDir.getFileHandle(AUDIO_FILE_NAME, { create: true });
+    const audioWritable = await audioHandle.createWritable();
+
+    const CHUNK_SIZE = 4 * 1024 * 1024;
+    let offset = 0;
+    while (offset < partFile.size) {
+      const slice = partFile.slice(offset, offset + CHUNK_SIZE);
+      const buf = await slice.arrayBuffer();
+      await audioWritable.write(new Uint8Array(buf));
+      offset += CHUNK_SIZE;
+    }
+    await audioWritable.close();
+
+    // Delete audio.part
+    try {
+      await bookDir.removeEntry(PART_FILE_NAME);
+    } catch {
+      // Ignore
+    }
+  }
 
   // Cache cover picture into OPFS
   try {
@@ -476,13 +579,6 @@ async function finalizeDownload(
   };
   await metaWritable.write(JSON.stringify(finalMeta, null, 2));
   await metaWritable.close();
-
-  // Delete audio.part
-  try {
-    await bookDir.removeEntry(PART_FILE_NAME);
-  } catch {
-    // Ignore
-  }
 }
 
 /**

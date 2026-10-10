@@ -7,6 +7,7 @@ import {
   Pause,
   Play,
   Search,
+  ShieldCheck,
   Trash2,
   X,
   Zap,
@@ -25,6 +26,7 @@ import {
   getDownloadedBooks,
   getStorageEstimate,
   isOpfsSupported,
+  requestPersistentStorage,
 } from "../lib/opfs";
 import {
   type PrecacheNetworkPreference,
@@ -167,6 +169,11 @@ export function OfflinePage() {
     refreshData();
   }, [refreshData]);
 
+  const handleRequestPersistence = async () => {
+    await requestPersistentStorage();
+    await refreshData();
+  };
+
   const handleDelete = async (bookId: string) => {
     setDeletingId(bookId);
     try {
@@ -271,10 +278,23 @@ export function OfflinePage() {
           <div className="space-y-3 pt-2">
             <div className="flex justify-between items-center text-xs font-mono">
               <span className="text-muted">LOCAL DISK USAGE</span>
-              <span className="text-text">
-                {formatBytes(estimate.usageBytes)} / {formatBytes(estimate.quotaBytes)} (
-                {estimate.percentUsed}%)
-              </span>
+              <div className="flex items-center gap-2">
+                {estimate.isPersisted !== undefined && (
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                      estimate.isPersisted
+                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
+                        : "bg-amber-500/10 text-amber-400 border-amber-500/30"
+                    }`}
+                  >
+                    {estimate.isPersisted ? "PERSISTENT STORAGE" : "BEST-EFFORT STORAGE"}
+                  </span>
+                )}
+                <span className="text-text">
+                  {formatBytes(estimate.usageBytes)} / {formatBytes(estimate.quotaBytes)} (
+                  {estimate.percentUsed}%)
+                </span>
+              </div>
             </div>
 
             <div className="h-2 w-full bg-elevated rounded-full overflow-hidden border border-border">
@@ -283,6 +303,23 @@ export function OfflinePage() {
                 style={{ width: `${Math.max(1, Math.min(100, estimate.percentUsed))}%` }}
               />
             </div>
+
+            {estimate.isPersisted === false && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
+                <span>
+                  Persistent storage is not active. The phone OS might clear offline downloads if storage is low.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRequestPersistence}
+                  className="px-2.5 py-1 rounded bg-accent text-bg font-semibold text-xs shrink-0 self-start sm:self-auto cursor-pointer transition-opacity hover:opacity-90 flex items-center gap-1.5"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Enable Persistent Storage
+                </button>
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center justify-between text-[11px] font-mono text-subtle gap-2">
               <p>
                 Downloaded books are cached directly to your device disk using the Origin Private

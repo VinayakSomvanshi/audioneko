@@ -175,11 +175,17 @@ export function LibraryPage() {
     return set;
   }, [bookProgressMap]);
 
-  // Continue listening hero: the last audiobook the user started playing that is not yet completed
+  // Continue listening hero: the active audiobook the user is listening to or loaded in player
   const continueBook = useMemo(() => {
-    // 1. If actively playing right now, that is the continue book:
-    if (currentBook && isPlaying) {
-      return currentBook;
+    // 1. Highest priority: if a book is loaded in the player and in progress,
+    // it IS the continue book (whether playing or paused) so top card and player never mismatch:
+    if (currentBook) {
+      const activeEntry = bookProgressMap.get(currentBook.id);
+      const curT = currentTime > 0 ? currentTime : (activeEntry?.currentTime ?? 0);
+      const curDur = duration || activeEntry?.duration || currentBook.durationSeconds || 0;
+      if (!isPlaybackCompleted(curT, curDur)) {
+        return currentBook;
+      }
     }
 
     // 2. Otherwise find the uncompleted started book with the latest updatedAt timestamp across all devices:
@@ -193,18 +199,8 @@ export function LibraryPage() {
       if (match) return match;
     }
 
-    // 3. Fallback to loaded currentBook if in progress
-    if (currentBook) {
-      const activeEntry = bookProgressMap.get(currentBook.id);
-      const curT = activeEntry?.currentTime ?? currentTime;
-      const curDur = activeEntry?.duration ?? duration ?? currentBook.durationSeconds;
-      if (isPlaybackInProgress(curT, curDur)) {
-        return currentBook;
-      }
-    }
-
     return null;
-  }, [currentBook, currentTime, duration, isPlaying, bookProgressMap, booksList]);
+  }, [currentBook, currentTime, duration, bookProgressMap, booksList]);
 
   // Filtered books based on active tab
   const downloadedIds = new Set(downloadedBooks.map((b) => b.bookId));
