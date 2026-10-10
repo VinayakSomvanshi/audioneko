@@ -114,13 +114,16 @@ pnpm --filter @audioneko/server wrangler secret put APP_URL
 
 ### 4. Build and Deploy
 
-Build the client PWA and deploy the unified edge worker:
+Verify automated test suites (172 Vitest tests across 32 suites), build client assets, and deploy the unified edge worker:
 
 ```bash
-# 1. Build client static assets
+# 1. Run automated test suite
+pnpm test
+
+# 2. Build client static assets
 pnpm run build
 
-# 2. Deploy to Cloudflare Workers
+# 3. Deploy to Cloudflare Workers
 pnpm --filter @audioneko/server wrangler deploy
 ```
 

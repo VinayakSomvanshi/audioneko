@@ -9,8 +9,9 @@
 | Metric | Status | Details |
 | :--- | :--- | :--- |
 | **Current Phase** | **Phase 4: Polish, Compatibility & Production Deployment** | All 4 Phases Complete (100%) |
-| **Active Step** | **Step 4.4: 1:1 High-Resolution Square Audiobook Artwork & Fit Presentation** | Completed; Authentic 1:1 covers across all 18 titles; zero-cutoff ambient blur presentation active |
-| **Total Milestones** | **4 Phases / 18 Core Steps** | 18 of 18 steps completed (100% Monorepo Completion) |
+| **Active Step** | **Step 4.5: Mobile PWA Hardening, Offline Bookmarks Sync & Audio Resilience** | Completed; Full offline PWA with OPFS byte streaming, airplane mode bookmarks auto-sync, anti-suspension audio watchdog, and tactile haptics |
+| **Total Milestones** | **4 Phases / 19 Core Steps** | 19 of 19 steps completed (100% Monorepo Completion) |
+| **Automated Test Coverage**| **172 Vitest Tests Across 32 Suites** | 100% passing (68 app tests + 104 server tests) |
 | **Platform Quota Safety** | **Verified & Compliant (100%)** | All services operate with high headroom margin |
 | **Git Repository** | **Connected to GitHub** | `main` branch synced with `origin` |
 
@@ -129,6 +130,18 @@
   - [x] GitHub Actions automated workflow (`.github/workflows/ci.yml`) for Biome format/lint, TypeScript typecheck, Vitest, and production Vite build
   - [x] Production deployment configuration in `packages/server/wrangler.jsonc` with Durable Objects, assets binding, and 6-hour cron triggers
   - [x] Comprehensive deployment runbook (`DEPLOYMENT.md`) covering D1, KV, Google Service Account secrets, and client connections
+- [x] **Step 4.4: 1:1 High-Resolution Square Artwork & Narrative Presentation**
+  - [x] Uniform 1:1 square artwork presentation across library, shelves, and player cards with zero edge clipping and ambient color backdrops
+  - [x] StoryGraph and Goodreads CSV import/export for reading progress synchronization (`/analytics`)
+  - [x] High-resolution HTML5 canvas quote card generator with exportable themes
+- [x] **Step 4.5: Mobile PWA Hardening, Offline Bookmarks Sync & Audio Resilience**
+  - [x] AudioContext anti-suspension watchdog preventing audio stalls when mobile screens lock or tabs background
+  - [x] Seamless Airplane Mode & Offline PWA launch: unauthenticated offline bypass to `/offline` to play downloaded OPFS books
+  - [x] Service Worker OPFS range-request streaming with automatic format/MIME type resolution (`audio/mpeg`, `audio/flac`, `audio/ogg`, `audio/mp4`) and offline cover fallback
+  - [x] Offline Bookmarks store with local caching, offline creation/deletion queueing, and automatic flush to Cloudflare D1 upon reconnection (`audioneko:bookmarks-synced`)
+  - [x] Storage quota protection: atomic OPFS `.move()`, persistent storage permission request, pre-flight estimation, and DownloadButton error state with one-click retry
+  - [x] Native-like tactile haptic feedback (`navigator.vibrate`) on transport buttons, chapter steps, and bookmarks
+  - [x] PWA Web App Manifest shortcuts for home-screen long-press quick launches ("Offline Audiobooks" and "Library")
 
 ---
 
@@ -173,4 +186,13 @@
 | **2026-10-06 16:10** | **Complete Codebase Audit, Dead Code Elimination, Robust Exception Handling & Guardrails** | Removed 100% of unused imports, dead variables, and uncalled parameters across `@audioneko/server`, `@audioneko/app`, and `@audioneko/shared` (verified via `tsc --noUnusedLocals --noUnusedParameters`); implemented global `app.onError` uncaught exception handler and standardized `app.notFound` 404 JSON responses; added robust try/catch blocks and input sanitization to Bookmarks API; fixed critical listener logout bug in `audio-context.tsx` (switched audio error session check from `/api/admin/me` to `/api/auth/get-session`); added safe finite/non-negative number boundary clamping in `WaveformScrubber.tsx`, `MiniPlayer.tsx`, and `audio-context.tsx` to eliminate any possible `NaN` glitches; verified 126/126 tests passing (100%), Biome lint/format clean; deployed live to Cloudflare Workers (`dc0b00b3-b145-49dc-8fc6-4fca0cd0297b`). |
 | **2026-10-07 13:15** | **Analytics Timezone Alignment & UI Refinement** | Shifted server-side peak listening hour, streak dates, and 365-day heatmap calculations to the user's browser timezone offset (`tzOffset`); removed friend activity bar and social terminology from `/analytics`; 127 Vitest tests passing; deployed live to Cloudflare. |
 | **2026-10-07 13:21** | **Blinking Neko Brand Indicator & Narrator Filter Removal** | Removed narrator filter chip row from library; created `BlinkingNeko` component with theme-aware `.neko-pulse` animation replacing generic dots across continue listening, OPFS downloading badges, and player sync banners; updated documentation. |
+| **2026-10-08 14:10** | **StoryGraph & Goodreads CSV Sync + Quote Cards** | Implemented reading history CSV import and export on `/analytics` route; added HTML5 canvas quote card generator modal with customizable aesthetic themes (`editorial-dark`, `sober-minimal`, `warm-paper`). |
+| **2026-10-09 18:40** | **Audio Engine Anti-Suspension & Background Watchdog** | Built active `AudioContext.onstatechange` watchdog in `audio-engine.ts` and `audio-context.tsx` to automatically resume audio if suspended by mobile OS background constraints; attached `visibilitychange`, `focus`, and `playing` handlers; enforced `playsinline` and `webkit-playsinline` for iOS PWA background longevity. |
+| **2026-10-09 19:15** | **Continue Listening Hero Alignment** | Synchronized `continueBook` state in `library.tsx` to directly prioritize the currently loaded audio player book whenever playback is not completed, eliminating UI desynchronization between player and hero. |
+| **2026-10-10 12:20** | **Mobile OPFS Quota Protection & Storage Persistence** | Added `requestPersistentStorage()` using `navigator.storage.persist()`; integrated atomic `partHandle.move()` in OPFS download pipeline to prevent temporary file duplication; added pre-flight storage quota checks and user-friendly error formatting. |
+| **2026-10-10 14:15** | **Offline PWA & Airplane Mode Architecture** | Implemented unauthenticated offline access bypass in `root.tsx` and `login.tsx` for immediate access to `/offline` without network; upgraded `sw.js` to intercept audio range requests and stream from OPFS with format/MIME type auto-detection from `meta.json` (`audio/mpeg`, `audio/flac`, `audio/ogg`, `audio/mp4`); added offline cover fallback from OPFS `cover.jpg`. |
+| **2026-10-10 16:30** | **WebSocket Offline Progress Queue & Reconnection Sync** | Added `pendingOfflineUpdates` buffer in `sync-client.ts` to queue listening progress while offline; attached `window.addEventListener("online")` and `socket.onopen` triggers to automatically flush offline progress to Cloudflare D1 upon regaining connection. |
+| **2026-10-10 18:10** | **Picture-in-Picture Button Mobile Separation** | Replaced misleading outward-arrows icon with standard `PictureInPicture2` icon; hid PiP button on mobile viewports (`hidden sm:inline-flex`) where mobile browsers reject canvas-stream PiP, preventing dead button interactions. |
+| **2026-10-10 21:15** | **Offline Cover Loop Fix, Bookmarks Store, Haptics & App Shortcuts** | Resolved `useEffect` dependency loop in `OfflineCover` preventing premature blob URL revocation; created `offline-bookmarks.ts` with local caching and offline creation/deletion queueing that auto-syncs to D1 upon reconnecting (`audioneko:bookmarks-synced`); added `DownloadButton` error state with one-click retry; added tactile haptics (`navigator.vibrate`) on transport buttons; added PWA manifest home-screen shortcuts for "Offline Audiobooks" and "Library". 172 Vitest tests passing (100%). Deployed live. |
+
 

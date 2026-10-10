@@ -7,14 +7,14 @@
 
 ## Document Control & Metadata
 * **Project Name**: audioneko
-* **Document Version**: 1.2.0 (Production Verified & Deployed)
+* **Document Version**: 1.3.0 (Production Verified & Deployed)
 * **Author / Architect**: Pair Programming Engineering Specification
 * **Target Audience**: Core Maintainer / Developer (Solo Execution)
 * **Classification**: Technical Project Design Document & Implementation Standard
 * **Architecture Model**: **Serverless Edge & Cloud Storage Pipeline**
 * **Target Scale**: 3–10 Active Listeners (Private Trusted Circle)
 * **Production Deployment**: `https://audioneko.greatmidoriya.workers.dev`
-* **Automated Test Coverage**: 126 Vitest Tests Across 23 Suites (100% Pass Rate)
+* **Automated Test Coverage**: 172 Vitest Tests Across 32 Suites (100% Pass Rate: 68 App + 104 Server)
 
 ---
 
@@ -198,12 +198,23 @@ The application eliminates server maintenance overhead and brittle container orc
         $$\text{Resolved Position} = \max(\text{Pos}_A, \text{Pos}_B) \quad \text{if } |\text{Timestamp}_A - \text{Timestamp}_B| < 30\text{s}$$
     *   If a major discrepancy ($> 5\text{ minutes}$) occurs with an older timestamp from another device, an unobtrusive banner notifies the user: *"Resume from 03:12:40 on iPhone? [Resume] [Dismiss]"*.
 
-### 2.5 Offline PWA & Storage Management
-*   **PWA Packaging**: Web App Manifest with `display: standalone`, custom theme colors, service worker offline shell, and install prompts across desktop and mobile.
+### 2.5 Offline PWA, Storage Management & Mobile Resilience
+*   **PWA Packaging & Shortcuts**: Web App Manifest with `display: standalone`, custom theme colors, service worker offline shell, install prompts, and home-screen launcher shortcuts for "Offline Audiobooks" and "Library".
 *   **Origin Private File System (OPFS)**:
     *   Audiobook downloads bypass legacy IndexedDB 50 MB limits by writing binary streams directly into OPFS via `FileSystemWritableFileStream`.
-    *   Storage manager interface displaying exact device quota, space consumed per book, and one-tap chapter/book removal.
-    *   Seamless offline playback: Service Worker intercepts range requests for downloaded books and streams directly from OPFS blobs.
+    *   Storage manager interface (`/offline`) displaying exact device quota, space consumed per book, persistent storage status, and one-tap chapter/book removal.
+    *   Persistent storage permission (`navigator.storage.persist()`), pre-flight quota estimate checks, and atomic file move operations (`partHandle.move()`) preventing disk duplication during background downloads.
+    *   Seamless offline playback: Service Worker intercepts range requests for downloaded books and streams directly from OPFS blobs (`206 Partial Content`) with automatic codec/MIME resolution (`audio/mpeg`, `audio/flac`, `audio/ogg`, `audio/mp4`) and offline cover fallback.
+*   **Airplane Mode Launch & Direct Offline Bypass**:
+    *   Unauthenticated offline startup bypasses network authentication gates and directs the user straight to `/offline` to browse and listen to downloaded audiobooks without network lockouts.
+*   **Offline Bookmarks & Annotation Reconciliation**:
+    *   Local storage caching and pending operation queues enable creation and deletion of bookmarks and notes while completely offline.
+    *   Automatic reconciliation and flush to Cloudflare D1 occurs immediately upon network restoration (`audioneko:bookmarks-synced`).
+*   **Audio Engine Anti-Suspension Watchdog**:
+    *   Active `AudioContext.state` watchdog automatically detects mobile operating system background suspensions and restores audio execution smoothly upon lock-screen or tab switches.
+    *   Enforces `playsinline` and `webkit-playsinline` on HTML media elements for iOS Safari background longevity.
+*   **Tactile Mobile Haptic Feedback**:
+    *   Native-like 10ms–15ms vibration pulses (`navigator.vibrate`) on transport buttons (play/pause, chapter skips, +/-15s/30s jumps, and bookmark creation).
 
 ### 2.6 Social Features (Small Group)
 *   **Friend Activity**: Real-time presence indicators displaying what friends are currently listening to and their percentage progress.

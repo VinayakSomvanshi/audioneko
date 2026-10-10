@@ -33,6 +33,7 @@ The complete technical architecture, data model, performance budget, security th
 * **Enhanced Media Session and Headset Remapping**: Hardware headset button customization (double-tap skip, triple-tap previous) alongside native lock screen timeline sync and media controls.
 * **Variable Playback Speeds**: Granular playback rates from 0.5x to 3.0x in 0.05x increments using native WSOLA pitch preservation (`preservesPitch = true`).
 * **Gain Ramp Crossfading**: Automated 40ms linear gain ramp-up and ramp-down on play, pause, and seek events to eliminate speaker pops and clicks.
+* **Audio Engine Anti-Suspension Watchdog**: Active watchdog tracking `AudioContext.state` that automatically resumes playback if suspended by mobile operating system background limits, lock screens, or tab switching.
 * **Picture-in-Picture Visualizer**: HTML5 Canvas rendering real-time frequency bar spectrum analysis alongside book artwork, streaming to Picture-in-Picture (PiP) mode.
 * **Volume and Mute Memory**: In-player volume slider with non-zero volume memory and instant mute toggle.
 
@@ -87,6 +88,7 @@ The complete technical architecture, data model, performance budget, security th
 
 ### 7. Notebook, Annotations and Content Tools
 * **Single-Tap Bookmarking**: Creates instant timestamped bookmarks capturing exact playback offset, active chapter, and creation date.
+* **Offline Bookmarking & Airplane Mode Sync**: Full offline bookmark and note creation supported while traveling or disconnected. Bookmarks persist locally in browser storage and automatically sync and reconcile to Cloudflare D1 upon regaining internet connectivity.
 * **Notebook Timeline (`/bookmarks`, `/notebook`)**: Consolidated timeline across the entire audiobook library featuring live search, book covers, audio jump links, and inline note editing.
 * **Markdown Annotation Export**: One-click download of all highlights and notes formatted in clean Markdown (`/api/bookmarks/export/markdown`), grouped hierarchically by book and chapter.
 * **High-Resolution Quote Card Generator**: Built-in HTML5 Canvas generator rendering 1200x675 exportable PNG quote cards with typographic styling and customizable aesthetic themes (`editorial-dark`, `sober-minimal`, `warm-paper`).
@@ -95,17 +97,21 @@ The complete technical architecture, data model, performance budget, security th
 ### 8. Real-Time Multi-Device Sync and Listen-Along Rooms
 * **Cloudflare Durable Objects (`SyncRoom`)**: Stateful, hibernatable WebSocket connections maintaining real-time listener state across browser tabs, smartphones, and desktop computers.
 * **Conflict-Free State Resolution**: Hybrid Logical Clocks (HLC) and Monotonic Progress Vectors resolve multi-device playback discrepancies without position loss.
+* **Offline Progress Queue & Auto-Sync**: Buffers playback updates when disconnected and automatically flushes accumulated progress to Cloudflare D1 via WebSockets upon reconnection.
 * **Cross-Device Resume Toast**: Unobtrusive banner alerting listeners when playback progress advanced on another device, allowing one-click synchronization.
 * **Synchronized Listen-Along Rooms**: Shared rooms over WebSockets where a host coordinates playback. Dynamic audio clock slewing aligns listener audio within +/-50ms without acoustic clicks.
 
 ### 9. Offline-First Progressive Web App (OPFS)
 * **Origin Private File System (OPFS)**: High-performance streaming storage engine storing multi-gigabyte audiobooks directly in private browser storage, bypassing IndexedDB quota bottlenecks.
+* **Airplane Mode Launch & Direct Offline Access**: PWA detects offline state on app boot and allows direct access to downloaded audiobooks via `/offline` without network authentication lockouts.
 * **Multi-Task Download Queue**: Concurrent background audio downloads with granular progress tracking, speed calculation, and estimated completion times.
+* **Persistent Storage & Atomic Assembly**: Automatically requests browser persistent storage (`navigator.storage.persist()`), performs pre-flight disk quota checks, and executes atomic file assembly (`partHandle.move()`) to prevent temporary file duplication.
+* **Download Error Recovery & Retry**: Explicit error states with clear user advice on quota or network failures, plus one-click download retry actions.
 * **Pause, Resume, and Cancel Controls**: Individual and bulk controls (`Pause All`, `Resume All`, `Cancel All`) with state preservation that survives page reloads without restarting downloads.
 * **Persistent Offline Cover Artwork**: Caches high-resolution book covers locally in OPFS alongside audio data for full visual fidelity while offline.
-* **Service Worker HTTP 206 Interception**: Service Worker intercepts audio range requests for saved titles, streaming Partial Content (`206 Partial Content`) directly from local OPFS blobs when offline.
-* **Storage Management Dashboard (`/offline`)**: Detailed client storage meter displaying total device quota, consumed bytes per audiobook, and one-tap chapter/book eviction.
-* **PWA Standalone App**: Installable Progressive Web App with standalone window display, custom theme colors, and offline app shell caching.
+* **Service Worker HTTP 206 Interception**: Service Worker intercepts audio range requests for saved titles, streaming Partial Content (`206 Partial Content`) directly from local OPFS blobs when offline with codec/MIME auto-detection (`audio/mpeg`, `audio/flac`, `audio/ogg`, `audio/mp4`).
+* **Storage Management Dashboard (`/offline`)**: Detailed client storage meter displaying total device quota, consumed bytes per audiobook, persistent storage status, and one-tap chapter/book eviction.
+* **PWA Standalone App & Shortcuts**: Installable Progressive Web App with standalone display, dark theme colors, offline app shell caching, and home-screen launcher shortcuts for "Offline Audiobooks" and "Library".
 
 ### 10. Listening Analytics and Streaks
 * **Consecutive Day Listening Streaks**: Automated daily streak counter tracking active listening consistency with local timezone alignment.

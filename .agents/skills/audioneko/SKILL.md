@@ -87,12 +87,15 @@ audioneko/
 - Single Page Application with TanStack Router, React 19, and Tailwind CSS v4.
 - Output directory: `dist/` (configured in `wrangler.jsonc` as static assets for the server).
 - **Audio Context**: Centralized transport coordinator ([`src/context/audio-context.tsx`](file:///home/vinayak/Documents/audioneko/packages/app/src/context/audio-context.tsx)).
-- **Audio Engine**: Web Audio DSP pipeline ([`src/lib/audio-engine.ts`](file:///home/vinayak/Documents/audioneko/packages/app/src/lib/audio-engine.ts)).
-- **Media Session**: Lock-screen controls and metadata ([`src/lib/media-session.ts`](file:///home/vinayak/Documents/audioneko/packages/app/src/lib/media-session.ts)).
+- **Audio Engine**: Web Audio DSP pipeline with Anti-Suspension Watchdog ([`src/lib/audio-engine.ts`](file:///home/vinayak/Documents/audioneko/packages/app/src/lib/audio-engine.ts)).
+- **Media Session**: Lock-screen controls and artwork metadata ([`src/lib/media-session.ts`](file:///home/vinayak/Documents/audioneko/packages/app/src/lib/media-session.ts)).
 - **Sleep Timer**: Countdown with 30s linear volume fade and shake-to-extend ([`src/lib/sleep-timer.ts`](file:///home/vinayak/Documents/audioneko/packages/app/src/lib/sleep-timer.ts)).
 - **Scrubber**: Decelerated vertical-drag timeline ([`src/components/player/WaveformScrubber.tsx`](file:///home/vinayak/Documents/audioneko/packages/app/src/components/player/WaveformScrubber.tsx)).
 - **PiP Visualizer**: Picture-in-Picture canvas with live frequency spectrum ([`src/lib/pip-visualizer.ts`](file:///home/vinayak/Documents/audioneko/packages/app/src/lib/pip-visualizer.ts)).
-- **Full Player Modal**: Expanded tactile player ([`src/components/player/FullPlayerModal.tsx`](file:///home/vinayak/Documents/audioneko/packages/app/src/components/player/FullPlayerModal.tsx)).
+- **Full Player Modal**: Expanded tactile player with EQ, bookmarks, and sleep controls ([`src/components/player/FullPlayerModal.tsx`](file:///home/vinayak/Documents/audioneko/packages/app/src/components/player/FullPlayerModal.tsx)).
+- **Offline Storage (OPFS)**: Atomic chunk assembly (`partHandle.move()`), persistent storage requests, and indexed metadata ([`src/lib/opfs.ts`](file:///home/vinayak/Documents/audioneko/packages/app/src/lib/opfs.ts)).
+- **Offline Progress & Bookmarks Sync**: IndexedDB queues that replay playback progress and offline bookmarks seamlessly on reconnection ([`src/lib/sync-client.ts`](file:///home/vinayak/Documents/audioneko/packages/app/src/lib/sync-client.ts), [`src/lib/offline-bookmarks.ts`](file:///home/vinayak/Documents/audioneko/packages/app/src/lib/offline-bookmarks.ts)).
+- **Tactile Haptics**: Vibration patterns for play, pause, bookmark creation, scrubbing, and mode switches ([`src/lib/haptics.ts`](file:///home/vinayak/Documents/audioneko/packages/app/src/lib/haptics.ts)).
 
 ---
 
@@ -120,6 +123,14 @@ When editing or extending the audio playback pipeline:
 6. **Sleep Timer Volume Fade**:
    - Within the final 30 seconds: `volumeMultiplier = remainingSeconds / 30`.
    - Shake to extend: Accelerometer $\Delta(\text{vector}) > 18\text{ m/s}^2$ extends by $+15$ minutes and vibrates with `[40, 60, 40]`.
+7. **Audio Engine Anti-Suspension Watchdog**:
+   - Periodically monitors `audioCtx.state === 'suspended'` while `isPlaying === true`.
+   - Automatically executes `audioCtx.resume()` if mobile browsers suspend the audio pipeline during backgrounding or tab switching.
+8. **Tactile Haptic Feedback**:
+   - Clean, subtle mechanical vibration pulses: light tick (`[12]`) on seek/scrub/toggles, confirmation pulse (`[18, 40, 22]`) on bookmark creation, and alert pulse (`[40, 60, 40]`) on sleep timer extension.
+9. **Offline Resiliency & OPFS Persistence**:
+   - OPFS downloads are assembled atomically via temporary files moved into place using `partHandle.move(finalName)`.
+   - Service worker provides instant offline shell fallback and routes directly to `/offline` when launching without an active internet connection.
 
 ---
 
