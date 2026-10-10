@@ -5,10 +5,10 @@ import {
   FastForward,
   Headphones,
   ListMusic,
-  Maximize2,
   Mic,
   Moon,
   Pause,
+  PictureInPicture2,
   Play,
   Plus,
   Rewind,
@@ -210,19 +210,19 @@ export function FullPlayerModal() {
             )}
           </button>
 
-          {/* PiP button */}
+          {/* Picture-in-Picture floating mini-player button (Desktop / Tablet) */}
           <button
             type="button"
             onClick={togglePiP}
-            className={`p-1.5 sm:p-2 rounded transition-colors cursor-pointer ${
+            className={`hidden sm:inline-flex p-1.5 sm:p-2 rounded transition-colors cursor-pointer ${
               isPiPActive
                 ? "bg-accent/20 text-accent border border-accent/40"
                 : "text-muted hover:text-text hover:bg-elevated"
             }`}
-            aria-label="Picture-in-Picture"
-            title="Picture-in-Picture"
+            aria-label="Floating Mini-Player (Picture-in-Picture)"
+            title="Floating Mini-Player (Picture-in-Picture)"
           >
-            <Maximize2 className="w-4 h-4" />
+            <PictureInPicture2 className="w-4 h-4" />
           </button>
 
           {/* Sleep timer button */}
