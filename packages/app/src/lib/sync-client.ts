@@ -73,6 +73,7 @@ export class SyncClient {
   private wsUrl: string;
   private localHlc: HybridLogicalClock;
   private books = new Map<string, BookProgressRecord>();
+  private pendingOfflineUpdates = new Map<string, SyncClientMessage>();
 
   private remoteProgressListeners = new Set<RemoteProgressCallback>();
   private connectionListeners = new Set<ConnectionChangeCallback>();
@@ -90,6 +91,15 @@ export class SyncClient {
       this.wsUrl = `${protocol}//${window.location.host}/api/sync/ws`;
     } else {
       this.wsUrl = "ws://localhost:8787/api/sync/ws";
+    }
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("online", () => {
+        if (!this.isConnected() && !this.isExplicitlyClosed) {
+          this.reconnectAttempts = 0;
+          this.connect();
+        }
+      });
     }
   }
 
@@ -113,6 +123,7 @@ export class SyncClient {
         this.reconnectAttempts = 0;
         this.notifyConnectionChange(true);
         this.startHeartbeat();
+        this.flushPendingUpdates();
       };
 
       this.socket.onmessage = (event: MessageEvent) => {
@@ -189,8 +200,6 @@ export class SyncClient {
     // Store in local cache
     this.books.set(params.bookId, record);
 
-    if (!this.isConnected()) return;
-
     const message: SyncClientMessage = {
       type: "SYNC_UPDATE",
       bookId: params.bookId,
@@ -204,7 +213,24 @@ export class SyncClient {
       isExplicitSeek: params.isExplicitSeek,
     };
 
+    if (!this.isConnected()) {
+      this.pendingOfflineUpdates.set(params.bookId, message);
+      return;
+    }
+
     this.socket?.send(JSON.stringify(message));
+  }
+
+  /**
+   * Flushes any updates that accumulated while offline or disconnected.
+   */
+  public flushPendingUpdates(): void {
+    if (!this.isConnected() || this.pendingOfflineUpdates.size === 0) return;
+
+    for (const [bookId, msg] of this.pendingOfflineUpdates.entries()) {
+      this.socket?.send(JSON.stringify(msg));
+      this.pendingOfflineUpdates.delete(bookId);
+    }
   }
 
   /**
