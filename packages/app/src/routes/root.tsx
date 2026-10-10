@@ -39,6 +39,11 @@ export function RootLayout() {
   useEffect(() => {
     if (!isLoading && !user) {
       const path = location.pathname;
+      // If user is offline (e.g. airplane mode) and cannot reach auth API, route to /offline
+      if (typeof navigator !== "undefined" && !navigator.onLine && path !== "/offline") {
+        navigate({ to: "/offline" });
+        return;
+      }
       if (path !== "/login" && path !== "/join" && path !== "/offline") {
         navigate({ to: "/login" });
       }

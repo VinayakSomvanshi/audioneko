@@ -1,5 +1,5 @@
-import { useNavigate } from "@tanstack/react-router";
-import { Loader2, ShieldAlert } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { HardDriveDownload, Loader2, ShieldAlert } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
 import { ForgotPasswordModal } from "../components/auth/ForgotPasswordModal";
 import { NekoIcon } from "../components/icons/NekoIcon";
@@ -157,6 +157,16 @@ export function LoginPage() {
             audioneko is private and invite-only. New accounts can only be created via a
             cryptographic invite link.
           </span>
+        </div>
+
+        <div className="pt-3 border-t border-border/50 flex justify-center">
+          <Link
+            to="/offline"
+            className="text-[11px] font-mono text-muted hover:text-accent transition-colors flex items-center gap-1.5"
+          >
+            <HardDriveDownload className="w-3.5 h-3.5" />
+            <span>Access Offline Audiobooks</span>
+          </Link>
         </div>
       </div>
 
