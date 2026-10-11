@@ -106,7 +106,6 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     ) {
       series = "Zodiac Academy";
       author = "Caroline Peckham & Susanne Valenti";
-      narrator = "GraphicAudio Full Cast";
     }
   }
 
@@ -245,46 +244,67 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
   ) {
     author = "Caroline Peckham & Susanne Valenti";
     series = "Zodiac Academy";
-    narrator = narrator || "GraphicAudio Full Cast";
 
     if (lowerTitle.includes("awakening")) {
       title = "The Awakening";
       seriesIndex = 1;
+      narrator =
+        "Khaya Fraites, Jessica Schly, Gregory Linnington, Julian Dailey, Jon Vertullo, Ryan Dalusung, Gabriel Michael, Karenna Foley, Daniel Llaca, Lydia Kraniotis, Nora Achrati, Kelly Baskin, Stephanie Nemeth-Parker, Crystal Lee, Dawn Ursula, Lise Bruneau, Kaylee Eluvian, Marissa Clay, Bradley Foster Smith, Michael John Casey, Ken Jackson, Tyler Hyrchuk, Donald Guzzi, Yasmin Tuazon, Jeri J. Marshall, Laura C. Harris, Karen Novack, Eric Messner, Scott McCormick, Drew Kopas & James Konicek";
     } else if (lowerTitle.includes("ruthless fae")) {
       title = "Ruthless Fae";
       seriesIndex = 2;
+      narrator =
+        "Khaya Fraites, Jessica Schly, Gregory Linington, Julian Dailey, Ryan Dalusung, Jon Vertullo, Gabriel Michael, Daniel Llaca, Michael Glenn, Karenna Foley, Lydia Kraniotis, Nora Achrati, James Konicek, Lise Bruneau, Kelly Baskin, Stephanie Nemeth-Parker, Ian Russell, Kit Swann, Terence Aselford, Laura C. Harris, Shravan Amin, Michael John Casey, Tyler Hyrchuk, Crystal Lee, Ken Jackson, Yasmin Tuazon, Christopher Williams, Nanette Savard, Jeri J. Marshall, Kaylee Eluvian, Richard Rohan, Dawn Ursula, Eric Messner, Bradley Foster Smith, Amanda Forstrom, Colleen Delany, Matthew Bassett & Christopher Walker";
     } else if (lowerTitle.includes("the reckoning")) {
       if (lowerTitle.includes("1 of 2") || lowerTitle.includes("part 1")) {
         title = "The Reckoning (1 of 2)";
         seriesIndex = 3.1;
+        narrator =
+          "Khaya Fraites, Jessica Schly, Gregory Linnington, Julian Dailey, Jon Vertullo, Ryan Dalusung, Gabriel Michael, Daniel Llaca, Karenna Foley, Lydia Kraniotis, Nora Achrati, James Konicek, Kelly Baskin, Stephanie Nemeth-Parker, Ian Russell, Tyler Hyrchuk, Crystal Lee, Yasmin Tuazon, Jeri J. Marshall, Dawn Ursula, Eric Messner, Amanda Forstrom, Colleen Delany, Matthew Bassett & Christopher Walker";
       } else if (lowerTitle.includes("2 of 2") || lowerTitle.includes("part 2")) {
         title = "The Reckoning (2 of 2)";
         seriesIndex = 3.2;
+        narrator =
+          "Khaya Fraites, Jessica Schly, Gregory Linington, Julian Dailey, Jon Vertullo, Ryan Dalusung, Gabriel Michael, Nora Achrati, Shravan Amin, Kelly Baskin, Matthew Bassett, Lise Bruneau, Michael John Casey, Colleen Delany, Kaylee Eluvian, Karenna Foley, Amanda Forstrom, Bradley Foster Smith, Michael Glenn, Laura C. Harris, Tyler Hyrchuk, Ken Jackson, James Konicek, Drew Kopas, Lydia Kraniotis, Crystal Lee, Daniel Llaca, Jeri J. Marshall, Scott McCormick, Eric Messner, Robb Moreira, Stephanie Nemeth-Parker, Karen Novack, Richard Rohan, Joey Sourlis, Kit Swann, Yasmin Tuazon, Dawn Ursula & Christopher Walker";
       } else {
         title = "The Reckoning";
         seriesIndex = 3;
+        narrator =
+          "Khaya Fraites, Jessica Schly, Gregory Linnington, Julian Dailey, Jon Vertullo, Ryan Dalusung, Gabriel Michael & GraphicAudio Ensemble";
       }
     } else if (lowerTitle.includes("shadow princess")) {
       if (lowerTitle.includes("1 of 2") || lowerTitle.includes("part 1")) {
         title = "Shadow Princess (1 of 2)";
         seriesIndex = 4.1;
+        narrator =
+          "Khaya Fraites, Jessica Schly, Gregory Linnington, Julian Dailey, Jon Vertullo, Ryan Dalusung, Gabriel Michael, Rayner Gabriel, Lydia Kraniotis, Karenna Foley, Daniel Llaca, Kelly Baskin, Shravan Amin, Stephanie Nemeth-Parker, Crystal Lee, Amanda Forstrom, Su Ling Chan, Michael Glenn, Tyler Hyrchuk, Kit Swann, Nanette Savard, Robb Moreira, Joey Sourlis, KenYatta Rogers, Richard Rohan, Bradley Foster Smith, Emlyn McFarland, Drew Kopas, Ken Jackson, Laura C. Harris, Matthew Bassett, Nora Achrati, Yasmin Tuazon, Jeri J. Marshall, Eric Messner, Aeri Weaver & James Konicek";
       } else if (lowerTitle.includes("2 of 2") || lowerTitle.includes("part 2")) {
         title = "Shadow Princess (2 of 2)";
         seriesIndex = 4.2;
+        narrator =
+          "Khaya Fraites, Jessica Schly, Gregory Linington, Julian Dailey, Jon Vertullo, Ryan Dalusung, Gabriel Michael, Daniel Llaca, Shravan Amin, Terence Aselford, Karenna Foley, Lydia Kraniotis, Nora Achrati, James Konicek, Kelly Baskin, Stephanie Nemeth-Parker, Tyler Hyrchuk, Crystal Lee, Yasmin Tuazon, Jeri J. Marshall, Eric Messner, Colleen Delany, Matthew Bassett, Lise Bruneau, Darcey Lee, Michael John Casey, Megan Dominy, Kaylee Eluvian, Rayner Gabriel, Michael Glenn, Laura C. Harris, Ken Jackson, Emlyn McFarland, Nanette Savard, Kit Swann & Bradley Foster Smith";
       } else {
         title = "Shadow Princess";
         seriesIndex = 4;
+        narrator =
+          "Khaya Fraites, Jessica Schly, Gregory Linnington, Julian Dailey, Jon Vertullo, Ryan Dalusung, Gabriel Michael & GraphicAudio Ensemble";
       }
     } else if (lowerTitle.includes("cursed fates")) {
       if (lowerTitle.includes("1 of 2") || lowerTitle.includes("part 1")) {
         title = "Cursed Fates (1 of 2)";
         seriesIndex = 5.1;
+        narrator =
+          "Jessica Schly, Jon Vertullo, Gregory Linington, Jonathan Sleep, Julian Dailey, Khaya Fraites, Gabriel Michael, Emlyn McFarland, Ryan Dalusung, Rayner Gabriel, Lydia Kraniotis, Michael Glenn, Kelly Baskin, Karenna Foley, Tyler Hyrchuk, Crystal Lee, Nanette Savard, Darcey Lee, Daniel Llaca, Jeri J. Marshall, Karen Novack, Matthew Bassett, Drew Kopas, Nora Achrati, Lise Bruneau, Laura C. Harris, Yasmin Tuazon, Wyn Delano, Bradley Foster Smith, Christopher Walker, Richard Rohan, Stephanie Nemeth-Parker, Ken Jackson, Kit Swann, Robb Moreira, Eric Messner, Charles Joseph & James Konicek";
       } else if (lowerTitle.includes("2 of 2") || lowerTitle.includes("part 2")) {
         title = "Cursed Fates (2 of 2)";
         seriesIndex = 5.2;
+        narrator =
+          "Jon Vertullo, Ryan Dalusung, Khaya Fraites, Gabriel Michael, Gregory Linington, Jessica Schly, Julian Dailey, Emlyn McFarland, Jonathan Sleep, Michael Glenn, Lydia Kraniotis, Daniel Llaca, Emily Fury Daly, Michael John Casey, Yasmin Tuazon, Drew Kopas, Matthew Bassett, Laura C. Harris, Nora Sofyan, Ken Jackson, Bradley Foster Smith, Eric Messner, James Konicek, Jeri J. Marshall, Colleen Delany, Christopher Walker, Rayner Gabriel, Jenna Sharpe, Kourtney Cooper, Carolyn Kashner, Megan Dominy, Crystal Lee, Zoleka Vundla, Darcy Lee, Alex Hill-Knight, Nanette Savard, Karenna Foley, Kelly Baskin, Delton Engle-Sorrell, Robb Moreira, Kit Swann, Stephanie Nemeth-Parker, Christopher Graybill, Tyler Hyrchuk, Kay Eluvian, Wyn Delano & Joey Sourlis";
       } else {
         title = "Cursed Fates";
         seriesIndex = 5;
+        narrator =
+          "Jessica Schly, Jon Vertullo, Gregory Linington, Julian Dailey, Khaya Fraites, Gabriel Michael & GraphicAudio Ensemble";
       }
     }
   }
