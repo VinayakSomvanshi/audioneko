@@ -37,6 +37,8 @@ const CURATED_AUTHOR_PHOTOS: Record<string, string> = {
   "caroline peckham": "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
   "susanne valenti": "https://covers.openlibrary.org/a/olid/OL8417609A-L.jpg",
   "caroline peckham & susanne valenti": "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
+  "somme sketcher":
+    "https://www.authorsommesketcher.com/cdn/shop/files/ss-favicon.jpg?v=1715211417&width=800",
 };
 
 const CURATED_AUTHOR_BIOS: Record<string, { bio: string; birthDate: string; topWork: string }> = {
@@ -114,6 +116,11 @@ const CURATED_AUTHOR_BIOS: Record<string, { bio: string; birthDate: string; topW
     bio: "Caroline Peckham & Susanne Valenti (known as the Twisted Sisters) are #1 Wall Street Journal and USA Today bestselling sister authors from the UK. Together they write dark fantasy, paranormal romance, and romantasy sagas set in the magical universe of Solaria, most famously the nine-book blockbuster Zodiac Academy saga.",
     birthDate: "1991 & 1993",
     topWork: "Zodiac Academy: The Awakening",
+  },
+  "somme sketcher": {
+    bio: "Somme Sketcher is an international bestselling author of dark and mafia romance. She is best known for her Sinners Anonymous series and for writing the slowest of slow burns. When not writing, she enjoys exploring new hobbies like pottery and ice skating, or listening to true crime podcasts.",
+    birthDate: "",
+    topWork: "Sinners Anonymous",
   },
 };
 

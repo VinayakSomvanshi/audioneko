@@ -232,4 +232,34 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(b5.seriesIndex).toBe(5.1);
     expect(b5.narrator).toBe("Khaya Fraites & Jessica Schly");
   });
+
+  it("parses Sinners Anonymous series by Somme Sketcher with authentic narrators", () => {
+    const b1 = parseBookInfo("Sinners Anonymous.m4b", "Sinners Anonymous");
+    expect(b1.title).toBe("Sinners Anonymous");
+    expect(b1.author).toBe("Somme Sketcher");
+    expect(b1.series).toBe("Sinners Anonymous");
+    expect(b1.seriesIndex).toBe(1);
+    expect(b1.narrator).toBe("Alan Carlson & Lee Daniels");
+
+    const b2 = parseBookInfo("Sinners Condemned.m4b", "Sinners Anonymous");
+    expect(b2.title).toBe("Sinners Condemned");
+    expect(b2.author).toBe("Somme Sketcher");
+    expect(b2.series).toBe("Sinners Anonymous");
+    expect(b2.seriesIndex).toBe(2);
+    expect(b2.narrator).toBe("Stephen Dexter & Brooke Daniels");
+
+    const b3 = parseBookInfo("Sinners Consumed.m4b", "Sinners Anonymous");
+    expect(b3.title).toBe("Sinners Consumed");
+    expect(b3.author).toBe("Somme Sketcher");
+    expect(b3.series).toBe("Sinners Anonymous");
+    expect(b3.seriesIndex).toBe(3);
+    expect(b3.narrator).toBe("Stephen Dexter & Brooke Daniels");
+
+    const b4 = parseBookInfo("Sinners Atone.m4b", "Sinners Anonymous");
+    expect(b4.title).toBe("Sinners Atone");
+    expect(b4.author).toBe("Somme Sketcher");
+    expect(b4.series).toBe("Sinners Anonymous");
+    expect(b4.seriesIndex).toBe(4);
+    expect(b4.narrator).toBe("Vanessa Moyen & Gideon Frost");
+  });
 });

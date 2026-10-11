@@ -35,6 +35,8 @@ const KNOWN_AUTHOR_PHOTOS: Record<string, string> = {
   "susanne valenti": "https://covers.openlibrary.org/a/olid/OL8417609A-L.jpg",
   "caroline peckham & susanne valenti": "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
   "caroline peckham, susanne valenti": "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
+  "somme sketcher":
+    "https://www.authorsommesketcher.com/cdn/shop/files/ss-favicon.jpg?v=1715211417&width=800",
 };
 
 /**

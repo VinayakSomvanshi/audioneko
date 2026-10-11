@@ -106,6 +106,12 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     ) {
       series = "Zodiac Academy";
       author = "Caroline Peckham & Susanne Valenti";
+    } else if (
+      parentFolderName.toLowerCase().includes("sinners") ||
+      parentFolderName.toLowerCase().includes("somme sketcher")
+    ) {
+      series = "Sinners Anonymous";
+      author = "Somme Sketcher";
     }
   }
 
@@ -463,6 +469,41 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
       .trim();
   }
 
+  // Known series heuristics for Somme Sketcher Sinners Anonymous series
+  if (
+    series === "Sinners Anonymous" ||
+    lowerClean.includes("sinners anonymous") ||
+    lowerClean.includes("sinners condemned") ||
+    lowerClean.includes("sinners consumed") ||
+    lowerClean.includes("sinners atone") ||
+    lowerTitle.includes("sinners anonymous") ||
+    lowerTitle.includes("sinners condemned") ||
+    lowerTitle.includes("sinners consumed") ||
+    lowerTitle.includes("sinners atone") ||
+    author.toLowerCase().includes("somme sketcher")
+  ) {
+    author = "Somme Sketcher";
+    series = "Sinners Anonymous";
+
+    if (lowerTitle.includes("condemned") || lowerClean.includes("condemned")) {
+      title = "Sinners Condemned";
+      seriesIndex = 2;
+      narrator = narrator || "Stephen Dexter & Brooke Daniels";
+    } else if (lowerTitle.includes("consumed") || lowerClean.includes("consumed")) {
+      title = "Sinners Consumed";
+      seriesIndex = 3;
+      narrator = narrator || "Stephen Dexter & Brooke Daniels";
+    } else if (lowerTitle.includes("atone") || lowerClean.includes("atone")) {
+      title = "Sinners Atone";
+      seriesIndex = 4;
+      narrator = narrator || "Vanessa Moyen & Gideon Frost";
+    } else {
+      title = "Sinners Anonymous";
+      seriesIndex = 1;
+      narrator = narrator || "Alan Carlson & Lee Daniels";
+    }
+  }
+
   return { title, author, series, seriesIndex, narrator, format };
 }
 
@@ -788,6 +829,53 @@ export async function scanDriveLibrary(
         }
       } catch (enrichErr) {
         console.warn(`[scan] enrichment error for "${parsed.title}":`, enrichErr);
+      }
+    }
+
+    // Curated metadata fallback for Sinners Anonymous series
+    if (parsed.series === "Sinners Anonymous") {
+      const sinnersMap: Record<number, { cover: string; year: number; desc: string }> = {
+        1: {
+          cover:
+            "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/4c/30/23/4c302352-adcc-9fed-33d3-6e845059be34/rm_image.jpg/1200x1200bb.jpg",
+          year: 2021,
+          desc: "My fiancé's nephew knows every sin I've ever committed. He's about to become the deepest and darkest of them all. My name is Rory Carter and I do bad things. There's a charred soul under this angelic exterior and sometimes, I wonder if my weekly confessions to the Sinners Anonymous hotline will be enough to heal it. Marrying the seventy-something head of the Cosa Nostra to save my father is the only good deed I've ever done. Until Angelo \"Vicious\" Visconti turns up to dinner uninvited. A beautiful monster with cheekbones as sharp as his tongue—he holds all of my sins in his big, rough hands. And the only sins darker than mine are his own.",
+        },
+        2: {
+          cover:
+            "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/ee/8c/f3/ee8cf392-63b3-726d-d971-ea99d4dbcce6/rm_image.jpg/1200x1200bb.jpg",
+          year: 2022,
+          desc: "No good ever comes from a redhead in a stolen dress with her worldly possessions at her feet. I should have known she was trouble when smoke and sin followed her into my bar and she challenged me to a game. She may have won my watch, but she started a war. As she slipped my Breitling off my wrist and onto her own, she gleefully announced she was the luckiest girl in the world. Yeah, lucky to everyone but me. Because the moment her muddy boots stomped down the stairs and up my spine, my empire started to crumble. My cashmere charm is wrinkling. My gentlemanly facade is cracking. The Queen of Hearts will drag me down to hell—at least it’s wonderfully warm among the flames.",
+        },
+        3: {
+          cover:
+            "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/a2/7f/2b/a27f2b17-16b0-9d9f-c1b3-5316c566adb4/rm_image.jpg/1200x1200bb.jpg",
+          year: 2022,
+          desc: "My world is on fire, and I’m obsessed with the girl who lit the match. Bloodied knuckles and a lifeless body at my feet confirm it: Penny is my demise. My gentlemanly façade is nothing but a memory. My sins are seeping through my shirt like ink. I tried to leave her. Couldn’t do it. I tried to snuff the life out of her. Couldn’t do that, either. So we’ll slow dance in the flames until I’m nothing but ash and embers. The problem is, I’d never let her go. She’d have to run far away to escape me—and maybe she will if I just tell her the truth: I own the Sinners Anonymous Hotline, and I’ve listened to every call she’s ever made.",
+        },
+        4: {
+          cover:
+            "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/01/57/ff/0157ff78-02bc-ca79-a856-679a6c5abd6b/rm_image.jpg/1200x1200bb.jpg",
+          year: 2025,
+          desc: "I was bleeding out and halfway to Hell when God sent me an angel. He had no business sending her to a man like me. She was sunshine wrapped in pink glitter, with a touch so gentle it hurt. She was everything I’ve never had nor deserved. Under the glow of the streetlamp, I was delirious enough to tell her she was beautiful. Hell, I even laughed when she asked me to tell her again. But then she asked me something else. Something that stole the last breath from my lungs: Can you keep a secret? An angel with a sin. She should have let me die.",
+        },
+      };
+
+      const sIndex = parsed.seriesIndex ? Math.round(parsed.seriesIndex) : 1;
+      const meta = sinnersMap[sIndex];
+      if (meta) {
+        if (!enrichedCoverUrl || enrichedCoverUrl.includes("openlibrary")) {
+          enrichedCoverUrl = meta.cover;
+        }
+        if (!enrichedPublishedYear) {
+          enrichedPublishedYear = meta.year;
+        }
+        if (
+          !enrichedDescription ||
+          enrichedDescription === `${parsed.title} by ${enrichedAuthor}.`
+        ) {
+          enrichedDescription = meta.desc;
+        }
       }
     }
 
