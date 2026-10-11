@@ -1,4 +1,5 @@
-import { asc, count, countDistinct, desc, eq, like, or, sum } from "drizzle-orm";
+import type { AdminVisibilityResponse, BookProgressRecord } from "@audioneko/shared";
+import { asc, count, countDistinct, desc, eq, inArray, like, or, sum } from "drizzle-orm";
 import { Hono } from "hono";
 import { deleteInvite } from "../auth/invites";
 import {
@@ -19,7 +20,6 @@ import {
   isSeriesHidden,
   setVisibilityRule,
 } from "./visibility";
-import type { AdminVisibilityResponse } from "@audioneko/shared";
 
 export const adminRoutes = new Hono<{
   Bindings: Env;
@@ -229,8 +229,26 @@ adminRoutes.get("/users/:id/stats", requireAuth, requireAdmin, async (c) => {
     return c.json({ error: "User not found" }, 404);
   }
 
-  // Fetch all book progress for user with book metadata
-  const userProgress = await db
+  // 1. Fetch real-time progress from user's SyncRoom Durable Object
+  let doBooks: BookProgressRecord[] = [];
+  try {
+    if (c.env.SYNC_ROOM) {
+      const doId = c.env.SYNC_ROOM.idFromName(targetUserId);
+      const stub = c.env.SYNC_ROOM.get(doId);
+      const doRes = await stub.fetch(new Request("https://sync/state"));
+      if (doRes.ok) {
+        const doData = (await doRes.json().catch(() => ({ books: [] }))) as {
+          books?: BookProgressRecord[];
+        };
+        doBooks = doData.books || [];
+      }
+    }
+  } catch (err) {
+    console.error("[admin] Failed to fetch SyncRoom state for stats:", err);
+  }
+
+  // 2. Fetch all book progress for user with book metadata from D1
+  const d1Progress = await db
     .select({
       bookId: schema.progress.bookId,
       currentTimeSeconds: schema.progress.currentTimeSeconds,
@@ -245,10 +263,141 @@ adminRoutes.get("/users/:id/stats", requireAuth, requireAdmin, async (c) => {
     })
     .from(schema.progress)
     .leftJoin(schema.books, eq(schema.progress.bookId, schema.books.id))
-    .where(eq(schema.progress.userId, targetUserId))
-    .orderBy(desc(schema.progress.updatedAt));
+    .where(eq(schema.progress.userId, targetUserId));
 
-  // Fetch aggregate listening events time
+  // 3. Preload book metadata for any DO books not present in d1Progress
+  const booksMetaMap = new Map<
+    string,
+    { title: string; author: string; coverR2Key: string | null; duration: number }
+  >();
+  for (const row of d1Progress) {
+    if (row.bookTitle) {
+      booksMetaMap.set(row.bookId, {
+        title: row.bookTitle,
+        author: row.bookAuthor || "Unknown Author",
+        coverR2Key: row.coverR2Key,
+        duration: row.bookDuration || row.durationSeconds || 0,
+      });
+    }
+  }
+
+  const missingBookIds = doBooks.map((b) => b.bookId).filter((id) => !booksMetaMap.has(id));
+  if (missingBookIds.length > 0) {
+    const fetchedBooks = await db
+      .select({
+        id: schema.books.id,
+        title: schema.books.title,
+        author: schema.books.author,
+        coverR2Key: schema.books.coverR2Key,
+        durationSeconds: schema.books.durationSeconds,
+      })
+      .from(schema.books)
+      .where(inArray(schema.books.id, missingBookIds));
+    for (const fb of fetchedBooks) {
+      booksMetaMap.set(fb.id, {
+        title: fb.title,
+        author: fb.author,
+        coverR2Key: fb.coverR2Key,
+        duration: fb.durationSeconds || 0,
+      });
+    }
+  }
+
+  // 4. Merge DO books and D1 progress
+  const mergedMap = new Map<
+    string,
+    {
+      bookId: string;
+      currentTimeSeconds: number;
+      durationSeconds: number;
+      progressFraction: number;
+      isFinished: boolean;
+      isPlaying?: boolean;
+      updatedAt: number;
+      bookTitle: string | null;
+      bookAuthor: string | null;
+      coverR2Key: string | null;
+      bookDuration: number | null;
+    }
+  >();
+
+  for (const dob of doBooks) {
+    const meta = booksMetaMap.get(dob.bookId);
+    const dur = dob.duration || meta?.duration || 0;
+    const fraction = dur > 0 ? Math.min(1.0, dob.currentTime / dur) : 0;
+    const isDone = fraction >= 0.99;
+    const updatedSec = Math.floor((dob.updatedAt || Date.now()) / 1000);
+
+    mergedMap.set(dob.bookId, {
+      bookId: dob.bookId,
+      currentTimeSeconds: Math.round(dob.currentTime),
+      durationSeconds: dur,
+      progressFraction: fraction,
+      isFinished: isDone,
+      isPlaying: Boolean(dob.isPlaying),
+      updatedAt: updatedSec,
+      bookTitle: meta?.title || null,
+      bookAuthor: meta?.author || null,
+      coverR2Key: meta?.coverR2Key || null,
+      bookDuration: meta?.duration || dur,
+    });
+  }
+
+  for (const d1 of d1Progress) {
+    const existing = mergedMap.get(d1.bookId);
+    const d1UpdatedSec =
+      typeof d1.updatedAt === "number"
+        ? d1.updatedAt
+        : Math.floor(new Date(d1.updatedAt).getTime() / 1000);
+    if (!existing || d1UpdatedSec > existing.updatedAt) {
+      mergedMap.set(d1.bookId, {
+        bookId: d1.bookId,
+        currentTimeSeconds: Math.round(d1.currentTimeSeconds),
+        durationSeconds: d1.durationSeconds,
+        progressFraction: d1.progressFraction,
+        isFinished: Boolean(d1.isFinished || (d1.progressFraction && d1.progressFraction >= 0.99)),
+        isPlaying: existing?.isPlaying ?? false,
+        updatedAt: d1UpdatedSec,
+        bookTitle: d1.bookTitle,
+        bookAuthor: d1.bookAuthor,
+        coverR2Key: d1.coverR2Key,
+        bookDuration: d1.bookDuration,
+      });
+    }
+  }
+
+  const userProgress = Array.from(mergedMap.values()).sort((a, b) => b.updatedAt - a.updatedAt);
+
+  // Safely backfill to D1 progress table
+  for (const item of userProgress) {
+    try {
+      const progressId = `prg_${targetUserId.slice(0, 8)}_${item.bookId.slice(0, 16)}`;
+      await db
+        .insert(schema.progress)
+        .values({
+          id: progressId,
+          userId: targetUserId,
+          bookId: item.bookId,
+          currentTimeSeconds: item.currentTimeSeconds,
+          durationSeconds: item.durationSeconds,
+          progressFraction: item.progressFraction,
+          isFinished: item.isFinished,
+          updatedAt: item.updatedAt,
+        })
+        .onConflictDoUpdate({
+          target: [schema.progress.userId, schema.progress.bookId],
+          set: {
+            currentTimeSeconds: item.currentTimeSeconds,
+            durationSeconds: item.durationSeconds,
+            progressFraction: item.progressFraction,
+            isFinished: item.isFinished,
+            updatedAt: item.updatedAt,
+          },
+        });
+    } catch {}
+  }
+
+  // 5. Fetch aggregate listening events time
   const listeningRes = await db
     .select({
       totalSeconds: sum(schema.listeningEvents.durationListenedSeconds),
@@ -263,8 +412,15 @@ adminRoutes.get("/users/:id/stats", requireAuth, requireAdmin, async (c) => {
     .from(schema.bookmarks)
     .where(eq(schema.bookmarks.userId, targetUserId));
 
-  const totalListeningSeconds = Number(listeningRes[0]?.totalSeconds ?? 0);
-  const totalSessionsCount = Number(listeningRes[0]?.sessionsCount ?? 0);
+  let progressSecondsSum = 0;
+  for (const p of userProgress) {
+    progressSecondsSum += p.currentTimeSeconds || 0;
+  }
+
+  const rawEventsSeconds = Number(listeningRes[0]?.totalSeconds ?? 0);
+  const totalListeningSeconds = Math.max(rawEventsSeconds, Math.round(progressSecondsSum));
+  const rawSessions = Number(listeningRes[0]?.sessionsCount ?? 0);
+  const totalSessionsCount = Math.max(rawSessions, userProgress.length);
   const totalBookmarksCount = Number(bookmarksRes[0]?.count ?? 0);
 
   let booksStartedCount = 0;
@@ -721,4 +877,3 @@ adminRoutes.post("/visibility/toggle", requireAuth, requireAdmin, async (c) => {
   const updatedVisibility = await setVisibilityRule(c.env, body.type, body.target, body.hidden);
   return c.json({ success: true, visibility: updatedVisibility });
 });
-

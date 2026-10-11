@@ -12,7 +12,7 @@ import type {
 } from "@audioneko/shared";
 import { and, eq, gte, sql } from "drizzle-orm";
 import type { Database } from "../db";
-import { listeningEvents, progress } from "../db/schema";
+import { books, listeningEvents, progress } from "../db/schema";
 
 /**
  * Calculates GitHub-style heatmap intensity (0 to 4)
@@ -119,6 +119,51 @@ export async function recordListeningEvent(
     timestamp,
   });
 
+  // Keep D1 progress table synchronized
+  try {
+    if (db.insert && db.select) {
+      let bookDuration = 0;
+      try {
+        const bookRows = await db
+          .select({ duration: books.durationSeconds })
+          .from(books)
+          .where(eq(books.id, event.bookId))
+          .limit(1);
+        bookDuration = bookRows[0]?.duration || 0;
+      } catch {}
+
+      const progressFraction =
+        bookDuration > 0 ? Math.min(1.0, event.endTimeSeconds / bookDuration) : 0;
+      const isFinished = progressFraction >= 0.99;
+      const progressId = `prg_${userId.slice(0, 8)}_${event.bookId.slice(0, 16)}`;
+
+      await db
+        .insert(progress)
+        .values({
+          id: progressId,
+          userId,
+          bookId: event.bookId,
+          currentTimeSeconds: event.endTimeSeconds,
+          durationSeconds: bookDuration,
+          progressFraction,
+          isFinished,
+          updatedAt: timestamp,
+        })
+        .onConflictDoUpdate({
+          target: [progress.userId, progress.bookId],
+          set: {
+            currentTimeSeconds: event.endTimeSeconds,
+            durationSeconds: bookDuration,
+            progressFraction,
+            isFinished,
+            updatedAt: timestamp,
+          },
+        });
+    }
+  } catch {
+    // Graceful fallback for minimal unit test mocks
+  }
+
   return { id: eventId, recorded: true };
 }
 
@@ -145,7 +190,7 @@ export async function getUserListeningAnalytics(
     )
     .all();
 
-  // 2. Fetch completed books count
+  // 2. Fetch completed books count from D1 progress table
   const completedBooks = await db
     .select({ count: sql<number>`count(*)` })
     .from(progress)
@@ -154,7 +199,28 @@ export async function getUserListeningAnalytics(
 
   const totalBooksCompleted = completedBooks[0]?.count || 0;
 
-  // 3. Aggregate daily listening totals and listening velocity shifted to user's local timezone
+  // 3. Fetch all progress records to capture total listened progress if events were unrecorded
+  const progressRows = await db
+    .select({
+      currentTime: progress.currentTimeSeconds,
+      isFinished: progress.isFinished,
+      fraction: progress.progressFraction,
+    })
+    .from(progress)
+    .where(eq(progress.userId, userId))
+    .all()
+    .catch(() => []);
+
+  let progressTotalSeconds = 0;
+  let finishedCount = 0;
+  for (const p of progressRows) {
+    progressTotalSeconds += p.currentTime || 0;
+    if (p.isFinished || (p.fraction && p.fraction >= 0.99)) {
+      finishedCount++;
+    }
+  }
+
+  // 4. Aggregate daily listening totals and listening velocity shifted to user's local timezone
   const tzShiftSec = tzOffsetMinutes * 60;
   const dailyMap = new Map<string, { seconds: number; count: number }>();
   let totalListenedSeconds = 0;
@@ -199,11 +265,10 @@ export async function getUserListeningAnalytics(
     }
   }
 
-  // 4. Compute streak statistics
+  // 5. Compute streak statistics (active if >= 20s or has listening events today)
   const activeDatesSet = new Set<string>();
   for (const [date, data] of dailyMap.entries()) {
-    if (data.seconds >= 60) {
-      // At least 1 minute of active listening to count toward streak
+    if (data.seconds >= 20 || (data.count > 0 && data.seconds >= 10)) {
       activeDatesSet.add(date);
     }
   }
@@ -213,7 +278,7 @@ export async function getUserListeningAnalytics(
   const localTodayStr = formatIsoDate(localTodayDate);
   const { currentStreak, longestStreak } = computeStreaks(activeDatesSet, localTodayStr);
 
-  // 5. Construct full 365-day grid history
+  // 6. Construct full 365-day grid history
   const dailyHistory: DailyListeningData[] = [];
   let todaySeconds = 0;
 
@@ -234,15 +299,21 @@ export async function getUserListeningAnalytics(
     });
   }
 
+  const effectiveTotalListened = Math.max(
+    Math.round(totalListenedSeconds),
+    Math.round(progressTotalSeconds),
+  );
+  const effectiveBooksCompleted = Math.max(totalBooksCompleted, finishedCount);
+
   const activeDaysCount = activeDatesSet.size;
   const averageDailySeconds =
-    activeDaysCount > 0 ? Math.round(totalListenedSeconds / activeDaysCount) : 0;
+    activeDaysCount > 0 ? Math.round(effectiveTotalListened / activeDaysCount) : 0;
 
   return {
     currentStreakDays: currentStreak,
     longestStreakDays: longestStreak,
-    totalListenedSeconds: Math.round(totalListenedSeconds),
-    totalBooksCompleted,
+    totalListenedSeconds: effectiveTotalListened,
+    totalBooksCompleted: effectiveBooksCompleted,
     todayListenedSeconds: Math.round(todaySeconds),
     averageDailySeconds,
     averagePlaybackRate,

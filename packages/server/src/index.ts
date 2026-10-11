@@ -659,6 +659,38 @@ app.get("/api/sync/state", requireAuth, async (c) => {
   const books = Array.from(mergedMap.values()).sort(
     (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0),
   );
+
+  // Backfill DO books into D1 progress table safely
+  for (const b of books) {
+    try {
+      const dur = b.duration || 0;
+      const frac = dur > 0 ? Math.min(1.0, b.currentTime / dur) : 0;
+      const progressId = `prg_${user.id.slice(0, 8)}_${b.bookId.slice(0, 16)}`;
+      await db
+        .insert(schema.progress)
+        .values({
+          id: progressId,
+          userId: user.id,
+          bookId: b.bookId,
+          currentTimeSeconds: b.currentTime,
+          durationSeconds: dur,
+          progressFraction: frac,
+          isFinished: frac >= 0.99,
+          updatedAt: Math.floor((b.updatedAt || Date.now()) / 1000),
+        })
+        .onConflictDoUpdate({
+          target: [schema.progress.userId, schema.progress.bookId],
+          set: {
+            currentTimeSeconds: b.currentTime,
+            durationSeconds: dur,
+            progressFraction: frac,
+            isFinished: frac >= 0.99,
+            updatedAt: Math.floor((b.updatedAt || Date.now()) / 1000),
+          },
+        });
+    } catch {}
+  }
+
   return c.json({ books });
 });
 
@@ -677,6 +709,120 @@ app.delete("/api/sync/progress/:bookId", requireAuth, async (c) => {
     new Request(`https://sync/progress/${encodeURIComponent(bookId)}`, { method: "DELETE" }),
   );
   return c.newResponse(res.body, res.status as 200, Object.fromEntries(res.headers.entries()));
+});
+
+// REST progress map endpoint (/api/progress/all) used by shelves & analytics
+app.get("/api/progress/all", requireAuth, async (c) => {
+  const user = c.get("user");
+  if (!user?.id) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const doId = c.env.SYNC_ROOM.idFromName(user.id);
+  const stub = c.env.SYNC_ROOM.get(doId);
+  const res = await stub.fetch(new Request("https://sync/state"));
+  const doData = (await res.json().catch(() => ({ books: [] }))) as {
+    books?: BookProgressRecord[];
+  };
+
+  const db = createDb(c.env.DB);
+  const d1Rows = await db.query.progress.findMany({
+    where: eq(schema.progress.userId, user.id),
+  });
+
+  const progressMap: Record<string, BookProgressRecord> = {};
+  for (const b of doData.books || []) {
+    progressMap[b.bookId] = b;
+  }
+
+  for (const row of d1Rows) {
+    const existing = progressMap[row.bookId];
+    const rowUpdatedAtMs = (row.updatedAt || 0) * 1000;
+    if (!existing || rowUpdatedAtMs > (existing.updatedAt || 0)) {
+      progressMap[row.bookId] = {
+        bookId: row.bookId,
+        currentTime: row.currentTimeSeconds || 0,
+        duration: row.durationSeconds || existing?.duration || 0,
+        playbackRate: existing?.playbackRate || 1.0,
+        isPlaying: false,
+        hlc: existing?.hlc || createHlc("d1", rowUpdatedAtMs),
+        deviceId: existing?.deviceId || "d1",
+        deviceName: existing?.deviceName || "Audioneko",
+        updatedAt: rowUpdatedAtMs,
+      };
+    }
+  }
+
+  return c.json({ progress: progressMap });
+});
+
+// Update progress for a single book (/api/progress/:id)
+app.put("/api/progress/:id", requireAuth, async (c) => {
+  const user = c.get("user");
+  if (!user?.id) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const bookId = c.req.param("id");
+  const body = (await c.req.json().catch(() => ({}))) as {
+    currentTime?: number;
+    duration?: number;
+    isFinished?: boolean;
+    playbackRate?: number;
+  };
+
+  const currentTime = typeof body.currentTime === "number" ? body.currentTime : 0;
+  const duration = typeof body.duration === "number" ? body.duration : 0;
+  const progressFraction = duration > 0 ? Math.min(1.0, currentTime / duration) : 0;
+  const isFinished = body.isFinished ?? progressFraction >= 0.99;
+  const nowSec = Math.floor(Date.now() / 1000);
+
+  // 1. Update D1 progress table
+  const db = createDb(c.env.DB);
+  const progressId = `prg_${user.id.slice(0, 8)}_${bookId.slice(0, 16)}`;
+  await db
+    .insert(schema.progress)
+    .values({
+      id: progressId,
+      userId: user.id,
+      bookId,
+      currentTimeSeconds: currentTime,
+      durationSeconds: duration,
+      progressFraction,
+      isFinished,
+      updatedAt: nowSec,
+    })
+    .onConflictDoUpdate({
+      target: [schema.progress.userId, schema.progress.bookId],
+      set: {
+        currentTimeSeconds: currentTime,
+        durationSeconds: duration,
+        progressFraction,
+        isFinished,
+        updatedAt: nowSec,
+      },
+    });
+
+  // 2. Notify SyncRoom DO
+  const doId = c.env.SYNC_ROOM.idFromName(user.id);
+  const stub = c.env.SYNC_ROOM.get(doId);
+  await stub
+    .fetch(
+      new Request(`https://sync/progress/${encodeURIComponent(bookId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentTime,
+          duration,
+          playbackRate: body.playbackRate ?? 1.0,
+          isPlaying: false,
+          updatedAt: Date.now(),
+        }),
+      }),
+    )
+    .catch(() => {});
+
+  return c.json({ success: true, bookId, currentTime, duration, isFinished });
 });
 
 // ==========================================

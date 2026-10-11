@@ -22,6 +22,7 @@ export interface UserStatsBookProgress {
   isFinished: boolean | null;
   updatedAt: number | Date;
   bookDuration?: number | null;
+  isPlaying?: boolean;
 }
 
 export interface UserStatsResponse {
@@ -252,6 +253,45 @@ export function UserStatsModal({
                 </div>
               </div>
 
+              {/* Active Listening Highlight Banner */}
+              {(() => {
+                const firstBook = data.books[0];
+                const activeBook =
+                  data.books.find((b) => b.isPlaying) ||
+                  (firstBook && firstBook.currentTimeSeconds > 0 && !firstBook.isFinished
+                    ? firstBook
+                    : null);
+                if (!activeBook) return null;
+                return (
+                  <div className="surface-card p-3 rounded-lg border border-accent/30 bg-accent-bg/30 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-2.5 h-2.5 rounded-full bg-accent animate-pulse shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-accent font-semibold">
+                          {activeBook.isPlaying ? "Active Listening Session" : "Current Listening"}
+                        </div>
+                        <div className="text-xs font-semibold text-text truncate">
+                          {activeBook.bookTitle || "Audiobook"}
+                          <span className="text-muted font-normal ml-1.5">
+                            ({formatClockTime(activeBook.currentTimeSeconds)} /{" "}
+                            {formatClockTime(
+                              activeBook.durationSeconds || activeBook.bookDuration || 0,
+                            )}
+                            )
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs font-mono font-bold text-accent">
+                        {Math.min(100, Math.round((activeBook.progressFraction || 0) * 100))}%
+                      </div>
+                      <div className="text-[10px] font-mono text-subtle">Progress</div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Shelf & Progress Table */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -307,7 +347,12 @@ export function UserStatsModal({
                                   </div>
                                 </td>
                                 <td className="py-3 px-4">
-                                  {isDone ? (
+                                  {b.isPlaying ? (
+                                    <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-accent/20 text-accent border border-accent/40 font-bold inline-flex items-center gap-1.5 animate-pulse">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-accent" />
+                                      Listening Now
+                                    </span>
+                                  ) : isDone ? (
                                     <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                                       Finished
                                     </span>

@@ -230,6 +230,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
           durationListenedSeconds: Math.round(elapsedWallSecs),
           playbackRate: rate,
         }),
+        keepalive: true,
       }).catch(() => {});
     },
     [],
@@ -345,33 +346,53 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     }
   }, [pause, resume]);
 
-  const seekTo = useCallback((seconds: number) => {
-    if (!Number.isFinite(seconds)) return;
-    const audio = audioRef.current;
-    if (!audio) return;
-    const rawDur = durationRef.current || audio.duration || 0;
-    const dur = Number.isFinite(rawDur) ? Math.max(0, rawDur) : 0;
-    const clamped = Math.max(0, dur > 0 ? Math.min(seconds, dur) : Math.max(0, seconds));
-    audio.currentTime = clamped;
-    setCurrentTime(clamped);
-    currentTimeRef.current = clamped;
-    setMediaSessionPositionState({
-      duration: dur,
-      playbackRate: playbackRateRef.current,
-      position: clamped,
-    });
-    const book = currentBookRef.current;
-    if (book) {
-      syncClientRef.current?.sendUpdate({
-        bookId: book.id,
-        currentTime: clamped,
+  const seekTo = useCallback(
+    (seconds: number) => {
+      if (!Number.isFinite(seconds)) return;
+      const audio = audioRef.current;
+      if (!audio) return;
+      const prevCt = audio.currentTime;
+      const rawDur = durationRef.current || audio.duration || 0;
+      const dur = Number.isFinite(rawDur) ? Math.max(0, rawDur) : 0;
+      const clamped = Math.max(0, dur > 0 ? Math.min(seconds, dur) : Math.max(0, seconds));
+
+      const book = currentBookRef.current;
+      if (isPlayingRef.current && book && lastListenTickRef.current?.bookId === book.id) {
+        const elapsed = (Date.now() - lastListenTickRef.current.time) / 1000;
+        if (elapsed >= 3) {
+          flushListeningEvent(
+            book.id,
+            lastListenTickRef.current.position,
+            prevCt,
+            elapsed,
+            playbackRateRef.current,
+          );
+        }
+        lastListenTickRef.current = { time: Date.now(), position: clamped, bookId: book.id };
+      }
+
+      audio.currentTime = clamped;
+      setCurrentTime(clamped);
+      currentTimeRef.current = clamped;
+      setMediaSessionPositionState({
         duration: dur,
         playbackRate: playbackRateRef.current,
-        isPlaying: isPlayingRef.current,
-        isExplicitSeek: true,
+        position: clamped,
       });
-    }
-  }, []);
+      if (book) {
+        setProgress(book.id, clamped, dur);
+        syncClientRef.current?.sendUpdate({
+          bookId: book.id,
+          currentTime: clamped,
+          duration: dur,
+          playbackRate: playbackRateRef.current,
+          isPlaying: isPlayingRef.current,
+          isExplicitSeek: true,
+        });
+      }
+    },
+    [flushListeningEvent],
+  );
 
   const skipBy = useCallback(
     (seconds: number) => {
@@ -673,7 +694,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       });
       if (lastListenTickRef.current?.bookId === currentBook.id) {
         const elapsed = (Date.now() - lastListenTickRef.current.time) / 1000;
-        if (elapsed >= 60) {
+        if (elapsed >= 25) {
           flushListeningEvent(
             currentBook.id,
             lastListenTickRef.current.position,
@@ -682,11 +703,50 @@ export function AudioProvider({ children }: { children: ReactNode }) {
             playbackRateRef.current,
           );
           lastListenTickRef.current = { time: Date.now(), position: ct, bookId: currentBook.id };
+          setProgress(currentBook.id, ct, durationRef.current || currentBook.durationSeconds || 0);
         }
       }
     }, 10000);
     return () => clearInterval(interval);
   }, [isPlaying, currentBook, flushListeningEvent]);
+
+  // Window exit / pagehide / visibilitychange flush to ensure zero dropped listening time
+  useEffect(() => {
+    const handleFlushOnExit = () => {
+      const book = currentBookRef.current;
+      const audio = audioRef.current;
+      if (isPlayingRef.current && book && lastListenTickRef.current?.bookId === book.id) {
+        const ct = audio?.currentTime ?? currentTimeRef.current;
+        const elapsed = (Date.now() - lastListenTickRef.current.time) / 1000;
+        if (elapsed >= 3) {
+          flushListeningEvent(
+            book.id,
+            lastListenTickRef.current.position,
+            ct,
+            elapsed,
+            playbackRateRef.current,
+          );
+          lastListenTickRef.current = { time: Date.now(), position: ct, bookId: book.id };
+          setProgress(book.id, ct, durationRef.current || book.durationSeconds || 0);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        handleFlushOnExit();
+      }
+    };
+
+    window.addEventListener("pagehide", handleFlushOnExit);
+    window.addEventListener("beforeunload", handleFlushOnExit);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", handleFlushOnExit);
+      window.removeEventListener("beforeunload", handleFlushOnExit);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [flushListeningEvent]);
 
   // Current chapter derived from time
   const currentChapter = useMemo(() => {
@@ -857,6 +917,21 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // If switching from another book, flush previous book listening time
+      if (lastListenTickRef.current && lastListenTickRef.current.bookId !== book.id) {
+        const elapsed = (Date.now() - lastListenTickRef.current.time) / 1000;
+        if (elapsed >= 3) {
+          flushListeningEvent(
+            lastListenTickRef.current.bookId,
+            lastListenTickRef.current.position,
+            currentTimeRef.current,
+            elapsed,
+            playbackRateRef.current,
+          );
+        }
+        lastListenTickRef.current = null;
+      }
+
       setCurrentBook(book);
       currentBookRef.current = book;
       setChapters(bookChapters);
@@ -956,7 +1031,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       // Trigger predictive offline pre-caching across cellular and Wi-Fi networks
       triggerPredictivePrecache(book, bookChapters).catch(() => {});
     },
-    [],
+    [flushListeningEvent],
   );
   playBookRef.current = playBook;
 
