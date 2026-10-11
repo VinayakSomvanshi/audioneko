@@ -1,8 +1,6 @@
 import type { Book } from "@audioneko/shared";
 import { Link } from "@tanstack/react-router";
-import { BookOpen, Download, Glasses, HelpCircle } from "lucide-react";
-import { useState } from "react";
-import { SideloadGuidanceModal } from "./SideloadGuidanceModal";
+import { BookOpen, Download, Glasses } from "lucide-react";
 
 interface EbookDownloadButtonProps {
   book: Book;
@@ -22,15 +20,13 @@ export function EbookDownloadButton({
   className = "",
   showReaderLink = true,
 }: EbookDownloadButtonProps) {
-  const [showGuideModal, setShowGuideModal] = useState(false);
-
   if (!book.ebookDriveFileId) {
     return null;
   }
 
   const format = (book.ebookFormat || "epub").toUpperCase();
   const sizeString = formatBytes(book.ebookSizeBytes);
-  const downloadUrl = `/api/books/${book.id}/ebook`;
+  const downloadUrl = `/api/books/${book.id}/ebook?download=true`;
 
   return (
     <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
@@ -41,7 +37,7 @@ export function EbookDownloadButton({
           book.ebookFileName || `${book.title} - ${book.author}.${book.ebookFormat || "epub"}`
         }
         className="px-3.5 sm:px-4 py-2.5 rounded border border-border bg-surface text-muted hover:text-text hover:border-accent/40 font-mono text-xs flex items-center gap-2 transition-colors cursor-pointer group shadow-xs"
-        title={`Download companion ${format} for Kindle, Kobo, or Apple Books (${sizeString})`}
+        title={`Download companion ${format} (${sizeString})`}
       >
         <BookOpen className="w-3.5 h-3.5 text-accent group-hover:scale-105 transition-transform" />
         <span className="font-medium text-text">Download {format}</span>
@@ -49,18 +45,7 @@ export function EbookDownloadButton({
         <Download className="w-3 h-3 text-subtle group-hover:text-text transition-colors ml-0.5" />
       </a>
 
-      {/* 2. Sideload Help Action */}
-      <button
-        type="button"
-        onClick={() => setShowGuideModal(true)}
-        className="p-2.5 rounded border border-border bg-surface text-muted hover:text-text hover:bg-elevated transition-colors cursor-pointer"
-        title="View Sideloading Guide (Send to Kindle, Kobo, Apple Books)"
-        aria-label="Sideloading guide"
-      >
-        <HelpCircle className="w-3.5 h-3.5 text-subtle hover:text-accent transition-colors" />
-      </button>
-
-      {/* 3. In-App Immersion Reading Route Link */}
+      {/* 2. In-App Immersion Reading Route Link */}
       {showReaderLink && (
         <Link
           to="/book/$id/read"
@@ -72,14 +57,6 @@ export function EbookDownloadButton({
           <span>Read Along</span>
         </Link>
       )}
-
-      {/* Sideload Guide Modal */}
-      <SideloadGuidanceModal
-        isOpen={showGuideModal}
-        onClose={() => setShowGuideModal(false)}
-        format={format}
-        bookTitle={book.title}
-      />
     </div>
   );
 }

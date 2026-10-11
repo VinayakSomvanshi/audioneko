@@ -320,7 +320,7 @@ export function MetadataFixerModal({ isOpen, onClose, book, onSuccess }: Metadat
           <div className="p-3 rounded-lg bg-bg/60 border border-border space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-medium text-text">
-                Companion E-Book (Immersion Reading & Sideloading)
+                Companion E-Book (Immersion Reading & EPUB)
               </span>
               <span className="text-[10px] font-mono text-accent">Google Drive File</span>
             </div>

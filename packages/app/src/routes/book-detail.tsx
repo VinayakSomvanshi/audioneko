@@ -421,7 +421,7 @@ export function BookDetailPage() {
             {/* Offline Audio Download Button */}
             <DownloadButton book={book} />
 
-            {/* Companion E-Book Download & Sideload Button */}
+            {/* Companion E-Book Download & Read Along Button */}
             <EbookDownloadButton book={book} />
 
             {/* Admin: Fix Metadata Button */}
