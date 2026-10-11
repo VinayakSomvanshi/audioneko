@@ -1,3 +1,4 @@
+import type { AdminVisibilityResponse } from "@audioneko/shared";
 import {
   AlertTriangle,
   BarChart2,
@@ -22,7 +23,6 @@ import {
   Users,
 } from "lucide-react";
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import type { AdminVisibilityResponse } from "@audioneko/shared";
 import {
   type EditableBookMetadata,
   MetadataFixerModal,
@@ -116,9 +116,9 @@ export function AdminDashboardPage() {
   // Visibility state
   const [visibilityData, setVisibilityData] = useState<AdminVisibilityResponse | null>(null);
   const [visibilityLoading, setVisibilityLoading] = useState(false);
-  const [visibilityFilter, setVisibilityFilter] = useState<
-    "all" | "books" | "series" | "authors"
-  >("all");
+  const [visibilityFilter, setVisibilityFilter] = useState<"all" | "books" | "series" | "authors">(
+    "all",
+  );
   const [visibilitySearch, setVisibilitySearch] = useState("");
   const [togglingKey, setTogglingKey] = useState<string | null>(null);
 
@@ -147,7 +147,7 @@ export function AdminDashboardPage() {
       (b) =>
         b.title.toLowerCase().includes(searchLower) ||
         b.author.toLowerCase().includes(searchLower) ||
-        (b.series && b.series.toLowerCase().includes(searchLower)),
+        b.series?.toLowerCase().includes(searchLower),
     );
   }, [visibilityData?.books, searchLower]);
 
@@ -481,23 +481,6 @@ export function AdminDashboardPage() {
             Google Drive automated sync, cryptographic invites, user access, and active shelf
             maintenance.
           </p>
-        </div>
-
-        {/* Global Quick Action: Re-scan */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => handleTriggerScan()}
-            disabled={scanning}
-            className="w-full sm:w-auto justify-center px-4 py-2 rounded bg-accent text-bg text-xs font-mono font-semibold flex items-center gap-2 hover:opacity-90 disabled:opacity-50 transition-opacity cursor-pointer shadow-sm"
-          >
-            {scanning ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FolderSync className="w-4 h-4" />
-            )}
-            <span>{scanning ? "Scanning Library..." : "Sync Google Drive"}</span>
-          </button>
         </div>
       </div>
 
@@ -1258,7 +1241,9 @@ export function AdminDashboardPage() {
                               >
                                 {b.title}
                               </a>
-                              <div className="text-muted text-[11px] line-clamp-1">By {b.author}</div>
+                              <div className="text-muted text-[11px] line-clamp-1">
+                                By {b.author}
+                              </div>
                             </div>
                           </td>
                           <td className="py-3 px-4">
@@ -1346,8 +1331,8 @@ export function AdminDashboardPage() {
                   <span>Library Visibility & Catalog Display</span>
                 </h3>
                 <p className="text-xs font-mono text-muted mt-1">
-                  Control which series, authors, and audiobooks appear in library and listener catalogs.
-                  Hiding a series or author automatically hides all their audiobooks.
+                  Control which series, authors, and audiobooks appear in library and listener
+                  catalogs. Hiding a series or author automatically hides all their audiobooks.
                 </p>
               </div>
               <button
@@ -1414,10 +1399,10 @@ export function AdminDashboardPage() {
                     ? "All Categories"
                     : `${filterKey} (${
                         filterKey === "books"
-                          ? visibilityData?.books.length ?? 0
+                          ? (visibilityData?.books.length ?? 0)
                           : filterKey === "series"
-                            ? visibilityData?.series.length ?? 0
-                            : visibilityData?.authors.length ?? 0
+                            ? (visibilityData?.series.length ?? 0)
+                            : (visibilityData?.authors.length ?? 0)
                       })`}
                 </button>
               ))}
@@ -1474,18 +1459,16 @@ export function AdminDashboardPage() {
                             <th className="py-2.5 px-4 font-medium">Primary Author</th>
                             <th className="py-2.5 px-4 font-medium">Books Count</th>
                             <th className="py-2.5 px-4 font-medium text-center">Status</th>
-                            <th className="py-2.5 px-4 font-medium text-right">Visibility Toggle</th>
+                            <th className="py-2.5 px-4 font-medium text-right">
+                              Visibility Toggle
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                           {filteredSeries.map((s) => (
                             <tr key={s.id} className="hover:bg-elevated/40 transition-colors">
-                              <td className="py-3 px-4 font-semibold text-text">
-                                {s.name}
-                              </td>
-                              <td className="py-3 px-4 text-muted">
-                                {s.primaryAuthor}
-                              </td>
+                              <td className="py-3 px-4 font-semibold text-text">{s.name}</td>
+                              <td className="py-3 px-4 text-muted">{s.primaryAuthor}</td>
                               <td className="py-3 px-4 text-subtle">
                                 <span className="px-2 py-0.5 rounded bg-elevated text-accent font-medium">
                                   {s.bookCount} audiobooks
@@ -1548,22 +1531,19 @@ export function AdminDashboardPage() {
                             <th className="py-2.5 px-4 font-medium">Author Name</th>
                             <th className="py-2.5 px-4 font-medium">Catalog Stats</th>
                             <th className="py-2.5 px-4 font-medium text-center">Status</th>
-                            <th className="py-2.5 px-4 font-medium text-right">Visibility Toggle</th>
+                            <th className="py-2.5 px-4 font-medium text-right">
+                              Visibility Toggle
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                           {filteredAuthors.map((a) => (
                             <tr key={a.name} className="hover:bg-elevated/40 transition-colors">
-                              <td className="py-3 px-4 font-semibold text-text">
-                                {a.name}
-                              </td>
+                              <td className="py-3 px-4 font-semibold text-text">{a.name}</td>
                               <td className="py-3 px-4 text-muted">
                                 <span>{a.bookCount} audiobooks</span>
                                 {a.seriesCount > 0 && (
-                                  <span className="text-subtle">
-                                    {" "}
-                                    • {a.seriesCount} series
-                                  </span>
+                                  <span className="text-subtle"> • {a.seriesCount} series</span>
                                 )}
                               </td>
                               <td className="py-3 px-4 text-center">
@@ -1624,7 +1604,9 @@ export function AdminDashboardPage() {
                             <th className="py-2.5 px-4 font-medium">Title & Author</th>
                             <th className="py-2.5 px-4 font-medium">Series</th>
                             <th className="py-2.5 px-4 font-medium text-center">Status</th>
-                            <th className="py-2.5 px-4 font-medium text-right">Visibility Toggle</th>
+                            <th className="py-2.5 px-4 font-medium text-right">
+                              Visibility Toggle
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -1634,7 +1616,7 @@ export function AdminDashboardPage() {
                                 <div className="w-10 h-10 rounded border border-border bg-surface overflow-hidden flex items-center justify-center shrink-0">
                                   {b.coverR2Key ? (
                                     <img
-                                      src={getBookCoverUrl(b as any)}
+                                      src={getBookCoverUrl(b)}
                                       alt=""
                                       className="w-full h-full object-cover"
                                       onError={(e) => {
@@ -1686,9 +1668,7 @@ export function AdminDashboardPage() {
                                 <ToggleSwitch
                                   checked={!b.isHidden}
                                   disabled={togglingKey === `book:${b.id}`}
-                                  onChange={() =>
-                                    handleToggleVisibility("book", b.id, b.isHidden)
-                                  }
+                                  onChange={() => handleToggleVisibility("book", b.id, b.isHidden)}
                                   label={`Toggle visibility for ${b.title}`}
                                 />
                               </td>
