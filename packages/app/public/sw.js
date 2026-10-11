@@ -203,7 +203,7 @@ async function handleImageFetch(request) {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/covers/")) {
       const bookId = url.pathname.slice("/api/covers/".length).split("?")[0];
-      if (navigator.storage && navigator.storage.getDirectory) {
+      if (navigator.storage?.getDirectory) {
         const root = await navigator.storage.getDirectory();
         const booksDir = await root.getDirectoryHandle(OPFS_ROOT_DIR);
         const bookDir = await booksDir.getDirectoryHandle(bookId);

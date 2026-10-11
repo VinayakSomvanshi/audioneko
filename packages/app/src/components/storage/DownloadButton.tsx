@@ -1,4 +1,5 @@
 import type { Book } from "@audioneko/shared";
+import { AlertCircle } from "lucide-react";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { getBookCoverUrl } from "../../lib/covers";
@@ -9,7 +10,6 @@ import {
   isBookDownloaded,
   isOpfsSupported,
 } from "../../lib/opfs";
-import { AlertCircle } from "lucide-react";
 import { BlinkingNeko, NekoIcon } from "../icons/NekoIcon";
 
 interface DownloadButtonProps {

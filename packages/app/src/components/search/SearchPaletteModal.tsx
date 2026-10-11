@@ -124,8 +124,14 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
 
   // Extract author and series directories with respective images
   const { authorCatalog, seriesCatalog } = useMemo(() => {
-    const authorMap = new Map<string, { name: string; bookCount: number; photoUrl: string | null }>();
-    const seriesMap = new Map<string, { name: string; author: string; bookCount: number; coverUrl: string }>();
+    const authorMap = new Map<
+      string,
+      { name: string; bookCount: number; photoUrl: string | null }
+    >();
+    const seriesMap = new Map<
+      string,
+      { name: string; author: string; bookCount: number; coverUrl: string }
+    >();
 
     for (const b of allBooks) {
       const author = b.author?.trim();
@@ -179,9 +185,7 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
   const matchingAuthors = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q || q.length < 2) return [];
-    return authorCatalog
-      .filter((a) => a.name.toLowerCase().includes(q))
-      .slice(0, 3);
+    return authorCatalog.filter((a) => a.name.toLowerCase().includes(q)).slice(0, 3);
   }, [query, authorCatalog]);
 
   const matchingSeries = useMemo(() => {
@@ -195,7 +199,14 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
   // Unified items list for keyboard navigation and rendering
   type NavigationItem =
     | { type: "author"; id: string; name: string; bookCount: number; photoUrl: string | null }
-    | { type: "series"; id: string; name: string; author: string; bookCount: number; coverUrl: string }
+    | {
+        type: "series";
+        id: string;
+        name: string;
+        author: string;
+        bookCount: number;
+        coverUrl: string;
+      }
     | { type: "book"; id: string; book: BookSearchResult };
 
   const navigationItems = useMemo<NavigationItem[]>(() => {
@@ -421,7 +432,9 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
                       <SearchAuthorAvatar name={item.name} photoUrl={item.photoUrl} />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-text truncate">{item.name}</span>
+                          <span className="text-sm font-medium text-text truncate">
+                            {item.name}
+                          </span>
                           <span className="text-[10px] font-mono px-1.5 py-0.5 border border-border rounded bg-elevated text-accent shrink-0">
                             Author
                           </span>
@@ -459,7 +472,9 @@ export function SearchPaletteModal({ isOpen, onClose, books = [] }: SearchPalett
                       <SearchSeriesThumbnail title={item.name} coverUrl={item.coverUrl} />
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-text truncate">{item.name}</span>
+                          <span className="text-sm font-medium text-text truncate">
+                            {item.name}
+                          </span>
                           <span className="text-[10px] font-mono px-1.5 py-0.5 border border-border rounded bg-elevated text-accent shrink-0">
                             Series
                           </span>

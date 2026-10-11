@@ -31,14 +31,10 @@ const KNOWN_AUTHOR_PHOTOS: Record<string, string> = {
     "https://sarahjmaas.com/wp-content/uploads/2025/03/240117_Today_SarahJMaas_216_resized.jpg",
   "sarah j maas":
     "https://sarahjmaas.com/wp-content/uploads/2025/03/240117_Today_SarahJMaas_216_resized.jpg",
-  "caroline peckham":
-    "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
-  "susanne valenti":
-    "https://covers.openlibrary.org/a/olid/OL8417609A-L.jpg",
-  "caroline peckham & susanne valenti":
-    "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
-  "caroline peckham, susanne valenti":
-    "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
+  "caroline peckham": "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
+  "susanne valenti": "https://covers.openlibrary.org/a/olid/OL8417609A-L.jpg",
+  "caroline peckham & susanne valenti": "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
+  "caroline peckham, susanne valenti": "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
 };
 
 /**

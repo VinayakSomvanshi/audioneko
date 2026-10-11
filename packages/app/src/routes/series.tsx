@@ -273,9 +273,7 @@ export function SeriesPage() {
             <h2 className="text-sm font-bold text-text tracking-wide font-mono uppercase">
               Books in this Series
             </h2>
-            <p className="text-xs font-mono text-muted">
-              Complete collection and reading sequence
-            </p>
+            <p className="text-xs font-mono text-muted">Complete collection and reading sequence</p>
           </div>
           <span className="text-xs font-mono text-subtle">
             {activeSeries.books.length} installments

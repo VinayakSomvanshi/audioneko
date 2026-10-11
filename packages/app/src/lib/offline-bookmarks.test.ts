@@ -61,7 +61,7 @@ describe("offline-bookmarks", () => {
     expect(result[0]?.id).toBe("bm_1");
 
     // LocalStorage should now contain cached bookmarks
-    const cached = JSON.parse(store["audioneko_bm_book_test"] || "[]");
+    const cached = JSON.parse(store.audioneko_bm_book_test || "[]");
     expect(cached).toHaveLength(1);
     expect(cached[0]?.id).toBe("bm_1");
   });
@@ -75,7 +75,7 @@ describe("offline-bookmarks", () => {
       note: "Offline note",
       createdAt: 2000,
     };
-    store["audioneko_bm_book_offline"] = JSON.stringify([cachedItem]);
+    store.audioneko_bm_book_offline = JSON.stringify([cachedItem]);
 
     vi.stubGlobal("navigator", { onLine: false });
     const mockFetch = vi.fn().mockRejectedValue(new Error("Network offline"));
@@ -101,7 +101,7 @@ describe("offline-bookmarks", () => {
     expect(created.positionSeconds).toBe(450);
     expect(created.note).toBe("Note taken on plane");
 
-    const pending = JSON.parse(store["audioneko_pending_bm_creations"] || "[]");
+    const pending = JSON.parse(store.audioneko_pending_bm_creations || "[]");
     expect(pending).toHaveLength(1);
     expect(pending[0]?.tempId).toBe(created.id);
   });
@@ -109,7 +109,7 @@ describe("offline-bookmarks", () => {
   it("syncs pending bookmarks when coming back online", async () => {
     vi.stubGlobal("navigator", { onLine: true });
 
-    store["audioneko_pending_bm_creations"] = JSON.stringify([
+    store.audioneko_pending_bm_creations = JSON.stringify([
       {
         tempId: "local_bm_123",
         bookId: "book_synced",
@@ -142,12 +142,12 @@ describe("offline-bookmarks", () => {
       expect.objectContaining({ method: "POST" }),
     );
 
-    const pending = JSON.parse(store["audioneko_pending_bm_creations"] || "[]");
+    const pending = JSON.parse(store.audioneko_pending_bm_creations || "[]");
     expect(pending).toHaveLength(0);
   });
 
   it("deletes offline pending bookmark cleanly", async () => {
-    store["audioneko_bm_book_del"] = JSON.stringify([
+    store.audioneko_bm_book_del = JSON.stringify([
       {
         id: "local_bm_del_1",
         bookId: "book_del",
@@ -155,7 +155,7 @@ describe("offline-bookmarks", () => {
         createdAt: 4000,
       },
     ]);
-    store["audioneko_pending_bm_creations"] = JSON.stringify([
+    store.audioneko_pending_bm_creations = JSON.stringify([
       {
         tempId: "local_bm_del_1",
         bookId: "book_del",
@@ -166,10 +166,10 @@ describe("offline-bookmarks", () => {
 
     await deleteBookmarkWithOfflineSupport("local_bm_del_1", "book_del");
 
-    const cached = JSON.parse(store["audioneko_bm_book_del"] || "[]");
+    const cached = JSON.parse(store.audioneko_bm_book_del || "[]");
     expect(cached).toHaveLength(0);
 
-    const pending = JSON.parse(store["audioneko_pending_bm_creations"] || "[]");
+    const pending = JSON.parse(store.audioneko_pending_bm_creations || "[]");
     expect(pending).toHaveLength(0);
   });
 });

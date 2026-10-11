@@ -217,13 +217,19 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
   } else if (lowerTitle.includes("fan service")) {
     author = "Rosie Danan";
     narrator = narrator || "Brittany Pressley & Aaron Shedlock";
-  } else if (lowerTitle.includes("the nanny") && (author === "Lana Ferguson" || author === "Unknown Author")) {
+  } else if (
+    lowerTitle.includes("the nanny") &&
+    (author === "Lana Ferguson" || author === "Unknown Author")
+  ) {
     author = "Lana Ferguson";
     narrator = narrator || "Samantha Summers & Jameson Adams";
   } else if (lowerTitle.includes("rules for the summer")) {
     author = "Meghan Quinn";
     narrator = narrator || "Shane East, Stella Hunter, Gary Furlong & Cassandra Medcalf";
-  } else if (lowerTitle.includes("fever dream") && (author === "Elsie Silver" || author === "Unknown Author")) {
+  } else if (
+    lowerTitle.includes("fever dream") &&
+    (author === "Elsie Silver" || author === "Unknown Author")
+  ) {
     author = "Elsie Silver";
     series = "Emerald Lake";
     seriesIndex = 1;
@@ -386,7 +392,10 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
         seriesIndex = 1;
       } else if (lowerTitle.includes("crown of midnight")) {
         seriesIndex = 2;
-      } else if (lowerTitle.includes("assassin's blade") || lowerClean.includes("assassin's blade")) {
+      } else if (
+        lowerTitle.includes("assassin's blade") ||
+        lowerClean.includes("assassin's blade")
+      ) {
         seriesIndex = 3;
       } else if (lowerTitle.includes("heir of fire")) {
         seriesIndex = 4;
@@ -818,8 +827,7 @@ export async function scanDriveLibrary(
         seriesId,
         seriesIndex: parsed.seriesIndex ?? null,
         narrator:
-          parsed.narrator ??
-          (parsed.series === "Throne of Glass" ? "Elizabeth Evans" : null),
+          parsed.narrator ?? (parsed.series === "Throne of Glass" ? "Elizabeth Evans" : null),
         description: enrichedDescription,
         coverR2Key: finalCoverKey,
         durationSeconds,

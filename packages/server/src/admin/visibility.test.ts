@@ -92,9 +92,7 @@ describe("Library Visibility Controls", () => {
       reason: "author",
     });
 
-    expect(
-      getBookHiddenStatus({ id: "book_2", author: "Brandon Sanderson" }, visibility),
-    ).toEqual({
+    expect(getBookHiddenStatus({ id: "book_2", author: "Brandon Sanderson" }, visibility)).toEqual({
       isHidden: false,
     });
   });
@@ -131,7 +129,7 @@ describe("Library Visibility Controls", () => {
       },
     };
 
-    const initial = await getVisibility({ KV: mockKV as any });
+    const initial = await getVisibility({ KV: mockKV as unknown as KVNamespace });
     expect(initial).toEqual({
       hiddenBooks: [],
       hiddenSeries: [],
@@ -148,7 +146,7 @@ describe("Library Visibility Controls", () => {
       }),
     );
 
-    const updated = await getVisibility({ KV: mockKV as any });
+    const updated = await getVisibility({ KV: mockKV as unknown as KVNamespace });
     expect(updated.hiddenBooks).toContain("book_abc");
     expect(updated.hiddenSeries).toContain("Series XYZ");
     expect(updated.hiddenAuthors).toContain("Author 1");

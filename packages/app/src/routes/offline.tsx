@@ -309,7 +309,8 @@ export function OfflinePage() {
             {estimate.isPersisted === false && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300">
                 <span>
-                  Persistent storage is not active. The phone OS might clear offline downloads if storage is low.
+                  Persistent storage is not active. The phone OS might clear offline downloads if
+                  storage is low.
                 </span>
                 <button
                   type="button"

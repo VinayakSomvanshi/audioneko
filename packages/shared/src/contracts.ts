@@ -285,4 +285,3 @@ export interface AdminVisibilityResponse {
     isHidden: boolean;
   }>;
 }
-

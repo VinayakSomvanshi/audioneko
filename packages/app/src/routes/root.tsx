@@ -64,6 +64,7 @@ export function RootLayout() {
   }, []);
 
   // Scroll Restoration: Reset main content scroll container and window on route change or search param change
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Route change scroll restoration trigger
   useEffect(() => {
     if (mainScrollRef.current) {
       mainScrollRef.current.scrollTo({ top: 0, left: 0, behavior: "instant" });

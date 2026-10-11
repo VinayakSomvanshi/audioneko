@@ -161,9 +161,7 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
   });
 
   it("parses standalones and newly added series with enriched narrators and clean titles", () => {
-    const lh = parseBookInfo(
-      "The Love Hypothesis (The Love Hypothesis #1) (Updated Version).m4b",
-    );
+    const lh = parseBookInfo("The Love Hypothesis (The Love Hypothesis #1) (Updated Version).m4b");
     expect(lh.title).toBe("The Love Hypothesis");
     expect(lh.author).toBe("Ali Hazelwood");
     expect(lh.narrator).toBe("Callie Dalton & Teddy Hamilton");

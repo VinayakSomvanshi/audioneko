@@ -974,5 +974,16 @@ audioneko/
 All preliminary architectural options have been resolved and implemented in production:
 1.  **Google Drive Folder Structure**: Fully supports hierarchical `Author/Title/Book.m4b` folders as well as multi-file albums, automatically resolving metadata and cover art.
 2.  **Audiobookshelf Client Support**: The Audiobookshelf API emulation layer (`/api/v1/authorize`, `/api/libraries`, `/api/items`, `/api/session/local`) is active, allowing native apps like Plappa (iOS) and ShelfPlayer (Android) to connect directly.
-3.  **Monorepo Health & Quality**: Verified with 126 automated unit and integration tests (100% passing), clean Biome formatting across 112 files, and zero unused variables or dead functions.
+3.  **Monorepo Health & Quality**: Verified with 173 automated unit and integration tests (100% passing across 32 suites), clean Biome formatting across 152 files, and zero unused variables or dead functions.
 4.  **Live Production URL**: Active at `https://audioneko.greatmidoriya.workers.dev`.
+
+---
+
+## 15. Companion E-Books & Immersion Reading Specification
+
+The platform roadmap defines a first-class Immersion Reading and Companion E-Book architecture bridging audio performance and written text:
+*   **Detailed Technical Specification**: Complete architecture, database schema, scanner pairing heuristics, synchronization models, and PWA UI blueprints are documented in [IMMERSION_READING_SPECIFICATION.md](file:///home/vinayak/Documents/audioneko/IMMERSION_READING_SPECIFICATION.md).
+*   **Dual-Pillar Strategy**:
+    1.  **Companion E-Book Downloads**: Direct streaming of paired `.epub` and `.mobi` files for sideloading to physical e-readers (Kindle, Kobo) and offline OPFS storage.
+    2.  **In-Player Read-Along ("Spotify Lyrics for Books")**: Dynamic, code-split client-side reader inside `FullPlayerModal` with chapter synchronization, proportional auto-scrolling, and `sober-thoughts` dark typography.
+

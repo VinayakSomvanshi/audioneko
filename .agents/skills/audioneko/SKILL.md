@@ -63,6 +63,7 @@ audioneko/
 │   ├── server/         # Cloudflare Worker, Hono, D1, Drizzle, Better Auth, DO
 │   └── app/            # TanStack Router, React 19, Tailwind CSS v4, Web Audio
 ├── .agents/skills/     # Customization skills & workflows
+├── IMMERSION_READING_SPECIFICATION.md # Companion E-Books & Immersion Reading specification
 ├── PROGRESS.md         # Live milestone progress & activity log
 ├── PROJECT_DESIGN_DOCUMENT.md  # Architectural reference
 └── biome.json          # Formatter & linter configuration
