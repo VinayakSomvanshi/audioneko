@@ -1356,6 +1356,18 @@ async function serveSpaIndexHtml(env: Env, reqUrl: string): Promise<Response> {
   headers.set("Pragma", "no-cache");
   headers.set("Expires", "0");
   headers.set("Content-Type", "text/html; charset=utf-8");
+
+  if (env.APP_ENV === "dev") {
+    let html = await res.text();
+    html = html.replace("<title>audioneko</title>", "<title>audioneko (dev)</title>");
+    html = html.replace('content="audioneko"', 'content="audioneko (dev)"');
+    return new Response(html, {
+      status: res.status,
+      statusText: res.statusText,
+      headers,
+    });
+  }
+
   return new Response(res.body, {
     status: res.status,
     statusText: res.statusText,
@@ -1411,6 +1423,21 @@ app.on(["GET", "HEAD"], "*", async (c) => {
         statusText: res.statusText,
         headers,
       });
+    }
+
+    // Dynamic dev manifest differentiation
+    if (pathname === "/manifest.json" && c.env.APP_ENV === "dev") {
+      const res = await c.env.ASSETS.fetch(c.req.raw);
+      if (res.status === 200) {
+        try {
+          const manifest = (await res.json()) as Record<string, unknown>;
+          manifest.name = "audioneko (dev)";
+          manifest.short_name = "audioneko-dev";
+          return c.json(manifest);
+        } catch (_) {
+          return res;
+        }
+      }
     }
 
     const lastSegment = pathname.split("/").pop() || "";

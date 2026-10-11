@@ -46,5 +46,40 @@
   },
   "vars": {
     "GOOGLE_DRIVE_FOLDER_ID": "1Eb41o9yGeJoojEYniUZvRCjaxBziLN-Z"
+  },
+  "env": {
+    "dev": {
+      "name": "audioneko-dev",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "audioneko-dev-db",
+          "database_id": "15e5049d-aa51-4762-a6d8-c7543a67da9e",
+          "migrations_dir": "drizzle"
+        }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "KV",
+          "id": "69e602f0e84148cbb01c72a5500ad567"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "SYNC_ROOM",
+            "class_name": "SyncRoom"
+          },
+          {
+            "name": "LISTEN_ALONG_ROOM",
+            "class_name": "ListenAlongRoom"
+          }
+        ]
+      },
+      "vars": {
+        "APP_ENV": "dev",
+        "GOOGLE_DRIVE_FOLDER_ID": "1Eb41o9yGeJoojEYniUZvRCjaxBziLN-Z"
+      }
+    }
   }
 }

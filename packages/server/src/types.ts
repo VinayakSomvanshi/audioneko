@@ -23,4 +23,5 @@ export interface Env {
   BREVO_API_KEY?: string;
   BREVO_SENDER_EMAIL?: string;
   POSTMARK_API_KEY?: string;
+  APP_ENV?: string;
 }

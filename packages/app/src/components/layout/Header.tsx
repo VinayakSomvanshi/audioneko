@@ -65,9 +65,18 @@ export function Header({ onSearchClick, onMenuClick, onProfileClick }: HeaderPro
         >
           <NekoIcon className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-accent shrink-0 transition-transform duration-200 group-hover:scale-110" />
           <span>audioneko</span>
-          <span className="text-[10px] uppercase tracking-widest text-muted border border-border px-1.5 py-0.5 rounded font-mono hidden sm:inline-block">
-            beta
-          </span>
+          {typeof window !== "undefined" &&
+          (window.location.hostname.includes("dev") ||
+            window.location.hostname === "localhost" ||
+            window.location.hostname === "127.0.0.1") ? (
+            <span className="text-[10px] uppercase tracking-widest text-amber-500/90 border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 rounded font-mono inline-block">
+              dev
+            </span>
+          ) : (
+            <span className="text-[10px] uppercase tracking-widest text-muted border border-border px-1.5 py-0.5 rounded font-mono hidden sm:inline-block">
+              beta
+            </span>
+          )}
         </Link>
       </div>
 

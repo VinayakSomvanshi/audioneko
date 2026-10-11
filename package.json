@@ -7,6 +7,8 @@
   "scripts": {
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
+    "deploy:dev": "turbo run build && pnpm --filter @audioneko/server run deploy:dev",
+    "deploy:prod": "turbo run build && pnpm --filter @audioneko/server run deploy",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "turbo run typecheck",
