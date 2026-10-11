@@ -197,4 +197,37 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(league.seriesIndex).toBe(6);
     expect(league.narrator).toBe("Samantha Brentmoor & Jason Clarke");
   });
+
+  it("parses Zodiac Academy series books and GraphicAudio cues", () => {
+    const b1 = parseBookInfo("The Awakening [Dramatized Adaptation].m4b");
+    expect(b1.title).toBe("The Awakening");
+    expect(b1.author).toBe("Caroline Peckham & Susanne Valenti");
+    expect(b1.series).toBe("Zodiac Academy");
+    expect(b1.seriesIndex).toBe(1);
+    expect(b1.narrator).toBe("GraphicAudio Full Cast");
+
+    const b2 = parseBookInfo("Ruthless Fae [Dramatized Adaptation].m4b");
+    expect(b2.title).toBe("Ruthless Fae");
+    expect(b2.author).toBe("Caroline Peckham & Susanne Valenti");
+    expect(b2.series).toBe("Zodiac Academy");
+    expect(b2.seriesIndex).toBe(2);
+
+    const b3 = parseBookInfo("The Reckoning (1 of 2) [Dramatized Adaptation].m4b");
+    expect(b3.title).toBe("The Reckoning (1 of 2)");
+    expect(b3.author).toBe("Caroline Peckham & Susanne Valenti");
+    expect(b3.series).toBe("Zodiac Academy");
+    expect(b3.seriesIndex).toBe(3.1);
+
+    const b4 = parseBookInfo("Shadow Princess (2 of 2) [Dramatized Adaptation].m4b");
+    expect(b4.title).toBe("Shadow Princess (2 of 2)");
+    expect(b4.author).toBe("Caroline Peckham & Susanne Valenti");
+    expect(b4.series).toBe("Zodiac Academy");
+    expect(b4.seriesIndex).toBe(4.2);
+
+    const b5 = parseBookInfo("Cursed Fates (1 of 2) [Dramatized Adaptation].m4b");
+    expect(b5.title).toBe("Cursed Fates (1 of 2)");
+    expect(b5.author).toBe("Caroline Peckham & Susanne Valenti");
+    expect(b5.series).toBe("Zodiac Academy");
+    expect(b5.seriesIndex).toBe(5.1);
+  });
 });

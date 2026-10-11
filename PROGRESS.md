@@ -11,7 +11,7 @@
 | **Current Phase** | **Phase 4: Polish, Compatibility & Production Deployment** | All 4 Phases Complete (100%) |
 | **Active Step** | **Step 4.5: Mobile PWA Hardening, Offline Bookmarks Sync & Audio Resilience** | Completed; Full offline PWA with OPFS byte streaming, airplane mode bookmarks auto-sync, anti-suspension audio watchdog, and tactile haptics |
 | **Total Milestones** | **4 Phases / 19 Core Steps** | 19 of 19 steps completed (100% Monorepo Completion) |
-| **Automated Test Coverage**| **172 Vitest Tests Across 32 Suites** | 100% passing (68 app tests + 104 server tests) |
+| **Automated Test Coverage**| **173 Vitest Tests Across 32 Suites** | 100% passing (68 app tests + 105 server tests) |
 | **Platform Quota Safety** | **Verified & Compliant (100%)** | All services operate with high headroom margin |
 | **Git Repository** | **Connected to GitHub** | `main` branch synced with `origin` |
 
@@ -195,5 +195,6 @@
 | **2026-10-10 18:10** | **Picture-in-Picture Button Mobile Separation** | Replaced misleading outward-arrows icon with standard `PictureInPicture2` icon; hid PiP button on mobile viewports (`hidden sm:inline-flex`) where mobile browsers reject canvas-stream PiP, preventing dead button interactions. |
 | **2026-10-10 21:15** | **Offline Cover Loop Fix, Bookmarks Store, Haptics & App Shortcuts** | Resolved `useEffect` dependency loop in `OfflineCover` preventing premature blob URL revocation; created `offline-bookmarks.ts` with local caching and offline creation/deletion queueing that auto-syncs to D1 upon reconnecting (`audioneko:bookmarks-synced`); added `DownloadButton` error state with one-click retry; added tactile haptics (`navigator.vibrate`) on transport buttons; added PWA manifest home-screen shortcuts for "Offline Audiobooks" and "Library". 172 Vitest tests passing (100%). Deployed live. |
 | **2026-10-10 21:45** | **Open Source Licensing (AGPLv3)** | Adopted GNU Affero General Public License v3.0 (`AGPL-3.0-or-later`) across the monorepo; created root `LICENSE` file with standard FSF copyleft terms; updated `README.md`, `PROJECT_DESIGN_DOCUMENT.md`, and all workspace `package.json` files with `AGPL-3.0-or-later` SPDX identifier. |
+| **2026-10-11 20:20** | **Zodiac Academy Metadata & Series Fulfillment** | Cleaned and enriched metadata across all 8 GraphicAudio Zodiac Academy audiobooks in D1; assigned authentic authors Caroline Peckham & Susanne Valenti, series Zodiac Academy with sequential indexes (1 through 5.2), narrator GraphicAudio Full Cast, and verified publication dates/synopses; registered author portraits and biographies in server and client registries; added scanner heuristics; verified 173 Vitest tests (100%) and deployed live. |
 
 

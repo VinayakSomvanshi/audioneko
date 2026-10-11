@@ -100,6 +100,13 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     ) {
       series = "Red Rising";
       author = "Pierce Brown";
+    } else if (
+      parentFolderName.toLowerCase().includes("zodiac") ||
+      parentFolderName.toLowerCase().includes("peckham")
+    ) {
+      series = "Zodiac Academy";
+      author = "Caroline Peckham & Susanne Valenti";
+      narrator = "GraphicAudio Full Cast";
     }
   }
 
@@ -222,6 +229,64 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     series = "Emerald Lake";
     seriesIndex = 1;
     narrator = narrator || "Teddy Hamilton, Julia Goldani Telles & Emma Wilder";
+  }
+
+  // Known series heuristics for Zodiac Academy by Caroline Peckham & Susanne Valenti
+  if (
+    series === "Zodiac Academy" ||
+    lowerClean.includes("zodiac") ||
+    lowerTitle.includes("awakening") ||
+    lowerTitle.includes("ruthless fae") ||
+    lowerTitle.includes("the reckoning") ||
+    lowerTitle.includes("shadow princess") ||
+    lowerTitle.includes("cursed fates") ||
+    author.toLowerCase().includes("peckham") ||
+    author.toLowerCase().includes("valenti")
+  ) {
+    author = "Caroline Peckham & Susanne Valenti";
+    series = "Zodiac Academy";
+    narrator = narrator || "GraphicAudio Full Cast";
+
+    if (lowerTitle.includes("awakening")) {
+      title = "The Awakening";
+      seriesIndex = 1;
+    } else if (lowerTitle.includes("ruthless fae")) {
+      title = "Ruthless Fae";
+      seriesIndex = 2;
+    } else if (lowerTitle.includes("the reckoning")) {
+      if (lowerTitle.includes("1 of 2") || lowerTitle.includes("part 1")) {
+        title = "The Reckoning (1 of 2)";
+        seriesIndex = 3.1;
+      } else if (lowerTitle.includes("2 of 2") || lowerTitle.includes("part 2")) {
+        title = "The Reckoning (2 of 2)";
+        seriesIndex = 3.2;
+      } else {
+        title = "The Reckoning";
+        seriesIndex = 3;
+      }
+    } else if (lowerTitle.includes("shadow princess")) {
+      if (lowerTitle.includes("1 of 2") || lowerTitle.includes("part 1")) {
+        title = "Shadow Princess (1 of 2)";
+        seriesIndex = 4.1;
+      } else if (lowerTitle.includes("2 of 2") || lowerTitle.includes("part 2")) {
+        title = "Shadow Princess (2 of 2)";
+        seriesIndex = 4.2;
+      } else {
+        title = "Shadow Princess";
+        seriesIndex = 4;
+      }
+    } else if (lowerTitle.includes("cursed fates")) {
+      if (lowerTitle.includes("1 of 2") || lowerTitle.includes("part 1")) {
+        title = "Cursed Fates (1 of 2)";
+        seriesIndex = 5.1;
+      } else if (lowerTitle.includes("2 of 2") || lowerTitle.includes("part 2")) {
+        title = "Cursed Fates (2 of 2)";
+        seriesIndex = 5.2;
+      } else {
+        title = "Cursed Fates";
+        seriesIndex = 5;
+      }
+    }
   }
 
   // Known series heuristics for Rebecca Yarros The Empyrean books

@@ -34,6 +34,9 @@ const CURATED_AUTHOR_PHOTOS: Record<string, string> = {
   "elsie silver":
     "https://images.squarespace-cdn.com/content/v1/6904ff34eb46bd478b74d219/a96d7cb6-21f6-444f-ad98-0934e52c5b4b/194A1682.jpg",
   "liz tomforde": "https://static.showit.co/1200/LeiNY5tERxiHZOKslq26Xw/214378/img_1283.jpg",
+  "caroline peckham": "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
+  "susanne valenti": "https://covers.openlibrary.org/a/olid/OL8417609A-L.jpg",
+  "caroline peckham & susanne valenti": "https://covers.openlibrary.org/a/olid/OL7494548A-L.jpg",
 };
 
 const CURATED_AUTHOR_BIOS: Record<string, { bio: string; birthDate: string; topWork: string }> = {
@@ -96,6 +99,21 @@ const CURATED_AUTHOR_BIOS: Record<string, { bio: string; birthDate: string; topW
     bio: "Rosie Danan is an acclaimed contemporary romance author whose novels, including The Roommate, The Intimacy Experiment, and Fan Service, blend smart humor, vulnerability, and modern relationships.",
     birthDate: "1987",
     topWork: "The Roommate",
+  },
+  "caroline peckham": {
+    bio: "Caroline Peckham is a #1 Wall Street Journal, USA Today, and international bestselling dark fantasy and romance author from the UK, best known for creating the blockbuster Zodiac Academy, Ruthless Boys of the Zodiac, and Darkmore Penitentiary series alongside sister Susanne Valenti.",
+    birthDate: "1991",
+    topWork: "Zodiac Academy: The Awakening",
+  },
+  "susanne valenti": {
+    bio: "Susanne Valenti is a #1 Wall Street Journal, USA Today, and international bestselling fantasy and paranormal romance author from the UK, co-author of the acclaimed Zodiac Academy, Ruthless Boys of the Zodiac, and Darkmore Penitentiary sagas.",
+    birthDate: "1993",
+    topWork: "Zodiac Academy: The Awakening",
+  },
+  "caroline peckham & susanne valenti": {
+    bio: "Caroline Peckham & Susanne Valenti (known as the Twisted Sisters) are #1 Wall Street Journal and USA Today bestselling sister authors from the UK. Together they write dark fantasy, paranormal romance, and romantasy sagas set in the magical universe of Solaria, most famously the nine-book blockbuster Zodiac Academy saga.",
+    birthDate: "1991 & 1993",
+    topWork: "Zodiac Academy: The Awakening",
   },
 };
 
