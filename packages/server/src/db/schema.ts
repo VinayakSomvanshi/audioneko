@@ -123,6 +123,11 @@ export const books = sqliteTable(
       .default("m4b"),
     fileSizeBytes: integer("file_size_bytes").notNull().default(0),
     isActiveShelf: integer("is_active_shelf", { mode: "boolean" }).notNull().default(false),
+    ebookDriveFileId: text("ebook_drive_file_id"),
+    ebookFormat: text("ebook_format", { enum: ["epub", "mobi", "azw3", "pdf"] }),
+    ebookSizeBytes: integer("ebook_size_bytes").default(0),
+    ebookFileName: text("ebook_file_name"),
+    ebookChecksum: text("ebook_checksum"),
     createdAt: integer("created_at").notNull().default(sql`(unixepoch())`),
     updatedAt: integer("updated_at").notNull().default(sql`(unixepoch())`),
   },
@@ -130,6 +135,7 @@ export const books = sqliteTable(
     index("books_author_idx").on(table.author),
     index("books_series_idx").on(table.seriesId),
     index("books_active_shelf_idx").on(table.isActiveShelf),
+    index("books_ebook_idx").on(table.ebookDriveFileId),
   ],
 );
 

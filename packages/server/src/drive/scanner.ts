@@ -45,6 +45,50 @@ export function normalizeAuthor(authorStr: string): string {
 }
 
 /**
+ * Scores how well an e-book filename matches a book's metadata.
+ */
+export function scoreEbookMatch(
+  ebookFilename: string,
+  book: { title: string; series?: string; seriesIndex?: number; author?: string },
+): number {
+  const ext = ebookFilename.split(".").pop()?.toLowerCase() || "";
+  const lower = ebookFilename.toLowerCase().replace(/\.[^.]+$/, "");
+  let score = 0;
+
+  // Preferred web-renderable formats get higher score
+  if (ext === "epub") score += 2;
+  else if (ext === "mobi" || ext === "azw3") score += 1;
+
+  // Series index match (whole number boundary)
+  if (book.seriesIndex !== undefined) {
+    const idxStr = String(Math.round(book.seriesIndex));
+    if (new RegExp(`(?<![0-9])${idxStr}(?![0-9])`).test(lower)) score += 4;
+  }
+
+  // Exact title match or word-by-word match
+  const cleanTitle = book.title.toLowerCase();
+  if (lower.includes(cleanTitle)) {
+    score += 10;
+  } else {
+    for (const word of cleanTitle.split(/\s+/).filter((w) => w.length > 3)) {
+      if (lower.includes(word)) score += 2;
+    }
+  }
+
+  // Series name match
+  if (book.series) {
+    for (const word of book.series
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 3)) {
+      if (lower.includes(word)) score += 1;
+    }
+  }
+
+  return score;
+}
+
+/**
  * Extracts book title, author, series, seriesIndex from filenames and folder names
  */
 export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBookInfo {
@@ -519,6 +563,9 @@ export interface ScanResult {
     seriesIndex?: number;
     format: string;
     durationSeconds: number;
+    ebookDriveFileId?: string | null;
+    ebookFormat?: string | null;
+    ebookFileName?: string | null;
   }>;
 }
 
@@ -549,8 +596,15 @@ export async function scanDriveLibrary(
     parentFolderName: string;
   }
 
+  interface EbookFileEntry {
+    item: DriveItem;
+    parentFolderId: string;
+    parentFolderName: string;
+  }
+
   const audioFiles: AudioFileEntry[] = [];
   const imageFiles: ImageFileEntry[] = [];
+  const ebookFiles: EbookFileEntry[] = [];
 
   // Recursive directory explorer
   async function exploreFolder(
@@ -609,6 +663,20 @@ export async function scanDriveLibrary(
             parentFolderId: effectiveParentFolderId,
             parentFolderName: folderName,
           });
+        } else if (
+          item.name.endsWith(".epub") ||
+          item.name.endsWith(".mobi") ||
+          item.name.endsWith(".azw3") ||
+          item.name.endsWith(".pdf")
+        ) {
+          const isEbookSubfolder = /^(ebooks?|epubs?|books?)$/i.test(folderName);
+          const effectiveParentFolderId =
+            isEbookSubfolder && parentOfFolderId ? parentOfFolderId : folderId;
+          ebookFiles.push({
+            item,
+            parentFolderId: effectiveParentFolderId,
+            parentFolderName: folderName,
+          });
         }
       }
 
@@ -621,8 +689,9 @@ export async function scanDriveLibrary(
 
   const seriesCache = new Map<string, string>(); // seriesName -> seriesId
   const importedBooks: ScanResult["books"] = [];
-  // Per-folder tracking: prevent assigning the same image to multiple books in the same folder
+  // Per-folder tracking: prevent assigning the same image or ebook to multiple books in the same folder
   const usedCoverIdsByFolder = new Map<string, Set<string>>();
+  const usedEbookIdsByFolder = new Map<string, Set<string>>();
 
   // Process each audio file
   for (const { item, parentFolderId, parentFolderName } of audioFiles) {
@@ -750,6 +819,50 @@ export async function scanDriveLibrary(
       }
     }
     // If folderImages is empty → coverKey stays null (no cover for this book)
+
+    // 3. Find companion e-book — strictly folder-local
+    const folderEbooks = ebookFiles.filter((eb) => eb.parentFolderId === parentFolderId);
+    let matchedEbook: EbookFileEntry | null = null;
+    let matchedEbookFormat: "epub" | "mobi" | "azw3" | "pdf" | null = null;
+    let cleanEbookFileName: string | null = null;
+
+    if (folderEbooks.length > 0) {
+      if (!usedEbookIdsByFolder.has(parentFolderId)) {
+        usedEbookIdsByFolder.set(parentFolderId, new Set());
+      }
+      const usedInFolder = usedEbookIdsByFolder.get(parentFolderId)!;
+
+      const scored = folderEbooks
+        .map((eb) => ({
+          eb,
+          score: scoreEbookMatch(eb.item.name, {
+            title: parsed.title,
+            series: parsed.series,
+            seriesIndex: parsed.seriesIndex,
+            author: parsed.author,
+          }),
+        }))
+        .sort((a, b) => b.score - a.score);
+
+      const best = scored.find((s) => s.score > 0 && !usedInFolder.has(s.eb.item.id));
+      const fallback =
+        folderEbooks.length === 1 && folderEbooks[0] && !usedInFolder.has(folderEbooks[0].item.id)
+          ? folderEbooks[0]
+          : null;
+      const chosen = best?.eb ?? fallback;
+
+      if (chosen) {
+        matchedEbook = chosen;
+        usedInFolder.add(chosen.item.id);
+
+        const rawExt = chosen.item.name.split(".").pop()?.toLowerCase() || "epub";
+        matchedEbookFormat = (["epub", "mobi", "azw3", "pdf"].includes(rawExt) ? rawExt : "epub") as
+          | "epub"
+          | "mobi"
+          | "azw3"
+          | "pdf";
+      }
+    }
 
     // 3. Look up existing book from D1 to avoid redundant network subrequests
     const bookId = `bk_${item.id.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
@@ -884,6 +997,10 @@ export async function scanDriveLibrary(
       coverKey ?? (isLoveHypothesis ? "/covers/love-hypothesis.jpg" : enrichedCoverUrl);
     const nowEpoch = Math.floor(Date.now() / 1000);
 
+    if (matchedEbook && matchedEbookFormat) {
+      cleanEbookFileName = `${parsed.title} - ${enrichedAuthor}.${matchedEbookFormat}`;
+    }
+
     if (existingBook[0]) {
       await db
         .update(schema.books)
@@ -903,6 +1020,15 @@ export async function scanDriveLibrary(
           format: parsed.format,
           // Always overwrite coverR2Key — null clears stale bad covers from previous scans
           coverR2Key: finalCoverKey,
+          ebookDriveFileId: matchedEbook?.item.id ?? existingBook[0]?.ebookDriveFileId ?? null,
+          ebookFormat: matchedEbook ? matchedEbookFormat : (existingBook[0]?.ebookFormat ?? null),
+          ebookSizeBytes: matchedEbook
+            ? Number.parseInt(matchedEbook.item.size || "0", 10)
+            : (existingBook[0]?.ebookSizeBytes ?? 0),
+          ebookFileName: matchedEbook
+            ? cleanEbookFileName
+            : (existingBook[0]?.ebookFileName ?? null),
+          ebookChecksum: matchedEbook?.item.md5Checksum ?? existingBook[0]?.ebookChecksum ?? null,
           updatedAt: nowEpoch,
         })
         .where(eq(schema.books.id, existingBook[0].id));
@@ -918,6 +1044,11 @@ export async function scanDriveLibrary(
           parsed.narrator ?? (parsed.series === "Throne of Glass" ? "Elizabeth Evans" : null),
         description: enrichedDescription,
         coverR2Key: finalCoverKey,
+        ebookDriveFileId: matchedEbook?.item.id ?? null,
+        ebookFormat: matchedEbook ? matchedEbookFormat : null,
+        ebookSizeBytes: matchedEbook ? Number.parseInt(matchedEbook.item.size || "0", 10) : 0,
+        ebookFileName: matchedEbook ? cleanEbookFileName : null,
+        ebookChecksum: matchedEbook?.item.md5Checksum ?? null,
         durationSeconds,
         publishedYear: enrichedPublishedYear,
         format: parsed.format,
@@ -1008,6 +1139,9 @@ export async function scanDriveLibrary(
       seriesIndex: parsed.seriesIndex,
       format: parsed.format,
       durationSeconds,
+      ebookDriveFileId: matchedEbook?.item.id ?? existingBook[0]?.ebookDriveFileId ?? null,
+      ebookFormat: matchedEbook ? matchedEbookFormat : (existingBook[0]?.ebookFormat ?? null),
+      ebookFileName: matchedEbook ? cleanEbookFileName : (existingBook[0]?.ebookFileName ?? null),
     });
   }
 

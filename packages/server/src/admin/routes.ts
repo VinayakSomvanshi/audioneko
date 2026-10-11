@@ -646,6 +646,10 @@ adminRoutes.patch("/books/:id", requireAuth, requireAdmin, async (c) => {
     publishedYear?: number | null;
     description?: string | null;
     format?: "m4b" | "mp3" | "m4a" | "flac" | "opus";
+    ebookDriveFileId?: string | null;
+    ebookFormat?: "epub" | "mobi" | "azw3" | "pdf" | null;
+    ebookSizeBytes?: number | null;
+    ebookFileName?: string | null;
   }>();
 
   const db = createDb(c.env.DB);
@@ -684,6 +688,18 @@ adminRoutes.patch("/books/:id", requireAuth, requireAdmin, async (c) => {
   }
   if (body.format && ["m4b", "mp3", "m4a", "flac", "opus"].includes(body.format)) {
     updates.format = body.format;
+  }
+  if (body.ebookDriveFileId !== undefined) {
+    updates.ebookDriveFileId = body.ebookDriveFileId?.trim() || null;
+  }
+  if (body.ebookFormat !== undefined) {
+    updates.ebookFormat = body.ebookFormat;
+  }
+  if (body.ebookSizeBytes !== undefined) {
+    updates.ebookSizeBytes = body.ebookSizeBytes ?? 0;
+  }
+  if (body.ebookFileName !== undefined) {
+    updates.ebookFileName = body.ebookFileName?.trim() || null;
   }
 
   // Handle series association
@@ -737,6 +753,10 @@ adminRoutes.patch("/books/:id", requireAuth, requireAdmin, async (c) => {
       publishedYear: schema.books.publishedYear,
       format: schema.books.format,
       fileSizeBytes: schema.books.fileSizeBytes,
+      ebookDriveFileId: schema.books.ebookDriveFileId,
+      ebookFormat: schema.books.ebookFormat,
+      ebookSizeBytes: schema.books.ebookSizeBytes,
+      ebookFileName: schema.books.ebookFileName,
       updatedAt: schema.books.updatedAt,
     })
     .from(schema.books)

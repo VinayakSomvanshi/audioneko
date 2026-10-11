@@ -39,6 +39,7 @@ export const AUDIO_FILE_NAME = "audio.bin";
 export const PART_FILE_NAME = "audio.part";
 export const COVER_FILE_NAME = "cover.jpg";
 export const META_FILE_NAME = "meta.json";
+export const EBOOK_FILE_NAME = "book.epub";
 
 /**
  * Checks whether the Origin Private File System (OPFS) is supported by the current browser.
@@ -609,4 +610,59 @@ export async function clearAllDownloadedBooks(): Promise<void> {
   } catch (err) {
     console.warn("Failed to clear OPFS books directory:", err);
   }
+}
+
+/**
+ * Saves a companion e-book file to OPFS storage for offline reading.
+ */
+export async function saveOfflineEbook(bookId: string, data: Blob | ArrayBuffer): Promise<void> {
+  const booksDir = await getBooksDirectory();
+  if (!booksDir) return;
+  const bookDir = await booksDir.getDirectoryHandle(bookId, { create: true });
+  const fileHandle = await bookDir.getFileHandle(EBOOK_FILE_NAME, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(data);
+  await writable.close();
+}
+
+/**
+ * Retrieves a companion e-book file from OPFS storage.
+ */
+export async function getOfflineEbook(bookId: string): Promise<Blob | null> {
+  const booksDir = await getBooksDirectory();
+  if (!booksDir) return null;
+  try {
+    const bookDir = await booksDir.getDirectoryHandle(bookId);
+    const fileHandle = await bookDir.getFileHandle(EBOOK_FILE_NAME);
+    return await fileHandle.getFile();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks whether a companion e-book exists in OPFS storage.
+ */
+export async function hasOfflineEbook(bookId: string): Promise<boolean> {
+  const booksDir = await getBooksDirectory();
+  if (!booksDir) return false;
+  try {
+    const bookDir = await booksDir.getDirectoryHandle(bookId);
+    await bookDir.getFileHandle(EBOOK_FILE_NAME);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Removes a companion e-book file from OPFS storage.
+ */
+export async function deleteOfflineEbook(bookId: string): Promise<void> {
+  const booksDir = await getBooksDirectory();
+  if (!booksDir) return;
+  try {
+    const bookDir = await booksDir.getDirectoryHandle(bookId);
+    await bookDir.removeEntry(EBOOK_FILE_NAME);
+  } catch {}
 }

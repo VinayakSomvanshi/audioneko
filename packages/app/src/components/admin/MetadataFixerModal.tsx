@@ -21,6 +21,9 @@ export interface EditableBookMetadata {
   driveFolderId?: string;
   coverR2Key?: string | null;
   durationSeconds?: number;
+  ebookDriveFileId?: string | null;
+  ebookFormat?: string | null;
+  ebookFileName?: string | null;
 }
 
 interface MetadataFixerModalProps {
@@ -38,6 +41,9 @@ export function MetadataFixerModal({ isOpen, onClose, book, onSuccess }: Metadat
   const [publishedYear, setPublishedYear] = useState<string>("");
   const [format, setFormat] = useState<string>("m4b");
   const [description, setDescription] = useState("");
+  const [ebookDriveFileId, setEbookDriveFileId] = useState("");
+  const [ebookFormat, setEbookFormat] = useState<string>("epub");
+  const [ebookFileName, setEbookFileName] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -52,6 +58,9 @@ export function MetadataFixerModal({ isOpen, onClose, book, onSuccess }: Metadat
       setPublishedYear(book.publishedYear != null ? String(book.publishedYear) : "");
       setFormat(book.format || "m4b");
       setDescription(book.description || "");
+      setEbookDriveFileId(book.ebookDriveFileId || "");
+      setEbookFormat(book.ebookFormat || "epub");
+      setEbookFileName(book.ebookFileName || "");
       setErrorMsg(null);
       setSuccessNotice(false);
     }
@@ -90,6 +99,9 @@ export function MetadataFixerModal({ isOpen, onClose, book, onSuccess }: Metadat
         publishedYear: publishedYear ? Number.parseInt(publishedYear, 10) : null,
         format: format as "m4b" | "mp3" | "m4a" | "flac" | "opus",
         description: description.trim() || null,
+        ebookDriveFileId: ebookDriveFileId.trim() || null,
+        ebookFormat: ebookFormat ? (ebookFormat as "epub" | "mobi" | "azw3" | "pdf") : null,
+        ebookFileName: ebookFileName.trim() || null,
       };
 
       const res = await fetch(`/api/admin/books/${book.id}`, {
@@ -302,6 +314,72 @@ export function MetadataFixerModal({ isOpen, onClose, book, onSuccess }: Metadat
               placeholder="e.g. 2024"
               className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded border border-border"
             />
+          </div>
+
+          {/* Companion E-Book (Google Drive Link) */}
+          <div className="p-3 rounded-lg bg-bg/60 border border-border space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-mono font-medium text-text">
+                Companion E-Book (Immersion Reading & Sideloading)
+              </span>
+              <span className="text-[10px] font-mono text-accent">Google Drive File</span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="sm:col-span-2 space-y-1">
+                <label htmlFor="meta-ebook-id" className="block text-[11px] font-mono text-muted">
+                  E-Book Drive File ID
+                </label>
+                <input
+                  id="meta-ebook-id"
+                  type="text"
+                  disabled={saving}
+                  value={ebookDriveFileId}
+                  onChange={(e) => setEbookDriveFileId(e.target.value)}
+                  placeholder="e.g. 1yUo0gnjWECvnGppBXLRQkZCzSykiLqII"
+                  className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded border border-border"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label
+                  htmlFor="meta-ebook-format"
+                  className="block text-[11px] font-mono text-muted"
+                >
+                  Format
+                </label>
+                <select
+                  id="meta-ebook-format"
+                  disabled={saving}
+                  value={ebookFormat}
+                  onChange={(e) => setEbookFormat(e.target.value)}
+                  className="w-full px-3 py-2 text-xs font-mono surface-card text-text focus:border-accent outline-none rounded border border-border"
+                >
+                  <option value="epub">EPUB</option>
+                  <option value="mobi">MOBI</option>
+                  <option value="azw3">AZW3</option>
+                  <option value="pdf">PDF</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label
+                htmlFor="meta-ebook-filename"
+                className="block text-[11px] font-mono text-muted"
+              >
+                Clean Download File Name
+              </label>
+              <input
+                id="meta-ebook-filename"
+                type="text"
+                disabled={saving}
+                value={ebookFileName}
+                onChange={(e) => setEbookFileName(e.target.value)}
+                placeholder="e.g. House of Earth and Blood - Sarah J. Maas.epub"
+                className="w-full px-3 py-2 text-xs font-mono surface-card text-text placeholder:text-muted/60 focus:border-accent outline-none rounded border border-border"
+              />
+            </div>
           </div>
 
           {/* Description */}

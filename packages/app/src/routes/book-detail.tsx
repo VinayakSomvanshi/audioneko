@@ -22,6 +22,7 @@ import {
 import { useEffect, useState } from "react";
 import { MetadataFixerModal } from "../components/admin/MetadataFixerModal";
 import { AudioFidelityBadges } from "../components/audio/AudioFidelityBadges";
+import { EbookDownloadButton } from "../components/book/EbookDownloadButton";
 import { BlinkingNeko } from "../components/icons/NekoIcon";
 import { DownloadButton } from "../components/storage/DownloadButton";
 import { useAudio } from "../context/audio-context";
@@ -417,8 +418,11 @@ export function BookDetailPage() {
               </button>
             )}
 
-            {/* Offline Download Button */}
+            {/* Offline Audio Download Button */}
             <DownloadButton book={book} />
+
+            {/* Companion E-Book Download & Sideload Button */}
+            <EbookDownloadButton book={book} />
 
             {/* Admin: Fix Metadata Button */}
             {isAdmin && (

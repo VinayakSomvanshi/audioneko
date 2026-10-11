@@ -30,6 +30,7 @@ export default defineConfig({
           router: ["@tanstack/react-router"],
           search: ["minisearch"],
           icons: ["lucide-react"],
+          reader: ["fflate"],
         },
       },
     },

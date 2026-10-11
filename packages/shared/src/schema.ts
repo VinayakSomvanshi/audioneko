@@ -24,6 +24,11 @@ export interface Book {
   format: "m4b" | "mp3" | "m4a" | "flac" | "opus";
   fileSizeBytes: number;
   isActiveShelf: boolean;
+  ebookDriveFileId?: string | null;
+  ebookFormat?: "epub" | "mobi" | "azw3" | "pdf" | null;
+  ebookSizeBytes?: number | null;
+  ebookFileName?: string | null;
+  ebookChecksum?: string | null;
   createdAt: number;
   updatedAt: number;
 }

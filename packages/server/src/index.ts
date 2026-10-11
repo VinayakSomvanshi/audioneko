@@ -191,6 +191,116 @@ app.on("HEAD", "/api/stream/:fileId", requireAuth, async (c) => {
   return handleAudioStreamRequest(c.req.raw, fileInfo.driveFileId, c.env, fetch, preloadedMeta);
 });
 
+// Companion E-Book streaming proxy endpoint (GET and HEAD) - Protected by requireAuth
+app.on(["GET", "HEAD"], "/api/books/:id/ebook", requireAuth, async (c) => {
+  const bookId = c.req.param("id");
+  const db = createDb(c.env.DB);
+  const bookRows = await db.select().from(schema.books).where(eq(schema.books.id, bookId)).limit(1);
+
+  const book = bookRows[0];
+  if (!book || !book.ebookDriveFileId) {
+    return c.json({ error: "Companion e-book not found", code: "NOT_FOUND" }, 404);
+  }
+
+  if (!c.env.GOOGLE_SA_KEY) {
+    return c.json({ error: "Google Drive credentials unconfigured" }, 500);
+  }
+
+  const token = await getGoogleAccessToken(c.env.GOOGLE_SA_KEY, c.env.KV);
+  const totalSize = book.ebookSizeBytes || 0;
+  const format = book.ebookFormat || "epub";
+
+  const mimeMap: Record<string, string> = {
+    epub: "application/epub+zip",
+    pdf: "application/pdf",
+    mobi: "application/x-mobipocket-ebook",
+    azw3: "application/vnd.amazon.ebook",
+  };
+  const contentType = mimeMap[format] || "application/epub+zip";
+  const fileName = book.ebookFileName || `${book.title} - ${book.author}.${format}`;
+  const encodedFileName = encodeURIComponent(fileName);
+
+  const isDownload = c.req.query("download") === "true" || c.req.query("download") === "1";
+  const dispositionType = isDownload ? "attachment" : "inline";
+  const contentDisposition = `${dispositionType}; filename="${fileName.replace(/"/g, "")}"; filename*=UTF-8''${encodedFileName}`;
+
+  // Cache API check (for edge caching the EPUB bytes)
+  const cache =
+    typeof caches !== "undefined" && "default" in caches
+      ? (caches as unknown as { default: Cache }).default
+      : null;
+  const cacheKey = new Request(c.req.url, { method: "GET" });
+
+  if (c.req.method === "HEAD") {
+    const headers = new Headers();
+    headers.set("Content-Type", contentType);
+    if (totalSize > 0) headers.set("Content-Length", totalSize.toString());
+    headers.set("Accept-Ranges", "bytes");
+    headers.set("Content-Disposition", contentDisposition);
+    headers.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+    return new Response(null, { status: 200, headers });
+  }
+
+  const rangeHeader = c.req.header("Range");
+
+  // If cached and no range requested:
+  if (cache && !rangeHeader) {
+    const cachedRes = await cache.match(cacheKey);
+    if (cachedRes) {
+      return cachedRes;
+    }
+  }
+
+  const driveHeaders: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+  };
+  if (rangeHeader) {
+    driveHeaders.Range = rangeHeader;
+  }
+
+  const driveRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${book.ebookDriveFileId}?alt=media`,
+    { headers: driveHeaders },
+  );
+
+  if (!driveRes.ok && driveRes.status !== 206) {
+    const errText = await driveRes.text();
+    return c.json(
+      { error: `Google Drive API error [${driveRes.status}]: ${errText}` },
+      driveRes.status === 403 ? 429 : 502,
+    );
+  }
+
+  const responseHeaders = new Headers();
+  responseHeaders.set("Content-Type", contentType);
+  responseHeaders.set("Content-Disposition", contentDisposition);
+  responseHeaders.set("Accept-Ranges", "bytes");
+  responseHeaders.set("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+
+  const contentLength =
+    driveRes.headers.get("Content-Length") || (totalSize > 0 ? totalSize.toString() : null);
+  if (contentLength) {
+    responseHeaders.set("Content-Length", contentLength);
+  }
+  const contentRange = driveRes.headers.get("Content-Range");
+  if (contentRange) {
+    responseHeaders.set("Content-Range", contentRange);
+  }
+
+  const status = driveRes.status === 206 ? 206 : 200;
+  const res = new Response(driveRes.body, {
+    status,
+    headers: responseHeaders,
+  });
+
+  // Edge cache only full 200 responses without range headers
+  if (cache && status === 200 && !rangeHeader) {
+    c.executionCtx?.waitUntil(cache.put(cacheKey, res.clone()));
+  }
+
+  return res;
+});
+
 // Library Books API - Protected by requireAuth
 app.get("/api/books", requireAuth, async (c) => {
   const db = createDb(c.env.DB);
@@ -214,6 +324,10 @@ app.get("/api/books", requireAuth, async (c) => {
       format: schema.books.format,
       fileSizeBytes: schema.books.fileSizeBytes,
       isActiveShelf: schema.books.isActiveShelf,
+      ebookDriveFileId: schema.books.ebookDriveFileId,
+      ebookFormat: schema.books.ebookFormat,
+      ebookSizeBytes: schema.books.ebookSizeBytes,
+      ebookFileName: schema.books.ebookFileName,
       createdAt: schema.books.createdAt,
       updatedAt: schema.books.updatedAt,
       seriesName: schema.series.name,

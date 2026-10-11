@@ -7,6 +7,7 @@ describe("audioneko PWA Shell & Router", () => {
 
     expect(flatRoutes["/"]).toBeDefined();
     expect(flatRoutes["/book/$id"]).toBeDefined();
+    expect(flatRoutes["/book/$id/read"]).toBeDefined();
     expect(flatRoutes["/series"]).toBeDefined();
     expect(flatRoutes["/authors"]).toBeDefined();
     expect(flatRoutes["/shelves"]).toBeDefined();

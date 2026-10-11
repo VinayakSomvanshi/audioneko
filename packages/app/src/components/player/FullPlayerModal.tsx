@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  BookOpen,
   Bookmark,
   ChevronDown,
   FastForward,
   Headphones,
   ListMusic,
+  Loader2,
   Mic,
   Moon,
   Pause,
@@ -22,7 +24,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useAudio } from "../../context/audio-context";
 import { getBookCoverUrl } from "../../lib/covers";
 import { triggerHapticFeedback } from "../../lib/haptics";
@@ -34,6 +36,10 @@ import {
 } from "../../lib/offline-bookmarks";
 import type { SleepTimerPreset } from "../../lib/sleep-timer";
 import { WaveformScrubber, formatScrubberTime } from "./WaveformScrubber";
+
+const ReadAlongReader = lazy(() =>
+  import("../reader/ReadAlongReader").then((m) => ({ default: m.ReadAlongReader })),
+);
 
 export function FullPlayerModal() {
   const {
@@ -82,6 +88,14 @@ export function FullPlayerModal() {
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [newBookmarkNote, setNewBookmarkNote] = useState("");
   const [isAddingBookmark, setIsAddingBookmark] = useState(false);
+  const [playerView, setPlayerView] = useState<"artwork" | "reader">("artwork");
+
+  // Reset to artwork view when current book changes
+  useEffect(() => {
+    if (currentBook?.id) {
+      setPlayerView("artwork");
+    }
+  }, [currentBook?.id]);
 
   const { data: bookmarksData, isLoading: isBookmarksLoading } = useQuery<{
     bookmarks: BookmarkItem[];
@@ -246,45 +260,92 @@ export function FullPlayerModal() {
 
       {/* 2. Main Player Body */}
       <main className="flex-1 max-w-xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] flex flex-col justify-center gap-4 sm:gap-6">
-        {/* Large Cover Art with Crisp Border & Obsidian Shadow */}
-        <div className="relative aspect-square w-full max-w-[240px] sm:max-w-[300px] md:max-w-[340px] mx-auto rounded-lg border border-border bg-surface overflow-hidden shadow-2xl flex items-center justify-center group">
-          {currentBook.coverR2Key ? (
-            <>
-              <img
-                src={getBookCoverUrl(currentBook)}
-                alt=""
-                aria-hidden="true"
-                className="absolute inset-0 w-full h-full object-cover blur-md opacity-35 scale-110 pointer-events-none select-none"
-              />
-              <img
-                src={getBookCoverUrl(currentBook)}
-                alt={currentBook.title}
-                className="relative z-10 w-full h-full object-contain select-none drop-shadow-lg"
-              />
-            </>
-          ) : (
-            <div className="w-full h-full bg-elevated flex flex-col items-center justify-center p-6 text-center">
-              <span className="text-2xl font-bold font-mono text-muted mb-2">
-                {currentBook.format.toUpperCase()}
-              </span>
-              <p className="text-xs text-subtle font-mono truncate max-w-full">
-                {currentBook.title}
-              </p>
+        {/* Segmented View Switcher (Artwork vs Read Along) */}
+        {Boolean(currentBook.ebookDriveFileId) && (
+          <div className="flex items-center justify-center -mb-1">
+            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-elevated border border-border">
+              <button
+                type="button"
+                onClick={() => setPlayerView("artwork")}
+                className={`px-3 py-1 rounded text-xs font-mono font-medium transition-colors cursor-pointer ${
+                  playerView === "artwork"
+                    ? "bg-surface text-text shadow-xs"
+                    : "text-muted hover:text-text"
+                }`}
+              >
+                Artwork
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlayerView("reader")}
+                className={`px-3 py-1 rounded text-xs font-mono font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  playerView === "reader"
+                    ? "bg-surface text-text shadow-xs"
+                    : "text-muted hover:text-text"
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-accent" />
+                <span>Read Along</span>
+              </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Chapter Quick Jump Overlay Button */}
-          {chapters.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowChapterList(true)}
-              className="absolute bottom-3 right-3 bg-surface/90 border border-border text-text hover:text-accent px-3 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 shadow-md cursor-pointer transition-colors"
+        {/* Visual Content: Reader or Cover Art */}
+        {playerView === "reader" && Boolean(currentBook.ebookDriveFileId) ? (
+          <div className="w-full h-[320px] sm:h-[380px] md:h-[420px] rounded-lg border border-border bg-surface overflow-hidden shadow-2xl relative">
+            <Suspense
+              fallback={
+                <div className="flex flex-col items-center justify-center h-full text-muted font-mono text-xs gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-accent" />
+                  <span>Loading companion reader...</span>
+                </div>
+              }
             >
-              <ListMusic className="w-3.5 h-3.5" />
-              <span>Chapters ({chapters.length})</span>
-            </button>
-          )}
-        </div>
+              <ReadAlongReader book={currentBook} />
+            </Suspense>
+          </div>
+        ) : (
+          /* Large Cover Art with Crisp Border & Obsidian Shadow */
+          <div className="relative aspect-square w-full max-w-[240px] sm:max-w-[300px] md:max-w-[340px] mx-auto rounded-lg border border-border bg-surface overflow-hidden shadow-2xl flex items-center justify-center group">
+            {currentBook.coverR2Key ? (
+              <>
+                <img
+                  src={getBookCoverUrl(currentBook)}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover blur-md opacity-35 scale-110 pointer-events-none select-none"
+                />
+                <img
+                  src={getBookCoverUrl(currentBook)}
+                  alt={currentBook.title}
+                  className="relative z-10 w-full h-full object-contain select-none drop-shadow-lg"
+                />
+              </>
+            ) : (
+              <div className="w-full h-full bg-elevated flex flex-col items-center justify-center p-6 text-center">
+                <span className="text-2xl font-bold font-mono text-muted mb-2">
+                  {currentBook.format.toUpperCase()}
+                </span>
+                <p className="text-xs text-subtle font-mono truncate max-w-full">
+                  {currentBook.title}
+                </p>
+              </div>
+            )}
+
+            {/* Chapter Quick Jump Overlay Button */}
+            {chapters.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowChapterList(true)}
+                className="absolute bottom-3 right-3 bg-surface/90 border border-border text-text hover:text-accent px-3 py-1.5 rounded text-xs font-mono flex items-center gap-1.5 shadow-md cursor-pointer transition-colors"
+              >
+                <ListMusic className="w-3.5 h-3.5" />
+                <span>Chapters ({chapters.length})</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Title, Author & Chapter Badge */}
         <div className="text-center space-y-1 px-2">

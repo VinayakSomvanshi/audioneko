@@ -8,6 +8,13 @@
       "when": 1791134000079,
       "tag": "0000_chunky_warbird",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1791744606415,
+      "tag": "0001_abandoned_rogue",
+      "breakpoints": true
     }
   ]
 }

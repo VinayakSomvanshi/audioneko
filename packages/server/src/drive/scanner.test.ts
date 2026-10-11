@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeAuthor, parseBookInfo } from "./scanner";
+import { normalizeAuthor, parseBookInfo, scoreEbookMatch } from "./scanner";
 
 describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
   it("normalizes inverted author names", () => {
@@ -261,5 +261,67 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(b4.series).toBe("Sinners Anonymous");
     expect(b4.seriesIndex).toBe(4);
     expect(b4.narrator).toBe("Vanessa Moyen & Gideon Frost");
+  });
+
+  describe("Companion E-Book Discovery & Matching - scoreEbookMatch", () => {
+    it("scores exact title matches highest for Crescent City", () => {
+      const book = {
+        title: "House of Earth and Blood",
+        series: "Crescent City",
+        seriesIndex: 1,
+        author: "Sarah J. Maas",
+      };
+      const b1Score = scoreEbookMatch(
+        "House of Earth and Blood (Sarah J. Maas) (z-library.sk, 1lib.sk, z-lib.sk).epub",
+        book,
+      );
+      const b2Score = scoreEbookMatch(
+        "House of Sky and Breath (Sarah J. Maas) (z-library.sk, 1lib.sk, z-lib.sk).epub",
+        book,
+      );
+      const b3Score = scoreEbookMatch(
+        "House of Flame and Shadow (Sarah J. Maas) (z-library.sk, 1lib.sk, z-lib.sk).epub",
+        book,
+      );
+      expect(b1Score).toBeGreaterThan(b2Score);
+      expect(b1Score).toBeGreaterThan(b3Score);
+      expect(b1Score).toBeGreaterThanOrEqual(12);
+    });
+
+    it("scores exact title matches for Addicted series", () => {
+      const book = {
+        title: "Addicted to You",
+        series: "Addicted",
+        seriesIndex: 1,
+        author: "Krista Ritchie & Becca Ritchie",
+      };
+      const matchScore = scoreEbookMatch(
+        "Addicted to You (Addicted 1) (Krista Ritchie, Becca Ritchie) (z-library.sk, 1lib.sk, z-lib.sk).epub",
+        book,
+      );
+      const nonMatchScore = scoreEbookMatch(
+        "Addicted for Now (Addicted for Now 3) (Krista Ritchie, Becca Ritchie) (z-library.sk, 1lib.sk, z-lib.sk).epub",
+        book,
+      );
+      expect(matchScore).toBeGreaterThan(nonMatchScore);
+    });
+
+    it("scores exact title matches for ACOTAR series", () => {
+      const book = {
+        title: "A Court of Mist and Fury",
+        series: "A Court of Thorns and Roses",
+        seriesIndex: 2,
+        author: "Sarah J. Maas",
+      };
+      const matchScore = scoreEbookMatch(
+        "A Court of Mist and Fury (Sarah J. Maas) (z-library.sk, 1lib.sk, z-lib.sk).epub",
+        book,
+      );
+      const nonMatchScore = scoreEbookMatch(
+        "A Court of Wings and Ruin (Sarah J. Maas) (z-library.sk, 1lib.sk, z-lib.sk).epub",
+        book,
+      );
+      expect(matchScore).toBeGreaterThan(nonMatchScore);
+    });
   });
 });
