@@ -66,8 +66,11 @@ export function scoreEbookMatch(
   }
 
   // Exact title match or word-by-word match
-  const cleanTitle = book.title.toLowerCase();
-  if (lower.includes(cleanTitle)) {
+  const cleanTitle = book.title.toLowerCase().trim();
+  const titleWithoutArticle = cleanTitle.replace(/^(the|a|an)\s+/i, "");
+  const lowerWithoutArticle = lower.replace(/^(the|a|an)\s+/i, "");
+
+  if (lower.includes(cleanTitle) || lowerWithoutArticle.includes(titleWithoutArticle)) {
     score += 10;
   } else {
     for (const word of cleanTitle.split(/\s+/).filter((w) => w.length > 3)) {
@@ -610,7 +613,7 @@ export async function scanDriveLibrary(
   async function exploreFolder(
     folderId: string,
     folderName: string,
-    parentOfFolderId?: string,
+    ancestors: Array<{ id: string; name: string }> = [],
   ): Promise<void> {
     let pageToken: string | undefined;
 
@@ -637,10 +640,11 @@ export async function scanDriveLibrary(
 
       const data = (await res.json()) as { nextPageToken?: string; files?: DriveItem[] };
       const items = data.files || [];
+      const currentAncestors = [...ancestors, { id: folderId, name: folderName }];
 
       for (const item of items) {
         if (item.mimeType === "application/vnd.google-apps.folder") {
-          await exploreFolder(item.id, item.name, folderId);
+          await exploreFolder(item.id, item.name, currentAncestors);
         } else if (
           item.name.endsWith(".m4b") ||
           item.name.endsWith(".mp3") ||
@@ -656,6 +660,7 @@ export async function scanDriveLibrary(
           item.name.endsWith(".webp")
         ) {
           const isArtworkSubfolder = /^(artwork|covers?|images?)$/i.test(folderName);
+          const parentOfFolderId = ancestors[ancestors.length - 1]?.id;
           const effectiveParentFolderId =
             isArtworkSubfolder && parentOfFolderId ? parentOfFolderId : folderId;
           imageFiles.push({
@@ -669,9 +674,23 @@ export async function scanDriveLibrary(
           item.name.endsWith(".azw3") ||
           item.name.endsWith(".pdf")
         ) {
-          const isEbookSubfolder = /^(ebooks?|epubs?|books?)$/i.test(folderName);
-          const effectiveParentFolderId =
-            isEbookSubfolder && parentOfFolderId ? parentOfFolderId : folderId;
+          // Resolve effective parent folder: if inside an "epubs" or "ebooks" folder or any descendant of it
+          // (such as Calibre nested subfolders Throne of Glass/EPUBS/Heir of Fire (9166)/...),
+          // map its effective parent to the series folder containing the EPUBS directory!
+          let effectiveParentFolderId = folderId;
+          const epubIdx = currentAncestors.findIndex((a) =>
+            /^(epubs?|ebooks?|books?)$/i.test(a.name),
+          );
+          if (epubIdx > 0) {
+            effectiveParentFolderId = currentAncestors[epubIdx - 1]?.id ?? folderId;
+          } else {
+            const isEbookSubfolder = /^(ebooks?|epubs?|books?)$/i.test(folderName);
+            const parentOfFolderId = ancestors[ancestors.length - 1]?.id;
+            if (isEbookSubfolder && parentOfFolderId) {
+              effectiveParentFolderId = parentOfFolderId;
+            }
+          }
+
           ebookFiles.push({
             item,
             parentFolderId: effectiveParentFolderId,
@@ -685,7 +704,7 @@ export async function scanDriveLibrary(
   }
 
   // Explore starting at root folder
-  await exploreFolder(rootFolderId, "");
+  await exploreFolder(rootFolderId, "root", []);
 
   const seriesCache = new Map<string, string>(); // seriesName -> seriesId
   const importedBooks: ScanResult["books"] = [];
@@ -844,7 +863,7 @@ export async function scanDriveLibrary(
         }))
         .sort((a, b) => b.score - a.score);
 
-      const best = scored.find((s) => s.score > 0 && !usedInFolder.has(s.eb.item.id));
+      const best = scored.find((s) => s.score >= 5 && !usedInFolder.has(s.eb.item.id));
       const fallback =
         folderEbooks.length === 1 && folderEbooks[0] && !usedInFolder.has(folderEbooks[0].item.id)
           ? folderEbooks[0]

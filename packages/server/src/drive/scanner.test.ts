@@ -323,5 +323,47 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
       );
       expect(matchScore).toBeGreaterThan(nonMatchScore);
     });
+
+    it("scores Throne of Glass titles with and without leading articles", () => {
+      const book = {
+        title: "The Assassin's Blade",
+        series: "Throne of Glass",
+        seriesIndex: 3,
+        author: "Sarah J. Maas",
+      };
+      const matchScore = scoreEbookMatch("Assassin's Blade - Sarah J. Maas.epub", book);
+      expect(matchScore).toBeGreaterThanOrEqual(12);
+
+      const togBook = {
+        title: "Throne of Glass",
+        series: "Throne of Glass",
+        seriesIndex: 1,
+        author: "Sarah J. Maas",
+      };
+      expect(
+        scoreEbookMatch("Throne of Glass - Sarah J. Maas.epub", togBook),
+      ).toBeGreaterThanOrEqual(12);
+    });
+
+    it("scores Standalone book titles", () => {
+      const book = {
+        title: "The Love Hypothesis",
+        author: "Ali Hazelwood",
+      };
+      expect(
+        scoreEbookMatch(
+          "The Love Hypothesis (Ali Hazelwood) (z-library.sk, 1lib.sk, z-lib.sk).epub",
+          book,
+        ),
+      ).toBeGreaterThanOrEqual(12);
+
+      const fanBook = {
+        title: "Fan Service",
+        author: "Rosie Danan",
+      };
+      expect(
+        scoreEbookMatch("Fan Service (Rosie Danan) (Z-Library).epub", fanBook),
+      ).toBeGreaterThanOrEqual(12);
+    });
   });
 });
