@@ -104,6 +104,34 @@ export class EpubParser {
     return null;
   }
 
+  /**
+   * Safe XML parser that strips malformed/single-quoted <?xml ...?> declarations
+   * and falls back to HTML parsing if an XML parsererror occurs.
+   */
+  private parseXmlDoc(
+    rawStr: string,
+    mimeType: "application/xml" | "application/xhtml+xml" = "application/xml",
+  ): Document {
+    const parser = new DOMParser();
+    const cleanXml = rawStr.replace(/^\s*<\?xml[^>]*\?>/i, "").trim();
+    const doc = parser.parseFromString(cleanXml, mimeType);
+    if (doc.querySelector("parsererror")) {
+      return parser.parseFromString(cleanXml, "text/html");
+    }
+    return doc;
+  }
+
+  /**
+   * Namespace-agnostic element query helper.
+   */
+  private getElements(root: Document | Element, tagName: string): Element[] {
+    const list1 = Array.from(root.getElementsByTagName(tagName));
+    if (list1.length > 0) return list1;
+    const list2 = Array.from(root.getElementsByTagNameNS("*", tagName));
+    if (list2.length > 0) return list2;
+    return Array.from(root.querySelectorAll(tagName));
+  }
+
   private parseContainer(): void {
     const containerXmlBytes = this.getFileBytes("META-INF/container.xml");
     if (!containerXmlBytes) {
@@ -111,11 +139,10 @@ export class EpubParser {
     }
 
     const xmlStr = new TextDecoder("utf-8").decode(containerXmlBytes);
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xmlStr, "application/xml");
+    const doc = this.parseXmlDoc(xmlStr, "application/xml");
 
-    const rootfileEl = doc.querySelector("rootfile");
-    const opfFullPath = rootfileEl?.getAttribute("full-path");
+    const rootfiles = this.getElements(doc, "rootfile");
+    const opfFullPath = rootfiles[0]?.getAttribute("full-path");
     if (!opfFullPath) {
       throw new Error("Invalid EPUB: No rootfile full-path found in container.xml");
     }
@@ -133,17 +160,14 @@ export class EpubParser {
   }
 
   private parseOpf(opfXmlStr: string): void {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(opfXmlStr, "application/xml");
+    const doc = this.parseXmlDoc(opfXmlStr, "application/xml");
 
     // 1. Metadata
     const getMetaEl = (name: string): Element | null => {
-      const el = doc.getElementsByTagName(name)[0];
-      if (el) return el;
-      const elDc = doc.getElementsByTagName(`dc:${name}`)[0];
-      if (elDc) return elDc;
-      const elNs = doc.getElementsByTagNameNS?.("*", name);
-      return elNs && elNs.length > 0 ? (elNs[0] ?? null) : null;
+      const els = this.getElements(doc, name);
+      if (els[0]) return els[0];
+      const elsDc = this.getElements(doc, `dc:${name}`);
+      return elsDc[0] ?? null;
     };
 
     const titleEl = getMetaEl("title");
@@ -161,7 +185,7 @@ export class EpubParser {
     let ncxHref: string | null = null;
     let navHref: string | null = null;
 
-    const itemEls = Array.from(doc.getElementsByTagName("item"));
+    const itemEls = this.getElements(doc, "item");
     for (const item of itemEls) {
       const id = item.getAttribute("id");
       const href = item.getAttribute("href");
@@ -181,7 +205,7 @@ export class EpubParser {
 
     // 3. Spine
     this.spineItems = [];
-    const itemrefEls = Array.from(doc.getElementsByTagName("itemref"));
+    const itemrefEls = this.getElements(doc, "itemref");
     for (const itemref of itemrefEls) {
       const idref = itemref.getAttribute("idref");
       if (idref && this.manifest.has(idref)) {
@@ -211,15 +235,20 @@ export class EpubParser {
     }
 
     // 5. Parse standard EPUB 2 <guide> for landmarks (start of body matter)
-    const guideEl = doc.getElementsByTagName("guide")[0];
+    const guideEls = this.getElements(doc, "guide");
+    const guideEl = guideEls[0];
     if (guideEl && this.startOfContentSpineIndex === null) {
-      const references = Array.from(guideEl.getElementsByTagName("reference"));
+      const references = this.getElements(guideEl, "reference");
       for (const ref of references) {
         const type = (ref.getAttribute("type") || "").toLowerCase();
         const href = ref.getAttribute("href") || "";
-        if (type === "text" || type === "bodymatter" || type === "start") {
-          this.startOfContentSpineIndex = this.findSpineIndexForHref(href);
-          break;
+        // Only accept "text" or "bodymatter", and ensure spine index > 0 so cover isn't treated as story start
+        if (type === "text" || type === "bodymatter") {
+          const idx = this.findSpineIndexForHref(href);
+          if (idx > 0) {
+            this.startOfContentSpineIndex = idx;
+            break;
+          }
         }
       }
     }
@@ -249,10 +278,9 @@ export class EpubParser {
     if (!navBytes) return;
 
     const navStr = new TextDecoder("utf-8").decode(navBytes);
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(navStr, "application/xhtml+xml");
+    const doc = this.parseXmlDoc(navStr, "application/xhtml+xml");
 
-    const navEls = Array.from(doc.getElementsByTagName("nav"));
+    const navEls = this.getElements(doc, "nav");
     const navDir = navRelHref.includes("/") ? navRelHref.slice(0, navRelHref.lastIndexOf("/")) : "";
 
     // Check for EPUB 3 <nav epub:type="landmarks"> to identify start of story
@@ -263,7 +291,7 @@ export class EpubParser {
         ""
       ).toLowerCase();
       if (epubType.includes("landmark")) {
-        const landmarkLinks = Array.from(nav.getElementsByTagName("a"));
+        const landmarkLinks = this.getElements(nav, "a");
         for (const a of landmarkLinks) {
           const type = (a.getAttribute("epub:type") || "").toLowerCase();
           const hrefAttr = a.getAttribute("href") || "";
@@ -274,8 +302,11 @@ export class EpubParser {
             type.includes("start-page")
           ) {
             const resolvedHref = navDir ? this.resolvePath(navDir, hrefAttr) : hrefAttr;
-            this.startOfContentSpineIndex = this.findSpineIndexForHref(resolvedHref);
-            break;
+            const spineIdx = this.findSpineIndexForHref(resolvedHref);
+            if (spineIdx > 0) {
+              this.startOfContentSpineIndex = spineIdx;
+              break;
+            }
           }
         }
       }
@@ -296,7 +327,7 @@ export class EpubParser {
     if (!navEl) return;
 
     const items: EpubTocItem[] = [];
-    const linkEls = Array.from(navEl.getElementsByTagName("a"));
+    const linkEls = this.getElements(navEl, "a");
 
     let idx = 0;
     for (const a of linkEls) {
@@ -328,20 +359,19 @@ export class EpubParser {
     if (!ncxBytes) return;
 
     const ncxStr = new TextDecoder("utf-8").decode(ncxBytes);
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(ncxStr, "application/xml");
+    const doc = this.parseXmlDoc(ncxStr, "application/xml");
 
     const ncxDir = ncxRelHref.includes("/") ? ncxRelHref.slice(0, ncxRelHref.lastIndexOf("/")) : "";
 
-    const navPoints = Array.from(doc.getElementsByTagName("navPoint"));
+    const navPoints = this.getElements(doc, "navPoint");
     const items: EpubTocItem[] = [];
 
     let idx = 0;
     for (const np of navPoints) {
-      const textEl = np.getElementsByTagName("text")[0];
-      const contentEl = np.getElementsByTagName("content")[0];
-      const title = textEl?.textContent?.trim() || `Chapter ${idx + 1}`;
-      const src = contentEl?.getAttribute("src") || "";
+      const textEls = this.getElements(np, "text");
+      const contentEls = this.getElements(np, "content");
+      const title = textEls[0]?.textContent?.trim() || `Chapter ${idx + 1}`;
+      const src = contentEls[0]?.getAttribute("src") || "";
       const resolvedHref = ncxDir ? this.resolvePath(ncxDir, src) : src;
       const spineIndex = this.findSpineIndexForHref(resolvedHref);
 
@@ -390,8 +420,7 @@ export class EpubParser {
     const chapterDir = fullPath.includes("/") ? fullPath.slice(0, fullPath.lastIndexOf("/")) : "";
 
     const rawHtml = new TextDecoder("utf-8").decode(chapterBytes);
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(rawHtml, "application/xhtml+xml");
+    const doc = this.parseXmlDoc(rawHtml, "application/xhtml+xml");
 
     // 1. Strip publisher styles, stylesheets, and scripts
     const removeSelectors = ["style", "link[rel='stylesheet']", "script", "iframe", "object"];

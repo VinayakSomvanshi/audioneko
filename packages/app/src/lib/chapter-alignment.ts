@@ -138,15 +138,49 @@ export function parseRomanNumeral(str: string): number | null {
 }
 
 /**
+ * Extracts a part sequence number from a title string (e.g. "Part I", "Part One", "Part 1").
+ */
+export function extractPartNumber(title: string): number | null {
+  if (!title) return null;
+  const clean = title.toLowerCase().trim();
+
+  // 1. "Part 1", "Part 01"
+  const digitsMatch = clean.match(/\bpart\s*(\d+)/i);
+  if (digitsMatch?.[1]) {
+    return Number.parseInt(digitsMatch[1], 10);
+  }
+
+  // 2. "Part One", "Part Twenty-Two"
+  const wordMatch = clean.match(/\bpart\s+([a-z]+(?:-[a-z]+)?)/i);
+  if (wordMatch?.[1]) {
+    const word = wordMatch[1].toLowerCase();
+    if (WORD_TO_NUMBER[word]) {
+      return WORD_TO_NUMBER[word];
+    }
+  }
+
+  // 3. "Part I", "Part IV", "Part XXV"
+  const romanMatch = clean.match(/\bpart\s+([ivxlcdm]+)(?:\.|\s|:|-|$)/i);
+  if (romanMatch?.[1]) {
+    const val = parseRomanNumeral(romanMatch[1]);
+    if (val !== null) {
+      return val;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Extracts a chapter or sequence number from a title string.
- * Handles digits ("Chapter 1", "Ch. 02"), words ("Chapter One"), and Roman numerals ("Chapter XXV", "Part I").
+ * Handles digits ("Chapter 1", "Ch. 02"), words ("Chapter One"), and Roman numerals ("Chapter XXV").
  */
 export function extractChapterNumber(title: string): number | null {
   if (!title) return null;
   const clean = title.toLowerCase().trim();
 
-  // 1. "Chapter 1", "Ch. 1", "Ch 1", "Track 01"
-  const digitsMatch = clean.match(/(?:chapter|ch\.?|track|section)\s*(\d+)/i);
+  // 1. "Chapter 1", "Ch. 1", "Ch 1", "Track 01", "Part 1"
+  const digitsMatch = clean.match(/(?:chapter|ch\.?|part|track|section)\s*(\d+)/i);
   if (digitsMatch?.[1]) {
     return Number.parseInt(digitsMatch[1], 10);
   }
@@ -157,8 +191,8 @@ export function extractChapterNumber(title: string): number | null {
     return Number.parseInt(leadingDigits[1], 10);
   }
 
-  // 3. Spelled-out word: "Chapter One", "Chapter Twenty-Two"
-  const wordMatch = clean.match(/(?:chapter|ch\.?)\s+([a-z]+(?:-[a-z]+)?)/i);
+  // 3. Spelled-out word: "Chapter One", "Chapter Twenty-Two", "Part One"
+  const wordMatch = clean.match(/(?:chapter|ch\.?|part)\s+([a-z]+(?:-[a-z]+)?)/i);
   if (wordMatch?.[1]) {
     const word = wordMatch[1].toLowerCase();
     if (WORD_TO_NUMBER[word]) {
@@ -166,8 +200,8 @@ export function extractChapterNumber(title: string): number | null {
     }
   }
 
-  // 4. Roman numeral after chapter or part: "Chapter IV", "Part I", "Chapter XXV", "Chapter CXXI"
-  const romanMatch = clean.match(/(?:chapter|part|section)\s+([ivxlcdm]+)(?:\.|\s|:|-|$)/i);
+  // 4. Roman numeral after chapter or part: "Chapter IV", "Part I", "Chapter XXV"
+  const romanMatch = clean.match(/(?:chapter|ch\.?|part|section)\s+([ivxlcdm]+)(?:\.|\s|:|-|$)/i);
   if (romanMatch?.[1]) {
     const val = parseRomanNumeral(romanMatch[1]);
     if (val !== null) {
@@ -252,33 +286,36 @@ export function isFrontMatterSection(titleOrHref: string): boolean {
 
 /**
  * Determines the spine index of the first actual story chapter.
- * Uses authoritative EPUB landmarks first, then TOC chapter number/prologue, then front-matter exclusion.
+ * Prioritizes Chapter 1 or Prologue from TOC, then valid landmark, then front-matter exclusion.
  */
 export function findFirstStorySpineIndex(
   tocItems: EpubTocItem[],
   totalSpineCount = 0,
   startOfContentSpineIndex: number | null = null,
 ): number {
+  // 1. Search TOC for Chapter 1 or Prologue (most reliable indicator of story start)
+  const storyChapter = tocItems.find((t) => {
+    const num = extractChapterNumber(t.title);
+    return num === 1 || cleanTitle(t.title).includes("prologue");
+  });
+  if (storyChapter && storyChapter.spineIndex > 0) {
+    return storyChapter.spineIndex;
+  }
+
+  // 2. Authoritative EPUB landmarks if > 0 and not front-matter
   if (
     startOfContentSpineIndex !== null &&
-    startOfContentSpineIndex >= 0 &&
+    startOfContentSpineIndex > 0 &&
     (totalSpineCount === 0 || startOfContentSpineIndex < totalSpineCount)
   ) {
     return startOfContentSpineIndex;
   }
 
-  // 1. Look for Chapter 1 or Prologue
-  const storyChapter = tocItems.find((t) => {
-    const num = extractChapterNumber(t.title);
-    return num === 1 || cleanTitle(t.title).includes("prologue");
-  });
-  if (storyChapter) {
-    return storyChapter.spineIndex;
-  }
-
-  // 2. First TOC item that is not a front-matter section
-  const nonFrontMatter = tocItems.find((t) => !isFrontMatterSection(t.title));
-  if (nonFrontMatter) {
+  // 3. First TOC item that is not a front-matter section
+  const nonFrontMatter = tocItems.find(
+    (t) => !isFrontMatterSection(t.title) && !isFrontMatterSection(t.href),
+  );
+  if (nonFrontMatter && nonFrontMatter.spineIndex > 0) {
     return nonFrontMatter.spineIndex;
   }
 
@@ -288,11 +325,13 @@ export function findFirstStorySpineIndex(
 /**
  * Finds the best matching EPUB spine index for a given audio chapter.
  * Prioritizes:
- * 1. Authoritative EPUB landmarks if on first story chapter
- * 2. Exact or keyword title match (e.g., "Prologue", "Epilogue", "The Four Houses of Midgard")
- * 3. Chapter number match (e.g., Audio "Chapter 1 - Part One" matches TOC "Chapter One")
- * 4. Fallback to first story chapter if currently on opening credits
- * 5. Intelligent offset alignment matching audio track progression to story chapters
+ * 1. Opening credits handling (stays on cover for track 0/1)
+ * 2. Exact Title Match (authoritative, prevents false substring matches)
+ * 3. Named Section keywords (Prologue, Epilogue, etc.)
+ * 4. Explicit Chapter Number Match ("Chapter 1" <-> "Chapter One", "Chapter 10" <-> "Chapter Ten")
+ * 5. Explicit Part Number Match ("Part I" <-> "Part One")
+ * 6. Word-boundary phrase matching (safe non-digit phrases)
+ * 7. Intelligent offset alignment matching audio track progression to story chapters
  */
 export function findMatchingSpineIndex(
   currentAudioChapter: Chapter | null | undefined,
@@ -304,50 +343,70 @@ export function findMatchingSpineIndex(
 ): number {
   if (totalSpineCount <= 0) return 0;
   if (!currentAudioChapter || tocItems.length === 0) {
-    return Math.max(0, Math.min(totalSpineCount - 1, manualOffset));
+    const firstStory = findFirstStorySpineIndex(
+      tocItems,
+      totalSpineCount,
+      startOfContentSpineIndex,
+    );
+    return Math.max(0, Math.min(totalSpineCount - 1, firstStory + manualOffset));
   }
 
   const rawTitle = currentAudioChapter.title || "";
   const audioClean = cleanTitle(rawTitle);
 
-  // 1. Handle Opening Credits / Disclaimers
+  // 1. Handle Opening Credits / Disclaimers at the start of the book
   if (isCreditsOrDisclaimer(rawTitle)) {
-    // If in opening credits, show Cover/Title if available, or stay at 0
-    return Math.max(0, Math.min(totalSpineCount - 1, manualOffset));
+    const audioIdx = audioChapters.findIndex((c) => c.id === currentAudioChapter.id);
+    if (audioIdx <= 1) {
+      // Opening credits at start of book stay on cover / title page
+      return Math.max(0, Math.min(totalSpineCount - 1, manualOffset));
+    }
+    // Mid-book / End-book credits: stay near story chapters
+    const firstStory = findFirstStorySpineIndex(
+      tocItems,
+      totalSpineCount,
+      startOfContentSpineIndex,
+    );
+    return Math.max(0, Math.min(totalSpineCount - 1, firstStory + manualOffset));
   }
 
-  // 2. Exact or Named Section match (Prologue, Epilogue, Introduction, etc.)
-  const namedKeywords = ["prologue", "epilogue", "preface", "foreword", "afterword", "epigraph"];
+  // 2. Exact Title Match (Normalized) - 100% authoritative!
+  const exactMatch = tocItems.find((t) => cleanTitle(t.title) === audioClean);
+  if (exactMatch) {
+    return Math.max(0, Math.min(totalSpineCount - 1, exactMatch.spineIndex + manualOffset));
+  }
+
+  // 3. Named Section keywords (Prologue, Epilogue, Introduction, etc.)
+  const namedKeywords = [
+    "prologue",
+    "epilogue",
+    "preface",
+    "foreword",
+    "afterword",
+    "epigraph",
+    "interlude",
+  ];
   for (const kw of namedKeywords) {
-    if (audioClean.includes(kw)) {
-      const match = tocItems.find((t) => cleanTitle(t.title).includes(kw));
+    const regex = new RegExp(`\\b${kw}\\b`, "i");
+    if (regex.test(audioClean)) {
+      const match = tocItems.find((t) => regex.test(cleanTitle(t.title)));
       if (match) {
         return Math.max(0, Math.min(totalSpineCount - 1, match.spineIndex + manualOffset));
       }
     }
   }
 
-  // 3. High-confidence specific title phrase match (e.g. "The Four Houses of Midgard")
-  if (audioClean.length > 5) {
-    const matchPhrase = tocItems.find((t) => {
-      const tClean = cleanTitle(t.title);
-      return tClean.length > 5 && (audioClean.includes(tClean) || tClean.includes(audioClean));
-    });
-    if (matchPhrase) {
-      return Math.max(0, Math.min(totalSpineCount - 1, matchPhrase.spineIndex + manualOffset));
-    }
-  }
-
-  // 4. Chapter Number Matching ("Chapter 1" <-> "Chapter One")
+  // 4. Chapter Number Matching
+  const isExplicitAudioChapter = /\b(?:chapter|ch)\b/i.test(audioClean);
   const audioChapterNum = extractChapterNumber(rawTitle);
+
   if (audioChapterNum !== null) {
-    const isExplicitAudioChapter = audioClean.includes("chapter") || audioClean.includes("ch");
+    // 4a. If audio explicitly mentions "Chapter", match a TOC item that ALSO mentions "Chapter" with same number
     if (isExplicitAudioChapter) {
       const matchExplicitChapter = tocItems.find((t) => {
         const tClean = cleanTitle(t.title);
         return (
-          (tClean.includes("chapter") || tClean.includes("ch")) &&
-          extractChapterNumber(t.title) === audioChapterNum
+          /\b(?:chapter|ch)\b/i.test(tClean) && extractChapterNumber(t.title) === audioChapterNum
         );
       });
       if (matchExplicitChapter) {
@@ -358,9 +417,56 @@ export function findMatchingSpineIndex(
       }
     }
 
-    const matchByNum = tocItems.find((t) => extractChapterNumber(t.title) === audioChapterNum);
+    // 4b. Match any TOC item whose chapter number matches (avoid cross-matching Part and Chapter)
+    const isExplicitAudioPart = !isExplicitAudioChapter && /\bpart\b/i.test(audioClean);
+    const matchByNum = tocItems.find((t) => {
+      const tClean = cleanTitle(t.title);
+      if (
+        isExplicitAudioChapter &&
+        /\bpart\b/i.test(tClean) &&
+        !/\b(?:chapter|ch)\b/i.test(tClean)
+      ) {
+        return false;
+      }
+      if (isExplicitAudioPart && /\b(?:chapter|ch)\b/i.test(tClean) && !/\bpart\b/i.test(tClean)) {
+        return false;
+      }
+      return extractChapterNumber(t.title) === audioChapterNum;
+    });
     if (matchByNum) {
       return Math.max(0, Math.min(totalSpineCount - 1, matchByNum.spineIndex + manualOffset));
+    }
+  }
+
+  // 5. Part Number Matching (when audio is a Part divider track, e.g. "Part I - Armies and Allies")
+  const audioPartNum = extractPartNumber(rawTitle);
+  if (audioPartNum !== null && !isExplicitAudioChapter) {
+    const matchPart = tocItems.find((t) => extractPartNumber(t.title) === audioPartNum);
+    if (matchPart) {
+      return Math.max(0, Math.min(totalSpineCount - 1, matchPart.spineIndex + manualOffset));
+    }
+  }
+
+  // 6. Substring / Phrase Match with WORD BOUNDARIES (SAFE MATCHING)
+  // Ensures "chapter 10" never matches "chapter 1", and "the princess" never matches "the prince"
+  if (audioClean.length > 5) {
+    const matchPhrase = tocItems.find((t) => {
+      const tClean = cleanTitle(t.title);
+      if (tClean.length <= 5) return false;
+      // Do not use phrase matching if either has an explicit chapter number
+      if (extractChapterNumber(t.title) !== null || audioChapterNum !== null) {
+        return false;
+      }
+      // Word boundary match: tClean must appear as distinct whole words in audioClean or vice versa
+      const escapedT = tClean.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escapedAudio = audioClean.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return (
+        new RegExp(`(?:^|\\s)${escapedT}(?:\\s|$)`).test(audioClean) ||
+        new RegExp(`(?:^|\\s)${escapedAudio}(?:\\s|$)`).test(tClean)
+      );
+    });
+    if (matchPhrase) {
+      return Math.max(0, Math.min(totalSpineCount - 1, matchPhrase.spineIndex + manualOffset));
     }
   }
 
