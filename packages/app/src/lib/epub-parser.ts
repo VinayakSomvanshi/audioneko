@@ -43,6 +43,7 @@ export class EpubParser {
   public metadata: EpubMetadata = { title: "", creator: "" };
   public toc: EpubTocItem[] = [];
   public spineCount = 0;
+  public startOfContentSpineIndex: number | null = null;
 
   constructor(data: ArrayBuffer | Uint8Array) {
     const uint8 = data instanceof Uint8Array ? data : new Uint8Array(data);
@@ -208,6 +209,20 @@ export class EpubParser {
         level: 1,
       }));
     }
+
+    // 5. Parse standard EPUB 2 <guide> for landmarks (start of body matter)
+    const guideEl = doc.getElementsByTagName("guide")[0];
+    if (guideEl && this.startOfContentSpineIndex === null) {
+      const references = Array.from(guideEl.getElementsByTagName("reference"));
+      for (const ref of references) {
+        const type = (ref.getAttribute("type") || "").toLowerCase();
+        const href = ref.getAttribute("href") || "";
+        if (type === "text" || type === "bodymatter" || type === "start") {
+          this.startOfContentSpineIndex = this.findSpineIndexForHref(href);
+          break;
+        }
+      }
+    }
   }
 
   private findSpineIndexForHref(href: string): number {
@@ -238,6 +253,34 @@ export class EpubParser {
     const doc = parser.parseFromString(navStr, "application/xhtml+xml");
 
     const navEls = Array.from(doc.getElementsByTagName("nav"));
+    const navDir = navRelHref.includes("/") ? navRelHref.slice(0, navRelHref.lastIndexOf("/")) : "";
+
+    // Check for EPUB 3 <nav epub:type="landmarks"> to identify start of story
+    for (const nav of navEls) {
+      const epubType = (
+        nav.getAttribute("epub:type") ||
+        nav.getAttribute("role") ||
+        ""
+      ).toLowerCase();
+      if (epubType.includes("landmark")) {
+        const landmarkLinks = Array.from(nav.getElementsByTagName("a"));
+        for (const a of landmarkLinks) {
+          const type = (a.getAttribute("epub:type") || "").toLowerCase();
+          const hrefAttr = a.getAttribute("href") || "";
+          if (
+            type === "bodymatter" ||
+            type === "text" ||
+            type === "start" ||
+            type.includes("start-page")
+          ) {
+            const resolvedHref = navDir ? this.resolvePath(navDir, hrefAttr) : hrefAttr;
+            this.startOfContentSpineIndex = this.findSpineIndexForHref(resolvedHref);
+            break;
+          }
+        }
+      }
+    }
+
     let navEl: Element | null = null;
     for (const el of navEls) {
       const epubType = el.getAttribute("epub:type") || el.getAttribute("role");
@@ -251,8 +294,6 @@ export class EpubParser {
     }
 
     if (!navEl) return;
-
-    const navDir = navRelHref.includes("/") ? navRelHref.slice(0, navRelHref.lastIndexOf("/")) : "";
 
     const items: EpubTocItem[] = [];
     const linkEls = Array.from(navEl.getElementsByTagName("a"));

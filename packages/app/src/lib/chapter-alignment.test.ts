@@ -2,6 +2,7 @@ import type { Chapter } from "@audioneko/shared";
 import { describe, expect, it } from "vitest";
 import {
   extractChapterNumber,
+  findFirstStorySpineIndex,
   findMatchingAudioChapter,
   findMatchingSpineIndex,
   isCreditsOrDisclaimer,
@@ -223,6 +224,41 @@ describe("chapter-alignment", () => {
       const audioMatch = findMatchingAudioChapter(tocItem, mockAudioChapters);
       expect(audioMatch?.title).toBe("Prologue");
       expect(audioMatch?.startTime).toBe(20);
+    });
+  });
+
+  describe("findFirstStorySpineIndex", () => {
+    it("respects authoritative EPUB guide / landmarks when provided", () => {
+      const mockToc: EpubTocItem[] = [
+        { id: "t0", title: "Cover", href: "cover.xhtml", spineIndex: 0, level: 1 },
+        { id: "t1", title: "Title", href: "title.xhtml", spineIndex: 1, level: 1 },
+        { id: "t2", title: "Prologue", href: "prologue.xhtml", spineIndex: 2, level: 1 },
+      ];
+      // Landmark explicitly points to spine index 2
+      expect(findFirstStorySpineIndex(mockToc, 10, 2)).toBe(2);
+    });
+
+    it("skips multiple front-matter items to find Chapter One", () => {
+      const mockToc: EpubTocItem[] = [
+        { id: "t0", title: "Cover", href: "cover.xhtml", spineIndex: 0, level: 1 },
+        { id: "t1", title: "Title Page", href: "title.xhtml", spineIndex: 1, level: 1 },
+        { id: "t2", title: "Dedication", href: "ded.xhtml", spineIndex: 2, level: 1 },
+        { id: "t3", title: "Map of the Realm", href: "map.xhtml", spineIndex: 3, level: 1 },
+        { id: "t4", title: "Praise for the Author", href: "praise.xhtml", spineIndex: 4, level: 1 },
+        { id: "t5", title: "Chapter One: Awakening", href: "ch1.xhtml", spineIndex: 5, level: 1 },
+      ];
+      expect(findFirstStorySpineIndex(mockToc, 15)).toBe(5);
+    });
+
+    it("correctly identifies first story chapter with unnumbered named titles", () => {
+      const mockToc: EpubTocItem[] = [
+        { id: "t0", title: "Cover", href: "cover.xhtml", spineIndex: 0, level: 1 },
+        { id: "t1", title: "Copyright", href: "cop.xhtml", spineIndex: 1, level: 1 },
+        { id: "t2", title: "Dedication", href: "ded.xhtml", spineIndex: 2, level: 1 },
+        { id: "t3", title: "The Boy Who Lived", href: "ch1.xhtml", spineIndex: 3, level: 1 },
+        { id: "t4", title: "The Vanishing Glass", href: "ch2.xhtml", spineIndex: 4, level: 1 },
+      ];
+      expect(findFirstStorySpineIndex(mockToc, 10)).toBe(3);
     });
   });
 });

@@ -17,6 +17,7 @@ import { type UIEvent, useEffect, useRef, useState } from "react";
 import { useAudio } from "../../context/audio-context";
 import {
   extractChapterNumber,
+  findFirstStorySpineIndex,
   findMatchingAudioChapter,
   findMatchingSpineIndex,
 } from "../../lib/chapter-alignment";
@@ -100,13 +101,7 @@ export function ReadAlongReader({
 
   // Compute first story chapter spine index to allow fast skipping past front-matter
   const firstStorySpineIndex = parser
-    ? (() => {
-        const item = parser.toc.find((t) => {
-          const num = extractChapterNumber(t.title);
-          return num === 1 || t.title.toLowerCase().includes("prologue");
-        });
-        return item ? item.spineIndex : 0;
-      })()
+    ? findFirstStorySpineIndex(parser.toc, parser.spineCount, parser.startOfContentSpineIndex)
     : 0;
 
   // Save typography
@@ -164,7 +159,15 @@ export function ReadAlongReader({
     };
   }, [book.id]);
 
-  // 2. Synchronize Audio Chapter to Reader Spine Index (Tier 1 Smart Sync)
+  // 2. Default to first story chapter if opened while player is idle at start
+  useEffect(() => {
+    if (!parser || parser.spineCount === 0) return;
+    if (!currentChapter && activeSpineIndex === 0 && firstStorySpineIndex > 0) {
+      setActiveSpineIndex(firstStorySpineIndex);
+    }
+  }, [parser, currentChapter, activeSpineIndex, firstStorySpineIndex]);
+
+  // 3. Synchronize Audio Chapter to Reader Spine Index (Tier 1 Smart Sync)
   useEffect(() => {
     if (!parser || parser.spineCount === 0 || chapters.length === 0) return;
 
@@ -174,6 +177,7 @@ export function ReadAlongReader({
       parser.toc,
       parser.spineCount,
       chapterOffset,
+      parser.startOfContentSpineIndex,
     );
 
     if (matchedIndex !== activeSpineIndex) {

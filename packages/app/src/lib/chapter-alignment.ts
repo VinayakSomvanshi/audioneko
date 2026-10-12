@@ -180,10 +180,17 @@ function cleanTitle(s: string): string {
 }
 
 /**
- * Identifies if a title represents front-matter credits, disclaimer, or introductory material.
+ * Identifies if a title or filename represents front-matter credits, disclaimer, or introductory material.
  */
 export function isCreditsOrDisclaimer(title: string): boolean {
-  const clean = cleanTitle(title);
+  return isFrontMatterSection(title);
+}
+
+/**
+ * Universal detector for front-matter sections (cover, title page, copyright, dedication, maps, TOC, adcards).
+ */
+export function isFrontMatterSection(titleOrHref: string): boolean {
+  const clean = cleanTitle(titleOrHref);
   return (
     clean.includes("opening credit") ||
     clean.includes("closing credit") ||
@@ -193,17 +200,69 @@ export function isCreditsOrDisclaimer(title: string): boolean {
     clean.includes("acknowledgment") ||
     clean.includes("dedication") ||
     clean.includes("half title") ||
-    clean.includes("title page")
+    clean.includes("halftitle") ||
+    clean.includes("title page") ||
+    clean.includes("titlepage") ||
+    clean.includes("cover") ||
+    clean.includes("adcard") ||
+    clean.includes("praise") ||
+    clean.includes("also by") ||
+    clean.includes("other book") ||
+    clean.includes("author book") ||
+    clean.includes("table of content") ||
+    clean.includes("contents") ||
+    clean.includes("toc") ||
+    clean.includes("nav") ||
+    clean.includes("map") ||
+    clean.includes("cast of character") ||
+    clean.includes("dramatis personae") ||
+    clean.includes("epigraph")
   );
+}
+
+/**
+ * Determines the spine index of the first actual story chapter.
+ * Uses authoritative EPUB landmarks first, then TOC chapter number/prologue, then front-matter exclusion.
+ */
+export function findFirstStorySpineIndex(
+  tocItems: EpubTocItem[],
+  totalSpineCount = 0,
+  startOfContentSpineIndex: number | null = null,
+): number {
+  if (
+    startOfContentSpineIndex !== null &&
+    startOfContentSpineIndex >= 0 &&
+    (totalSpineCount === 0 || startOfContentSpineIndex < totalSpineCount)
+  ) {
+    return startOfContentSpineIndex;
+  }
+
+  // 1. Look for Chapter 1 or Prologue
+  const storyChapter = tocItems.find((t) => {
+    const num = extractChapterNumber(t.title);
+    return num === 1 || cleanTitle(t.title).includes("prologue");
+  });
+  if (storyChapter) {
+    return storyChapter.spineIndex;
+  }
+
+  // 2. First TOC item that is not a front-matter section
+  const nonFrontMatter = tocItems.find((t) => !isFrontMatterSection(t.title));
+  if (nonFrontMatter) {
+    return nonFrontMatter.spineIndex;
+  }
+
+  return 0;
 }
 
 /**
  * Finds the best matching EPUB spine index for a given audio chapter.
  * Prioritizes:
- * 1. Exact or keyword title match (e.g., "Prologue", "Epilogue", "The Four Houses of Midgard")
- * 2. Chapter number match (e.g., Audio "Chapter 1 - Part One" matches TOC "Chapter One")
- * 3. Fallback to first story chapter if currently on opening credits
- * 4. Fallback to index-proportional estimation if titles do not align
+ * 1. Authoritative EPUB landmarks if on first story chapter
+ * 2. Exact or keyword title match (e.g., "Prologue", "Epilogue", "The Four Houses of Midgard")
+ * 3. Chapter number match (e.g., Audio "Chapter 1 - Part One" matches TOC "Chapter One")
+ * 4. Fallback to first story chapter if currently on opening credits
+ * 5. Intelligent offset alignment matching audio track progression to story chapters
  */
 export function findMatchingSpineIndex(
   currentAudioChapter: Chapter | null | undefined,
@@ -211,6 +270,7 @@ export function findMatchingSpineIndex(
   tocItems: EpubTocItem[],
   totalSpineCount: number,
   manualOffset = 0,
+  startOfContentSpineIndex: number | null = null,
 ): number {
   if (totalSpineCount <= 0) return 0;
   if (!currentAudioChapter || tocItems.length === 0) {
@@ -275,10 +335,12 @@ export function findMatchingSpineIndex(
   }
 
   // 5. Intelligent Fallback: Calculate first story chapter offset in TOC
-  // If TOC has 8 front-matter entries before Chapter 1, use that offset!
+  // If TOC has front-matter entries before Chapter 1, use that offset!
   const firstStoryTocIndex = tocItems.findIndex((t) => {
+    if (startOfContentSpineIndex !== null && t.spineIndex === startOfContentSpineIndex) return true;
     const num = extractChapterNumber(t.title);
-    return num === 1 || cleanTitle(t.title).includes("prologue");
+    if (num === 1 || cleanTitle(t.title).includes("prologue")) return true;
+    return !isFrontMatterSection(t.title);
   });
 
   const audioIndex = audioChapters.findIndex((c) => c.id === currentAudioChapter.id);
