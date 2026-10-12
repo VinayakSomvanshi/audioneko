@@ -27,10 +27,20 @@ describe("chapter-alignment", () => {
       expect(extractChapterNumber("Chapter Forty")).toBe(40);
     });
 
-    it("extracts Roman numerals", () => {
+    it("extracts Roman numerals including numbers above 20", () => {
       expect(extractChapterNumber("Part I. The Drop")).toBe(1);
       expect(extractChapterNumber("Part II")).toBe(2);
       expect(extractChapterNumber("Chapter IV")).toBe(4);
+      expect(extractChapterNumber("Chapter IX")).toBe(9);
+      expect(extractChapterNumber("Chapter XXV")).toBe(25);
+      expect(extractChapterNumber("Chapter XL")).toBe(40);
+      expect(extractChapterNumber("Chapter LXXI")).toBe(71);
+      expect(extractChapterNumber("Chapter C")).toBe(100);
+      expect(extractChapterNumber("Chapter CXXI")).toBe(121);
+      // Standalone Roman numerals
+      expect(extractChapterNumber("IV")).toBe(4);
+      expect(extractChapterNumber("XXI")).toBe(21);
+      expect(extractChapterNumber("CXXI")).toBe(121);
     });
 
     it("returns null for non-numbered titles", () => {
@@ -46,6 +56,9 @@ describe("chapter-alignment", () => {
       expect(isCreditsOrDisclaimer("Closing Credits (Part 2)")).toBe(true);
       expect(isCreditsOrDisclaimer("Title Page")).toBe(true);
       expect(isCreditsOrDisclaimer("Dedication")).toBe(true);
+      expect(isCreditsOrDisclaimer("About the Author")).toBe(true);
+      expect(isCreditsOrDisclaimer("Books by Sarah J. Maas")).toBe(true);
+      expect(isCreditsOrDisclaimer("Excerpt from House of Earth and Blood")).toBe(true);
       expect(isCreditsOrDisclaimer("Chapter 1")).toBe(false);
       expect(isCreditsOrDisclaimer("Prologue")).toBe(false);
     });

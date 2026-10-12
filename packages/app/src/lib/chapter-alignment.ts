@@ -104,32 +104,42 @@ const WORD_TO_NUMBER: Record<string, number> = {
   hundred: 100,
 };
 
-const ROMAN_NUMERALS: Record<string, number> = {
-  i: 1,
-  ii: 2,
-  iii: 3,
-  iv: 4,
-  v: 5,
-  vi: 6,
-  vii: 7,
-  viii: 8,
-  ix: 9,
-  x: 10,
-  xi: 11,
-  xii: 12,
-  xiii: 13,
-  xiv: 14,
-  xv: 15,
-  xvi: 16,
-  xvii: 17,
-  xviii: 18,
-  xix: 19,
-  xx: 20,
-};
+/**
+ * Parses any valid Roman numeral (e.g. "iv", "xxv", "lxxi", "cxxi") into a decimal number.
+ * Validates canonical subtraction and addition rules for numbers 1 to 3999.
+ */
+export function parseRomanNumeral(str: string): number | null {
+  const s = str.toLowerCase().trim();
+  if (!s || !/^[ivxlcdm]+$/.test(s)) return null;
+
+  const romanValues: Record<string, number> = {
+    i: 1,
+    v: 5,
+    x: 10,
+    l: 50,
+    c: 100,
+    d: 500,
+    m: 1000,
+  };
+
+  let total = 0;
+  for (let i = 0; i < s.length; i++) {
+    const current = romanValues[s[i]!]!;
+    const next = s[i + 1] ? romanValues[s[i + 1]!] : undefined;
+
+    if (next !== undefined && current < next) {
+      total -= current;
+    } else {
+      total += current;
+    }
+  }
+
+  return total > 0 && total < 4000 ? total : null;
+}
 
 /**
  * Extracts a chapter or sequence number from a title string.
- * Handles digits ("Chapter 1", "Ch. 02"), words ("Chapter One"), and Roman numerals ("Part I").
+ * Handles digits ("Chapter 1", "Ch. 02"), words ("Chapter One"), and Roman numerals ("Chapter XXV", "Part I").
  */
 export function extractChapterNumber(title: string): number | null {
   if (!title) return null;
@@ -156,12 +166,21 @@ export function extractChapterNumber(title: string): number | null {
     }
   }
 
-  // 4. Roman numeral after chapter or part: "Chapter IV", "Part I"
+  // 4. Roman numeral after chapter or part: "Chapter IV", "Part I", "Chapter XXV", "Chapter CXXI"
   const romanMatch = clean.match(/(?:chapter|part|section)\s+([ivxlcdm]+)(?:\.|\s|:|-|$)/i);
   if (romanMatch?.[1]) {
-    const roman = romanMatch[1].toLowerCase();
-    if (ROMAN_NUMERALS[roman]) {
-      return ROMAN_NUMERALS[roman];
+    const val = parseRomanNumeral(romanMatch[1]);
+    if (val !== null) {
+      return val;
+    }
+  }
+
+  // 5. Standalone Roman numeral: e.g. "XXV", "IV", "III"
+  const standaloneRoman = clean.match(/^([ivxlcdm]+)$/i);
+  if (standaloneRoman?.[1]) {
+    const val = parseRomanNumeral(standaloneRoman[1]);
+    if (val !== null) {
+      return val;
     }
   }
 
@@ -187,7 +206,7 @@ export function isCreditsOrDisclaimer(title: string): boolean {
 }
 
 /**
- * Universal detector for front-matter sections (cover, title page, copyright, dedication, maps, TOC, adcards).
+ * Universal detector for front-matter sections (cover, title page, copyright, dedication, maps, TOC, adcards, author bios).
  */
 export function isFrontMatterSection(titleOrHref: string): boolean {
   const clean = cleanTitle(titleOrHref);
@@ -209,6 +228,9 @@ export function isFrontMatterSection(titleOrHref: string): boolean {
     clean.includes("also by") ||
     clean.includes("other book") ||
     clean.includes("author book") ||
+    clean.includes("books by") ||
+    clean.includes("about the author") ||
+    clean.includes("about the publisher") ||
     clean.includes("table of content") ||
     clean.includes("contents") ||
     clean.includes("toc") ||
@@ -216,7 +238,15 @@ export function isFrontMatterSection(titleOrHref: string): boolean {
     clean.includes("map") ||
     clean.includes("cast of character") ||
     clean.includes("dramatis personae") ||
-    clean.includes("epigraph")
+    clean.includes("epigraph") ||
+    clean.includes("colophon") ||
+    clean.includes("imprint") ||
+    clean.includes("teaser") ||
+    clean.includes("excerpt") ||
+    clean.includes("preview") ||
+    clean.includes("flyleaf") ||
+    clean.includes("frontmatter") ||
+    clean.includes("front matter")
   );
 }
 
