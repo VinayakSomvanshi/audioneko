@@ -15,6 +15,11 @@ import {
 } from "lucide-react";
 import { type UIEvent, useEffect, useRef, useState } from "react";
 import { useAudio } from "../../context/audio-context";
+import {
+  extractChapterNumber,
+  findMatchingAudioChapter,
+  findMatchingSpineIndex,
+} from "../../lib/chapter-alignment";
 import { loadBookEpub } from "../../lib/epub-cache";
 import { type EpubChapter, EpubParser, type EpubTocItem } from "../../lib/epub-parser";
 
@@ -93,6 +98,17 @@ export function ReadAlongReader({
   const lastProgrammaticScrollTop = useRef<number>(-1);
   const isInternalScrolling = useRef<boolean>(false);
 
+  // Compute first story chapter spine index to allow fast skipping past front-matter
+  const firstStorySpineIndex = parser
+    ? (() => {
+        const item = parser.toc.find((t) => {
+          const num = extractChapterNumber(t.title);
+          return num === 1 || t.title.toLowerCase().includes("prologue");
+        });
+        return item ? item.spineIndex : 0;
+      })()
+    : 0;
+
   // Save typography
   const updateTypography = (updates: Partial<TypographySettings>) => {
     setTypography((prev) => {
@@ -148,25 +164,20 @@ export function ReadAlongReader({
     };
   }, [book.id]);
 
-  // 2. Synchronize Audio Chapter to Reader Spine Index (Tier 1 Sync)
+  // 2. Synchronize Audio Chapter to Reader Spine Index (Tier 1 Smart Sync)
   useEffect(() => {
     if (!parser || parser.spineCount === 0 || chapters.length === 0) return;
 
-    // Find index of current audio chapter
-    const audioChapterIndex = currentChapter
-      ? chapters.findIndex((c) => c.id === currentChapter.id)
-      : 0;
-
-    if (audioChapterIndex < 0) return;
-
-    // Calculate effective spine index with manual offset
-    const effectiveIndex = Math.max(
-      0,
-      Math.min(parser.spineCount - 1, audioChapterIndex + chapterOffset),
+    const matchedIndex = findMatchingSpineIndex(
+      currentChapter,
+      chapters,
+      parser.toc,
+      parser.spineCount,
+      chapterOffset,
     );
 
-    if (effectiveIndex !== activeSpineIndex) {
-      setActiveSpineIndex(effectiveIndex);
+    if (matchedIndex !== activeSpineIndex) {
+      setActiveSpineIndex(matchedIndex);
       // Reset scroll lock when chapter changes
       setIsScrollLocked(false);
     }
@@ -261,13 +272,10 @@ export function ReadAlongReader({
     setShowTocDrawer(false);
     setIsScrollLocked(false);
 
-    // Also seek corresponding audio chapter if chapter aligns
-    const matchingAudioChapterIndex = tocItem.spineIndex - chapterOffset;
-    if (matchingAudioChapterIndex >= 0 && matchingAudioChapterIndex < chapters.length) {
-      const audioCh = chapters[matchingAudioChapterIndex];
-      if (audioCh && audioCh.startTime != null) {
-        seekTo(audioCh.startTime);
-      }
+    // Also seek corresponding audio chapter via intelligent title matching
+    const matchedAudio = findMatchingAudioChapter(tocItem, chapters);
+    if (matchedAudio && matchedAudio.startTime != null) {
+      seekTo(matchedAudio.startTime);
     }
   };
 
@@ -694,6 +702,32 @@ export function ReadAlongReader({
             lineHeight: typography.lineHeight,
           }}
         >
+          {/* Front-Matter Quick-Skip Banner */}
+          {firstStorySpineIndex > 0 && activeSpineIndex < firstStorySpineIndex && (
+            <div className="mb-6 p-3 rounded-lg border border-border bg-elevated flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 font-mono text-xs shadow-xs animate-in fade-in">
+              <div className="flex items-center gap-2 text-muted">
+                <BookOpen className="w-4 h-4 text-accent shrink-0" />
+                <span>Front-matter section. Looking for Chapter 1?</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveSpineIndex(firstStorySpineIndex);
+                  const firstAudio = chapters.find((c) => {
+                    const num = extractChapterNumber(c.title);
+                    return num === 1 || c.title.toLowerCase().includes("prologue");
+                  });
+                  if (firstAudio?.startTime != null) {
+                    seekTo(firstAudio.startTime);
+                  }
+                }}
+                className="px-3 py-1.5 rounded bg-accent text-bg font-bold hover:opacity-90 transition-opacity cursor-pointer text-center shrink-0 shadow-xs"
+              >
+                Jump to Chapter 1
+              </button>
+            </div>
+          )}
+
           {/* Chapter Heading Banner */}
           {currentChapterContent && (
             <div className="pb-4 mb-6 border-b border-border/60">
