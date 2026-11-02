@@ -44,6 +44,7 @@ class DownloadManager {
   private tasks: Map<string, DownloadTask> = new Map();
   private abortControllers: Map<string, AbortController> = new Map();
   private listeners: Set<() => void> = new Set();
+  private downloadedIds: Set<string> = new Set();
   private isProcessing = false;
   private isInitialized = false;
 
@@ -56,6 +57,17 @@ class DownloadManager {
     this.isInitialized = true;
 
     if (typeof window === "undefined") return;
+
+    // Pre-populate set of downloaded book IDs for instant synchronous lookups
+    try {
+      const { getDownloadedBooks } = await import("./opfs");
+      const downloaded = await getDownloadedBooks();
+      for (const b of downloaded) {
+        this.downloadedIds.add(b.bookId);
+      }
+    } catch {
+      // Non-fatal
+    }
 
     // Load persisted queue from localStorage
     try {
@@ -142,6 +154,18 @@ class DownloadManager {
 
   public getActiveCount(): number {
     return this.getActiveTasks().length;
+  }
+
+  public isDownloadedSync(bookId: string): boolean {
+    return this.downloadedIds.has(bookId);
+  }
+
+  public markDownloaded(bookId: string): void {
+    this.downloadedIds.add(bookId);
+  }
+
+  public unmarkDownloaded(bookId: string): void {
+    this.downloadedIds.delete(bookId);
   }
 
   public async enqueue(meta: OfflineBookMeta): Promise<void> {
@@ -336,6 +360,7 @@ class DownloadManager {
       task.estimatedTimeSeconds = undefined;
       task.updatedAt = Date.now();
       this.abortControllers.delete(task.bookId);
+      this.downloadedIds.add(task.bookId);
 
       // Remove completed from active queue after brief delay
       setTimeout(() => {

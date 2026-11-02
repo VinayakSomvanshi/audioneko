@@ -5,6 +5,8 @@ import {
   deleteDownloadedBook,
   downloadBookToOpfs,
   getBookCoverBlobUrl,
+  getDownloadedAudioBlobUrl,
+  getDownloadedAudioFile,
   getDownloadedBooks,
   getPartialDownloadBytes,
   getStorageEstimate,
@@ -255,6 +257,14 @@ describe("Origin Private File System (OPFS) Download Manager", () => {
     expect(books[0]?.bookId).toBe("book_offline_1");
     expect(books[0]?.title).toBe("Project Hail Mary");
     expect(books[0]?.fileSizeBytes).toBe(8);
+
+    const localAudio = await getDownloadedAudioFile("book_offline_1");
+    expect(localAudio).toBeDefined();
+    expect(localAudio?.size).toBe(8);
+
+    const localBlobUrl = await getDownloadedAudioBlobUrl("book_offline_1");
+    expect(localBlobUrl).toBeDefined();
+    expect(typeof localBlobUrl).toBe("string");
   });
 
   it("resumes partial downloads using HTTP range requests without restarting from zero", async () => {

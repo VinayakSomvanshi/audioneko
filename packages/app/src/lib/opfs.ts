@@ -243,6 +243,40 @@ export async function getBookCoverBlobUrl(bookId: string): Promise<string | null
 }
 
 /**
+ * Retrieves the local audio File object from OPFS if completely downloaded.
+ */
+export async function getDownloadedAudioFile(bookId: string): Promise<File | null> {
+  const booksDir = await getBooksDirectory();
+  if (!booksDir) return null;
+
+  try {
+    const bookDir = await booksDir.getDirectoryHandle(bookId);
+    const audioHandle = await bookDir.getFileHandle(AUDIO_FILE_NAME);
+    const metaHandle = await bookDir.getFileHandle(META_FILE_NAME);
+
+    const [audioFile, metaFile] = await Promise.all([audioHandle.getFile(), metaHandle.getFile()]);
+    if (audioFile.size > 0 && metaFile.size > 0) {
+      return audioFile;
+    }
+  } catch {
+    // Incomplete or not downloaded
+  }
+  return null;
+}
+
+/**
+ * Retrieves a local Blob Object URL for the downloaded audio file stored in OPFS.
+ * Provides zero-network latency, offline capability, and instant seeking.
+ */
+export async function getDownloadedAudioBlobUrl(bookId: string): Promise<string | null> {
+  const file = await getDownloadedAudioFile(bookId);
+  if (file && file.size > 0) {
+    return URL.createObjectURL(file);
+  }
+  return null;
+}
+
+/**
  * Lists all audiobooks currently downloaded to the local OPFS storage.
  */
 export async function getDownloadedBooks(): Promise<OfflineBookMeta[]> {

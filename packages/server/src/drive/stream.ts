@@ -162,10 +162,98 @@ export async function getDriveFileMetadata(
   return metadata;
 }
 
+export async function getOrFetchChunk(
+  fileId: string,
+  chunkIndex: number,
+  chunkStart: number,
+  chunkEnd: number,
+  accessToken: string,
+  requestUrl: string,
+  customFetch: typeof fetch = fetch,
+): Promise<{ data: Uint8Array; fromCache: boolean }> {
+  const cache =
+    typeof caches !== "undefined" && "default" in caches
+      ? (caches as unknown as { default: Cache }).default
+      : null;
+
+  let cacheKey: Request | null = null;
+  if (cache) {
+    try {
+      const url = new URL(requestUrl);
+      const chunkUrl = `${url.origin}/cdn-cache/audio/${fileId}/chunk-${chunkIndex}`;
+      cacheKey = new Request(chunkUrl, { method: "GET" });
+      const cached = await cache.match(cacheKey);
+      if (cached) {
+        const buf = await cached.arrayBuffer();
+        if (buf.byteLength > 0) {
+          return { data: new Uint8Array(buf), fromCache: true };
+        }
+      }
+    } catch {
+      // Non-fatal cache lookup fallback
+    }
+  }
+
+  // Fetch chunk from Google Drive API with retry
+  const driveRange = `bytes=${chunkStart}-${chunkEnd}`;
+  let driveRes: Response | null = null;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    try {
+      driveRes = await customFetch(
+        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Range: driveRange,
+          },
+        },
+      );
+      if (driveRes.ok || driveRes.status === 206) break;
+      if (driveRes.status !== 429 && driveRes.status !== 503 && driveRes.status !== 500) break;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+    }
+    if (attempt < 2) {
+      await new Promise((resolve) => setTimeout(resolve, 150 * (attempt + 1)));
+    }
+  }
+
+  if (!driveRes || (!driveRes.ok && driveRes.status !== 206)) {
+    const errorText = driveRes ? await driveRes.text() : lastError?.message || "Network error";
+    const status = driveRes ? driveRes.status : 502;
+    throw new Error(`Google Drive API chunk error [${status}]: ${errorText}`);
+  }
+
+  const chunkBuf = await driveRes.arrayBuffer();
+  const data = new Uint8Array(chunkBuf);
+
+  // Store in Cloudflare Edge Cache API (HTTP 200 response is fully cacheable)
+  if (cache && cacheKey && data.byteLength > 0) {
+    try {
+      const cacheResponse = new Response(data, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "Cache-Control": "public, max-age=2592000, s-maxage=2592000",
+          ETag: `"${fileId}-chunk-${chunkIndex}"`,
+        },
+      });
+      cache.put(cacheKey, cacheResponse).catch(() => {});
+    } catch {
+      // Non-fatal
+    }
+  }
+
+  return { data, fromCache: false };
+}
+
 /**
  * Handles audio stream requests with zero-copy streaming:
- * Tier 2: Cloudflare R2 Active Shelf (if configured)
- * Tier 4: Google Drive API (alt=media) with direct piped ReadableStream
+ * Tier 1: Cloudflare R2 Active Shelf (if configured)
+ * Tier 2: Cloudflare Edge Cache API (caches.default 2 MB chunk slices)
+ * Tier 3: Google Drive API (alt=media) with chunk-cached progressive ReadableStream
  *
  * Eliminates intermediate ArrayBuffer buffering stalls and 2 MB chunk fragmentation,
  * allowing instant startup (< 1s) and continuous smooth playback without buffer underruns.
@@ -232,7 +320,7 @@ export async function handleAudioStreamRequest(
   const { start, end } = parsedRange;
   const requestedLength = end - start + 1;
 
-  // 5. Tier 2: Check Cloudflare R2 "Active Shelf" Cache (if configured)
+  // 5. Tier 1: Check Cloudflare R2 "Active Shelf" Cache (if configured)
   if (env.R2) {
     try {
       const r2Key = `audio/${fileId}`;
@@ -259,44 +347,142 @@ export async function handleAudioStreamRequest(
     }
   }
 
-  // 6. Direct Zero-Latency Stream from Google Drive API
-  const driveRange = `bytes=${start}-${end}`;
-  const driveRes = await customFetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Range: driveRange,
-      },
-    },
-  );
+  // 6. Direct Stream or Edge Chunk-Cache Stream
+  // If the client requested an explicit small range (< CHUNK_SIZE):
+  if (requestedLength < CHUNK_SIZE) {
+    // If range is within a single chunk, check Edge Cache first
+    const chunkIndex = Math.floor(start / CHUNK_SIZE);
+    const { chunkStart, chunkEnd } = getChunkBounds(start, totalSize);
 
-  if (!driveRes.ok && driveRes.status !== 206) {
-    const errorText = await driveRes.text();
-    return new Response(
-      JSON.stringify({ error: `Google Drive API error [${driveRes.status}]: ${errorText}` }),
+    const cache =
+      typeof caches !== "undefined" && "default" in caches
+        ? (caches as unknown as { default: Cache }).default
+        : null;
+
+    if (cache && chunkEnd >= end) {
+      try {
+        const url = new URL(request.url);
+        const chunkUrl = `${url.origin}/cdn-cache/audio/${fileId}/chunk-${chunkIndex}`;
+        const cacheKey = new Request(chunkUrl, { method: "GET" });
+        const cached = await cache.match(cacheKey);
+        if (cached) {
+          const buf = await cached.arrayBuffer();
+          const chunkData = new Uint8Array(buf);
+          const sliceStart = start - chunkStart;
+          const sliceEnd = sliceStart + requestedLength;
+          if (sliceEnd <= chunkData.byteLength) {
+            const slice = chunkData.subarray(sliceStart, sliceEnd);
+            return new Response(slice, {
+              status: 206,
+              headers: {
+                "Content-Type": metadata.mimeType,
+                "Accept-Ranges": "bytes",
+                "Content-Range": `bytes ${start}-${end}/${totalSize}`,
+                "Content-Length": requestedLength.toString(),
+                "Cache-Control": "public, max-age=604800, s-maxage=604800",
+                "X-Content-Type-Options": "nosniff",
+                "X-Audioneko-Tier": "Edge-Cache-Hit",
+              },
+            });
+          }
+        }
+      } catch {
+        // Fallback to fetch
+      }
+    }
+
+    // Direct Google Drive fetch for explicit small range (e.g. metadata probes)
+    const driveRange = `bytes=${start}-${end}`;
+    const driveRes = await customFetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
       {
-        status: driveRes.status === 403 ? 429 : 502,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Range: driveRange,
+        },
       },
     );
+
+    if (!driveRes.ok && driveRes.status !== 206) {
+      const errorText = await driveRes.text();
+      return new Response(
+        JSON.stringify({ error: `Google Drive API error [${driveRes.status}]: ${errorText}` }),
+        {
+          status: driveRes.status === 403 ? 429 : 502,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const responseHeaders = new Headers();
+    responseHeaders.set("Content-Type", metadata.mimeType);
+    responseHeaders.set("Accept-Ranges", "bytes");
+    responseHeaders.set("Cache-Control", "public, max-age=604800, s-maxage=604800");
+    responseHeaders.set("X-Content-Type-Options", "nosniff");
+    responseHeaders.set("X-Audioneko-Tier", "Google-Drive-Direct-Stream");
+
+    const contentRange =
+      driveRes.headers.get("content-range") || `bytes ${start}-${end}/${totalSize}`;
+    responseHeaders.set("Content-Range", contentRange);
+
+    const contentLength = driveRes.headers.get("content-length") || requestedLength.toString();
+    responseHeaders.set("Content-Length", contentLength);
+
+    return new Response(driveRes.body, {
+      status: 206,
+      headers: responseHeaders,
+    });
   }
+
+  // 7. Tier 3: Edge Chunk-Cache Progressive Stream (for continuous audio streaming)
+  let currentOffset = start;
+  const targetEnd = end;
+
+  const stream = new ReadableStream({
+    async pull(controller) {
+      if (currentOffset > targetEnd) {
+        controller.close();
+        return;
+      }
+
+      const chunkIndex = Math.floor(currentOffset / CHUNK_SIZE);
+      const chunkStart = chunkIndex * CHUNK_SIZE;
+      const chunkEnd = Math.min(chunkStart + CHUNK_SIZE - 1, totalSize - 1);
+
+      try {
+        const { data } = await getOrFetchChunk(
+          fileId,
+          chunkIndex,
+          chunkStart,
+          chunkEnd,
+          accessToken,
+          request.url,
+          customFetch,
+        );
+
+        const sliceStart = currentOffset - chunkStart;
+        const bytesRemaining = targetEnd - currentOffset + 1;
+        const sliceEnd = Math.min(data.byteLength, sliceStart + bytesRemaining);
+        const slice = data.subarray(sliceStart, sliceEnd);
+
+        controller.enqueue(slice);
+        currentOffset += slice.byteLength;
+      } catch (err) {
+        controller.error(err);
+      }
+    },
+  });
 
   const responseHeaders = new Headers();
   responseHeaders.set("Content-Type", metadata.mimeType);
   responseHeaders.set("Accept-Ranges", "bytes");
   responseHeaders.set("Cache-Control", "public, max-age=604800, s-maxage=604800");
   responseHeaders.set("X-Content-Type-Options", "nosniff");
-  responseHeaders.set("X-Audioneko-Tier", "Google-Drive-Direct-Stream");
+  responseHeaders.set("X-Audioneko-Tier", "Edge-Cache-Chunk-Stream");
+  responseHeaders.set("Content-Range", `bytes ${start}-${end}/${totalSize}`);
+  responseHeaders.set("Content-Length", requestedLength.toString());
 
-  const contentRange =
-    driveRes.headers.get("content-range") || `bytes ${start}-${end}/${totalSize}`;
-  responseHeaders.set("Content-Range", contentRange);
-
-  const contentLength = driveRes.headers.get("content-length") || requestedLength.toString();
-  responseHeaders.set("Content-Length", contentLength);
-
-  return new Response(driveRes.body, {
+  return new Response(stream, {
     status: 206,
     headers: responseHeaders,
   });

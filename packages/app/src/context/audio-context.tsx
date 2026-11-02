@@ -15,6 +15,7 @@ import { HeadsetSettingsModal } from "../components/player/HeadsetSettingsModal"
 import { ResumeBanner } from "../components/player/ResumeBanner";
 import { audioEngine } from "../lib/audio-engine";
 import { useCurrentUser } from "../lib/auth-client";
+import { downloadManager } from "../lib/download-manager";
 import type { EqualizerBands, EqualizerPresetId } from "../lib/equalizer";
 import {
   type HeadsetRemappingSettings,
@@ -27,8 +28,12 @@ import {
   setMediaSessionPlaybackState,
   setMediaSessionPositionState,
 } from "../lib/media-session";
+import { getDownloadedAudioBlobUrl } from "../lib/opfs";
 import { pipManager } from "../lib/pip-visualizer";
-import { triggerPredictivePrecache } from "../lib/predictive-precache";
+import {
+  cancelScheduledPredictivePrecache,
+  schedulePredictivePrecache,
+} from "../lib/predictive-precache";
 import {
   PROGRESS_CHANGE_EVENT,
   clearProgress,
@@ -168,6 +173,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const volumeRef = useRef(1.0);
   const isMutedRef = useRef(false);
   const prevVolumeRef = useRef(1.0);
+  const activeBlobUrlRef = useRef<string | null>(null);
 
   const userRef = useRef(user);
   const isUserLoadingRef = useRef(isUserLoading);
@@ -565,9 +571,71 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    let stallTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const clearStallWatchdog = () => {
+      if (stallTimeout) {
+        clearTimeout(stallTimeout);
+        stallTimeout = null;
+      }
+    };
+
+    const armStallWatchdog = () => {
+      clearStallWatchdog();
+      if (!isPlayingRef.current || !currentBookRef.current) return;
+      stallTimeout = setTimeout(() => {
+        const book = currentBookRef.current;
+        if (isPlayingRef.current && book && audio.readyState < 3 && !audio.paused) {
+          console.warn(
+            "[audioneko] Stream stalled > 4s - auto-recovering from position:",
+            audio.currentTime,
+          );
+          const pos = audio.currentTime;
+          audio.src = `/api/stream/${book.id}#t=${pos}`;
+          audio.currentTime = pos;
+          audioEngine.playWithRamp(audio).catch(() => {});
+        }
+      }, 4000);
+    };
+
+    const onWaiting = () => {
+      armStallWatchdog();
+    };
+
+    const onStalled = () => {
+      armStallWatchdog();
+    };
+
+    const onCanPlay = () => {
+      clearStallWatchdog();
+    };
+
     const onAudioError = () => {
       const err = audio.error;
       console.warn("[audioneko] Audio error:", err?.code, err?.message);
+      clearStallWatchdog();
+
+      const book = currentBookRef.current;
+      // 1. Try local OPFS fallback if offline or stream error:
+      if (book) {
+        getDownloadedAudioBlobUrl(book.id)
+          .then((blobUrl) => {
+            if (blobUrl && audioRef.current && currentBookRef.current?.id === book.id) {
+              console.log("[audioneko] Network error; switching seamlessly to local OPFS copy");
+              if (activeBlobUrlRef.current && activeBlobUrlRef.current !== blobUrl) {
+                URL.revokeObjectURL(activeBlobUrlRef.current);
+              }
+              activeBlobUrlRef.current = blobUrl;
+              const pos = audioRef.current.currentTime || currentTimeRef.current;
+              audioRef.current.src = pos > 0 ? `${blobUrl}#t=${pos}` : blobUrl;
+              audioRef.current.currentTime = pos;
+              audioEngine.playWithRamp(audioRef.current).catch(() => {});
+              return;
+            }
+          })
+          .catch(() => {});
+      }
+
       setIsPlaying(false);
       isPlayingRef.current = false;
       if (typeof window !== "undefined") {
@@ -618,8 +686,13 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     audio.addEventListener("pause", onPause);
     audio.addEventListener("ended", onEnded);
     audio.addEventListener("error", onAudioError);
+    audio.addEventListener("waiting", onWaiting);
+    audio.addEventListener("stalled", onStalled);
+    audio.addEventListener("canplay", onCanPlay);
 
     return () => {
+      clearStallWatchdog();
+      cancelScheduledPredictivePrecache();
       window.removeEventListener("beforeunload", onBeforeUnload);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("focus", onWindowFocus);
@@ -627,6 +700,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       timer.cancel();
       audio.pause();
       audio.src = "";
+      if (activeBlobUrlRef.current) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+        activeBlobUrlRef.current = null;
+      }
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("durationchange", onDurationChange);
       audio.removeEventListener("progress", onProgress);
@@ -635,6 +712,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener("pause", onPause);
       audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("error", onAudioError);
+      audio.removeEventListener("waiting", onWaiting);
+      audio.removeEventListener("stalled", onStalled);
+      audio.removeEventListener("canplay", onCanPlay);
       audioRef.current = null;
     };
   }, []); // EMPTY - runs once for the app lifetime
@@ -943,7 +1023,38 @@ export function AudioProvider({ children }: { children: ReactNode }) {
 
       const streamUrl = `/api/stream/${book.id}`;
       const targetUrl = startPos > 0 ? `${streamUrl}#t=${startPos}` : streamUrl;
-      const isSameBook = audio.src?.includes(`/api/stream/${book.id}`);
+      const isSameBook =
+        audio.src?.includes(`/api/stream/${book.id}`) ||
+        Boolean(activeBlobUrlRef.current && audio.src?.includes(activeBlobUrlRef.current));
+
+      // Revoke previous Blob URL if switching to a different book
+      if (activeBlobUrlRef.current && currentBookRef.current?.id !== book.id) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+        activeBlobUrlRef.current = null;
+      }
+
+      // Check for instant local OPFS playback
+      const isDownloaded = downloadManager.isDownloadedSync(book.id);
+      if (isDownloaded || (typeof navigator !== "undefined" && !navigator.onLine)) {
+        getDownloadedAudioBlobUrl(book.id)
+          .then((blobUrl) => {
+            if (blobUrl && currentBookRef.current?.id === book.id && audioRef.current) {
+              if (activeBlobUrlRef.current && activeBlobUrlRef.current !== blobUrl) {
+                URL.revokeObjectURL(activeBlobUrlRef.current);
+              }
+              activeBlobUrlRef.current = blobUrl;
+              const pos = audioRef.current.currentTime || startPos;
+              const targetWithTime = pos > 0 ? `${blobUrl}#t=${pos}` : blobUrl;
+              if (!audioRef.current.src.includes(blobUrl)) {
+                audioRef.current.src = targetWithTime;
+                if (isPlayingRef.current) {
+                  audioEngine.playWithRamp(audioRef.current).catch(() => {});
+                }
+              }
+            }
+          })
+          .catch(() => {});
+      }
 
       audio.preload = "auto";
       audio.playbackRate = playbackRateRef.current;
@@ -1028,8 +1139,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         artworkUrl: book.coverR2Key ? `/api/covers/${book.id}` : undefined,
       });
 
-      // Trigger predictive offline pre-caching across cellular and Wi-Fi networks
-      triggerPredictivePrecache(book, bookChapters).catch(() => {});
+      // Trigger predictive offline pre-caching after stabilization delay to preserve initial streaming bandwidth
+      schedulePredictivePrecache(book, bookChapters);
     },
     [flushListeningEvent],
   );

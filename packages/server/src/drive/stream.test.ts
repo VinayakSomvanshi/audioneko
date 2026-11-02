@@ -238,4 +238,62 @@ describe("Audio Stream Engine & Range Proxy", () => {
     const body = new Uint8Array(await response.arrayBuffer());
     expect(body).toEqual(mockAudioBytes);
   });
+
+  it("serves large / open-ended range requests via Edge Chunk-Cache progressive stream", async () => {
+    const chunkData = new Uint8Array(CHUNK_SIZE).fill(42);
+
+    const mockEnv = {
+      GOOGLE_SA_KEY: JSON.stringify({ client_email: "test@sa.com", private_key: "dummy" }),
+      KV: {
+        get: vi.fn().mockImplementation((key: string) => {
+          if (key === "gdrive_access_token") return Promise.resolve("mock_bearer_token");
+          if (key.startsWith("gdrive_meta_")) {
+            return Promise.resolve({
+              size: 10 * 1024 * 1024, // 10 MB
+              mimeType: "audio/mp4",
+              name: "open-ended-book.m4b",
+            });
+          }
+          return Promise.resolve(null);
+        }),
+      },
+    } as unknown as Env;
+
+    const mockFetch = vi.fn().mockResolvedValue(
+      new Response(chunkData, {
+        status: 206,
+        headers: {
+          "Content-Range": `bytes 0-${CHUNK_SIZE - 1}/${10 * 1024 * 1024}`,
+          "Content-Length": CHUNK_SIZE.toString(),
+        },
+      }),
+    );
+
+    const request = new Request("https://audioneko.app/api/stream/file_123", {
+      method: "GET",
+      headers: { Range: "bytes=0-" },
+    });
+
+    const response = await handleAudioStreamRequest(
+      request,
+      "file_123",
+      mockEnv,
+      mockFetch as unknown as typeof fetch,
+    );
+
+    expect(response.status).toBe(206);
+    expect(response.headers.get("Content-Range")).toBe(
+      `bytes 0-${10 * 1024 * 1024 - 1}/${10 * 1024 * 1024}`,
+    );
+    expect(response.headers.get("X-Audioneko-Tier")).toBe("Edge-Cache-Chunk-Stream");
+
+    // Read first chunk from stream
+    const reader = response.body?.getReader();
+    expect(reader).toBeDefined();
+    const readResult = await reader?.read();
+    expect(readResult?.done).toBe(false);
+    expect(readResult?.value?.byteLength).toBe(CHUNK_SIZE);
+    expect(readResult?.value?.[0]).toBe(42);
+    await reader?.cancel();
+  });
 });

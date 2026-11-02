@@ -63,6 +63,36 @@ function isNetworkEligible(pref: PrecacheNetworkPreference): boolean {
   return true;
 }
 
+let precacheTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Schedules predictive pre-caching after a stabilization delay (default 12s).
+ * Prevents background downloads from contending with initial playback buffer startup bandwidth.
+ */
+export function schedulePredictivePrecache(
+  book: Book,
+  chapters?: Chapter[],
+  delayMs = 12000,
+): void {
+  if (precacheTimer) {
+    clearTimeout(precacheTimer);
+    precacheTimer = null;
+  }
+  precacheTimer = setTimeout(() => {
+    triggerPredictivePrecache(book, chapters).catch(() => {});
+  }, delayMs);
+}
+
+/**
+ * Cancels any pending scheduled predictive pre-cache.
+ */
+export function cancelScheduledPredictivePrecache(): void {
+  if (precacheTimer) {
+    clearTimeout(precacheTimer);
+    precacheTimer = null;
+  }
+}
+
 /**
  * Proactively precaches an audiobook into OPFS in the background.
  * Works seamlessly across both cellular phone data and Wi-Fi networks.
