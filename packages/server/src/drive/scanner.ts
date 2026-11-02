@@ -267,6 +267,10 @@ export function parseBookInfo(filename: string, parentFolderName = ""): ParsedBo
     title = "The Love Hypothesis";
     author = "Ali Hazelwood";
     narrator = narrator || "Callie Dalton & Teddy Hamilton";
+  } else if (lowerTitle.includes("bad in bed")) {
+    title = "Bad in Bed";
+    author = "Ali Hazelwood";
+    narrator = narrator || "Brooke Bloomingdale, Teddy Hamilton & Full Cast";
   } else if (lowerTitle.includes("fan service")) {
     author = "Rosie Danan";
     narrator = narrator || "Brittany Pressley & Aaron Shedlock";

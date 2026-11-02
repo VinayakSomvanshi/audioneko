@@ -166,6 +166,11 @@ describe("Drive Library Scanner - parseBookInfo & normalizeAuthor", () => {
     expect(lh.author).toBe("Ali Hazelwood");
     expect(lh.narrator).toBe("Callie Dalton & Teddy Hamilton");
 
+    const bib = parseBookInfo("Bad In Bed by Ali Hazelwood.m4b", "Standalones");
+    expect(bib.title).toBe("Bad in Bed");
+    expect(bib.author).toBe("Ali Hazelwood");
+    expect(bib.narrator).toBe("Brooke Bloomingdale, Teddy Hamilton & Full Cast");
+
     const fs = parseBookInfo("Fan Service.m4b");
     expect(fs.title).toBe("Fan Service");
     expect(fs.author).toBe("Rosie Danan");
