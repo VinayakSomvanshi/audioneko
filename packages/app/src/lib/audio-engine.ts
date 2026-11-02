@@ -192,26 +192,55 @@ export class AudioEngine {
   }
 
   /**
-   * Zero-latency playback trigger: ensures Web Audio graph is live, unmuted, and scheduled
+   * Zero-latency playback trigger: ensures Web Audio graph is live, unmuted, and scheduled.
+   * Invokes audioElement.play() synchronously to retain browser user-gesture activation tokens.
    */
-  public async playWithRamp(audioElement: HTMLAudioElement): Promise<void> {
+  public playWithRamp(audioElement: HTMLAudioElement): Promise<void> {
     this.attachedAudioElement = audioElement;
 
-    // Cancel any pending pause scheduled from a previous rapid toggle
+    // Cancel any pending pause scheduled from a previous rapid toggle or track switch
     if (this.pauseTimeout) {
       clearTimeout(this.pauseTimeout);
       this.pauseTimeout = null;
     }
 
-    await this.ensureContext();
+    // Resume AudioContext in background without awaiting, preserving user gesture for play()
+    if (this.ctx && this.ctx.state !== "running") {
+      this.ctx.resume().catch(() => {});
+    }
 
     if (this.gainNode && this.ctx) {
-      const now = this.ctx.currentTime;
-      this.gainNode.gain.cancelScheduledValues(now);
-      this.gainNode.gain.setValueAtTime(this.currentVolume, now);
+      try {
+        const now = this.ctx.currentTime;
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(this.currentVolume, now);
+      } catch {}
     }
 
     return audioElement.play();
+  }
+
+  /**
+   * Immediately pauses the audio element and cancels any pending delayed ramp pauses.
+   * Used when switching books or tracks to prevent race conditions.
+   */
+  public pauseImmediate(audioElement: HTMLAudioElement): void {
+    if (this.pauseTimeout) {
+      clearTimeout(this.pauseTimeout);
+      this.pauseTimeout = null;
+    }
+
+    try {
+      audioElement.pause();
+    } catch {}
+
+    if (this.gainNode && this.ctx && this.ctx.state === "running") {
+      try {
+        const now = this.ctx.currentTime;
+        this.gainNode.gain.cancelScheduledValues(now);
+        this.gainNode.gain.setValueAtTime(this.currentVolume, now);
+      } catch {}
+    }
   }
 
   /**
@@ -231,10 +260,14 @@ export class AudioEngine {
 
       this.pauseTimeout = setTimeout(() => {
         this.pauseTimeout = null;
-        audioElement.pause();
+        try {
+          audioElement.pause();
+        } catch {}
         if (this.gainNode && this.ctx && this.ctx.state === "running") {
-          this.gainNode.gain.cancelScheduledValues(this.ctx.currentTime);
-          this.gainNode.gain.setValueAtTime(this.currentVolume, this.ctx.currentTime);
+          try {
+            this.gainNode.gain.cancelScheduledValues(this.ctx.currentTime);
+            this.gainNode.gain.setValueAtTime(this.currentVolume, this.ctx.currentTime);
+          } catch {}
         }
       }, 45);
     } else {

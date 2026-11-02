@@ -173,7 +173,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   const volumeRef = useRef(1.0);
   const isMutedRef = useRef(false);
   const prevVolumeRef = useRef(1.0);
-  const activeBlobUrlRef = useRef<string | null>(null);
+  const activeBlobRef = useRef<{ bookId: string; blobUrl: string } | null>(null);
 
   const userRef = useRef(user);
   const isUserLoadingRef = useRef(isUserLoading);
@@ -474,7 +474,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       if (
         !book ||
         audio.paused ||
-        activeBlobUrlRef.current ||
+        (activeBlobRef.current && activeBlobRef.current.bookId === book.id) ||
         downloadManager.isDownloadedSync(book.id) ||
         isPrewarming
       ) {
@@ -548,6 +548,19 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     };
 
     const onTimeUpdate = () => {
+      const book = currentBookRef.current;
+      if (!book) return;
+
+      // Strict guard: verify audio element is actually playing this book and not lingering on a previous track
+      const isCurrentAudio =
+        audio.src.includes(`/api/stream/${book.id}`) ||
+        Boolean(
+          activeBlobRef.current &&
+            activeBlobRef.current.bookId === book.id &&
+            audio.src.includes(activeBlobRef.current.blobUrl),
+        );
+      if (!isCurrentAudio) return;
+
       const t = audio.currentTime;
       setCurrentTime(t);
       currentTimeRef.current = t;
@@ -564,8 +577,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         position: t,
       });
       // Throttled localStorage save (every 5s)
-      const book = currentBookRef.current;
-      if (book && t > 3) {
+      if (t > 3) {
         progressTracker.tick(book.id, t, audio.duration || durationRef.current || 0);
       }
     };
@@ -678,13 +690,21 @@ export function AudioProvider({ children }: { children: ReactNode }) {
           .then((blobUrl) => {
             if (blobUrl && audioRef.current && currentBookRef.current?.id === book.id) {
               console.log("[audioneko] Network error; switching seamlessly to local OPFS copy");
-              if (activeBlobUrlRef.current && activeBlobUrlRef.current !== blobUrl) {
-                URL.revokeObjectURL(activeBlobUrlRef.current);
+              if (activeBlobRef.current && activeBlobRef.current.blobUrl !== blobUrl) {
+                URL.revokeObjectURL(activeBlobRef.current.blobUrl);
               }
-              activeBlobUrlRef.current = blobUrl;
+              activeBlobRef.current = { bookId: book.id, blobUrl };
               const pos = audioRef.current.currentTime || currentTimeRef.current;
-              audioRef.current.src = pos > 0 ? `${blobUrl}#t=${pos}` : blobUrl;
-              audioRef.current.currentTime = pos;
+              audioRef.current.src = blobUrl;
+              if (pos > 0) {
+                const onMetaBlob = () => {
+                  audioRef.current?.removeEventListener("loadedmetadata", onMetaBlob);
+                  try {
+                    if (audioRef.current) audioRef.current.currentTime = pos;
+                  } catch {}
+                };
+                audioRef.current.addEventListener("loadedmetadata", onMetaBlob, { once: true });
+              }
               audioEngine.playWithRamp(audioRef.current).catch(() => {});
               return;
             }
@@ -737,8 +757,16 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       if (a && book && isPlayingRef.current && (a.paused || a.readyState < 3)) {
         console.log("[audioneko] Network online; auto-resuming playback");
         const pos = a.currentTime;
-        a.src = `/api/stream/${book.id}#t=${pos}`;
-        a.currentTime = pos;
+        a.src = `/api/stream/${book.id}`;
+        if (pos > 0) {
+          const onMetaResume = () => {
+            a.removeEventListener("loadedmetadata", onMetaResume);
+            try {
+              a.currentTime = pos;
+            } catch {}
+          };
+          a.addEventListener("loadedmetadata", onMetaResume, { once: true });
+        }
         audioEngine.playWithRamp(a).catch(() => {});
       }
     };
@@ -751,12 +779,20 @@ export function AudioProvider({ children }: { children: ReactNode }) {
             if (blobUrl && audioRef.current && currentBookRef.current?.id === book.id) {
               console.log("[audioneko] Network offline; hot-swapping to local OPFS copy");
               const pos = audioRef.current.currentTime;
-              if (activeBlobUrlRef.current && activeBlobUrlRef.current !== blobUrl) {
-                URL.revokeObjectURL(activeBlobUrlRef.current);
+              if (activeBlobRef.current && activeBlobRef.current.blobUrl !== blobUrl) {
+                URL.revokeObjectURL(activeBlobRef.current.blobUrl);
               }
-              activeBlobUrlRef.current = blobUrl;
-              audioRef.current.src = `${blobUrl}#t=${pos}`;
-              audioRef.current.currentTime = pos;
+              activeBlobRef.current = { bookId: book.id, blobUrl };
+              audioRef.current.src = blobUrl;
+              if (pos > 0) {
+                const onMetaOffline = () => {
+                  audioRef.current?.removeEventListener("loadedmetadata", onMetaOffline);
+                  try {
+                    if (audioRef.current) audioRef.current.currentTime = pos;
+                  } catch {}
+                };
+                audioRef.current.addEventListener("loadedmetadata", onMetaOffline, { once: true });
+              }
               if (isPlayingRef.current) {
                 audioEngine.playWithRamp(audioRef.current).catch(() => {});
               }
@@ -796,9 +832,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       timer.cancel();
       audio.pause();
       audio.src = "";
-      if (activeBlobUrlRef.current) {
-        URL.revokeObjectURL(activeBlobUrlRef.current);
-        activeBlobUrlRef.current = null;
+      if (activeBlobRef.current) {
+        URL.revokeObjectURL(activeBlobRef.current.blobUrl);
+        activeBlobRef.current = null;
       }
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("durationchange", onDurationChange);
@@ -1078,7 +1114,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Determine target playback start position
+      const prevBook = currentBookRef.current;
+      const isSameBook = prevBook?.id === book.id;
+
+      // Determine target playback start position specifically for this book
       let startPos = 0;
       if (
         initialPosition !== undefined &&
@@ -1088,76 +1127,13 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         startPos = initialPosition;
       } else if (initialPosition === undefined) {
         const saved = getProgress(book.id);
-        if (saved && saved.position > 0) {
+        if (saved && saved.position > 0 && Number.isFinite(saved.position)) {
           startPos = saved.position;
         }
       }
 
-      // If switching from another book, flush previous book listening time
-      if (lastListenTickRef.current && lastListenTickRef.current.bookId !== book.id) {
-        const elapsed = (Date.now() - lastListenTickRef.current.time) / 1000;
-        if (elapsed >= 3) {
-          flushListeningEvent(
-            lastListenTickRef.current.bookId,
-            lastListenTickRef.current.position,
-            currentTimeRef.current,
-            elapsed,
-            playbackRateRef.current,
-          );
-        }
-        lastListenTickRef.current = null;
-      }
-
-      setCurrentBook(book);
-      currentBookRef.current = book;
-      setChapters(bookChapters);
-      chaptersRef.current = bookChapters;
-      setCurrentTime(startPos);
-      currentTimeRef.current = startPos;
-      setDuration(book.durationSeconds || 0);
-      durationRef.current = book.durationSeconds || 0;
-
-      const streamUrl = `/api/stream/${book.id}`;
-      const targetUrl = startPos > 0 ? `${streamUrl}#t=${startPos}` : streamUrl;
-      const isSameBook =
-        audio.src?.includes(`/api/stream/${book.id}`) ||
-        Boolean(activeBlobUrlRef.current && audio.src?.includes(activeBlobUrlRef.current));
-
-      // Revoke previous Blob URL if switching to a different book
-      if (activeBlobUrlRef.current && currentBookRef.current?.id !== book.id) {
-        URL.revokeObjectURL(activeBlobUrlRef.current);
-        activeBlobUrlRef.current = null;
-      }
-
-      // Check for instant local OPFS playback
-      const isDownloaded = downloadManager.isDownloadedSync(book.id);
-      if (isDownloaded || (typeof navigator !== "undefined" && !navigator.onLine)) {
-        getDownloadedAudioBlobUrl(book.id)
-          .then((blobUrl) => {
-            if (blobUrl && currentBookRef.current?.id === book.id && audioRef.current) {
-              if (activeBlobUrlRef.current && activeBlobUrlRef.current !== blobUrl) {
-                URL.revokeObjectURL(activeBlobUrlRef.current);
-              }
-              activeBlobUrlRef.current = blobUrl;
-              const pos = audioRef.current.currentTime || startPos;
-              const targetWithTime = pos > 0 ? `${blobUrl}#t=${pos}` : blobUrl;
-              if (!audioRef.current.src.includes(blobUrl)) {
-                audioRef.current.src = targetWithTime;
-                if (isPlayingRef.current) {
-                  audioEngine.playWithRamp(audioRef.current).catch(() => {});
-                }
-              }
-            }
-          })
-          .catch(() => {});
-      }
-
-      audio.preload = "auto";
-      audio.playbackRate = playbackRateRef.current;
-      audioEngine.setBasePlaybackRate(playbackRateRef.current, audio);
-
       if (isSameBook) {
-        // Fast path: already on this book! Just seek if needed and play instantly!
+        // Fast path: already on this book! Just seek if needed and resume instantly!
         if (startPos > 0 && Math.abs(audio.currentTime - startPos) > 1.5) {
           try {
             audio.currentTime = startPos;
@@ -1168,6 +1144,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         audioEngine
           .playWithRamp(audio)
           .then(() => {
+            setIsPlaying(true);
+            isPlayingRef.current = true;
             setMediaSessionPlaybackState("playing");
             syncClientRef.current?.sendUpdate({
               bookId: book.id,
@@ -1185,24 +1163,113 @@ export function AudioProvider({ children }: { children: ReactNode }) {
           })
           .catch((err) => console.warn("Playback resume error:", err));
       } else {
-        // New book: set src directly with fragment and start playing IMMEDIATELY in user gesture
-        audio.src = targetUrl;
-        if (startPos > 0 && Number.isFinite(startPos)) {
-          try {
-            audio.currentTime = startPos;
-          } catch {
-            // Browser will apply via #t or loadedmetadata
+        // Switching to a DIFFERENT book: flush previous book progress and listening time
+        if (prevBook) {
+          const prevCt = audio.currentTime;
+          const prevDur = audio.duration || durationRef.current || prevBook.durationSeconds || 0;
+          if (prevCt > 3) {
+            progressTracker.flush(prevBook.id, prevCt, prevDur);
+            setProgress(prevBook.id, prevCt, prevDur);
           }
+          if (lastListenTickRef.current && lastListenTickRef.current.bookId === prevBook.id) {
+            const elapsed = (Date.now() - lastListenTickRef.current.time) / 1000;
+            if (elapsed >= 3) {
+              flushListeningEvent(
+                prevBook.id,
+                lastListenTickRef.current.position,
+                prevCt,
+                elapsed,
+                playbackRateRef.current,
+              );
+            }
+            lastListenTickRef.current = null;
+          }
+        }
+
+        // Immediately pause and detach to prevent previous book timeupdate events from firing
+        audioEngine.pauseImmediate(audio);
+        audio.pause();
+
+        // Revoke previous Blob URL if switching to a different book
+        if (activeBlobRef.current) {
+          URL.revokeObjectURL(activeBlobRef.current.blobUrl);
+          activeBlobRef.current = null;
+        }
+
+        // Set state to new book
+        setCurrentBook(book);
+        currentBookRef.current = book;
+        setChapters(bookChapters);
+        chaptersRef.current = bookChapters;
+        setCurrentTime(startPos);
+        currentTimeRef.current = startPos;
+        setDuration(book.durationSeconds || 0);
+        durationRef.current = book.durationSeconds || 0;
+
+        audio.preload = "auto";
+        audio.playbackRate = playbackRateRef.current;
+        audioEngine.setBasePlaybackRate(playbackRateRef.current, audio);
+
+        // Load new audio stream (clean URL without fragments to preserve mobile media pipelines)
+        audio.src = `/api/stream/${book.id}`;
+
+        // Precision sync: verify position once metadata loads
+        const onMeta = () => {
+          audio.removeEventListener("loadedmetadata", onMeta);
+          if (currentBookRef.current?.id !== book.id) return;
+          if (startPos > 0) {
+            try {
+              audio.currentTime = startPos;
+            } catch (e) {
+              console.warn("[audioneko] Initial seek error:", e);
+            }
+          }
+        };
+        if (audio.readyState >= 1) {
+          onMeta();
+        } else {
+          audio.addEventListener("loadedmetadata", onMeta, { once: true });
+        }
+
+        // Check for instant local OPFS playback
+        const isDownloaded = downloadManager.isDownloadedSync(book.id);
+        if (isDownloaded || (typeof navigator !== "undefined" && !navigator.onLine)) {
+          getDownloadedAudioBlobUrl(book.id)
+            .then((blobUrl) => {
+              if (blobUrl && currentBookRef.current?.id === book.id && audioRef.current) {
+                if (activeBlobRef.current && activeBlobRef.current.blobUrl !== blobUrl) {
+                  URL.revokeObjectURL(activeBlobRef.current.blobUrl);
+                }
+                activeBlobRef.current = { bookId: book.id, blobUrl };
+                const cur = audioRef.current.currentTime || startPos;
+                audioRef.current.src = blobUrl;
+                if (cur > 0) {
+                  const onMetaBlob = () => {
+                    audioRef.current?.removeEventListener("loadedmetadata", onMetaBlob);
+                    try {
+                      if (audioRef.current) audioRef.current.currentTime = cur;
+                    } catch {}
+                  };
+                  audioRef.current.addEventListener("loadedmetadata", onMetaBlob, { once: true });
+                }
+                if (isPlayingRef.current) {
+                  audioEngine.playWithRamp(audioRef.current).catch(() => {});
+                }
+              }
+            })
+            .catch(() => {});
         }
 
         // Trigger playback immediately in the user gesture
         audioEngine
           .playWithRamp(audio)
           .then(() => {
+            setIsPlaying(true);
+            isPlayingRef.current = true;
             setMediaSessionPlaybackState("playing");
             syncClientRef.current?.sendUpdate({
               bookId: book.id,
-              currentTime: audio.currentTime,
+              currentTime: startPos,
               duration: audio.duration || book.durationSeconds || 0,
               playbackRate: playbackRateRef.current,
               isPlaying: true,
@@ -1210,22 +1277,11 @@ export function AudioProvider({ children }: { children: ReactNode }) {
             });
             lastListenTickRef.current = {
               time: Date.now(),
-              position: audio.currentTime,
+              position: startPos,
               bookId: book.id,
             };
           })
           .catch((err) => console.warn("Auto-playback deferred:", err));
-
-        // Precision sync: verify position once metadata loads
-        const onMeta = () => {
-          audio.removeEventListener("loadedmetadata", onMeta);
-          if (startPos > 0 && Math.abs(audio.currentTime - startPos) > 1.5) {
-            try {
-              audio.currentTime = startPos;
-            } catch {}
-          }
-        };
-        audio.addEventListener("loadedmetadata", onMeta, { once: true });
       }
 
       setMediaSessionMetadata({

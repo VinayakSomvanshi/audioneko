@@ -425,82 +425,82 @@ export async function downloadBookToOpfs(
   });
 
   try {
-    const rangeHeader = existingBytes > 0 ? `bytes=${existingBytes}-` : undefined;
     const headers: Record<string, string> = {
       Accept: "audio/mp4, audio/mpeg, audio/*;q=0.9, */*;q=0.8",
     };
-    if (rangeHeader) {
-      headers.Range = rangeHeader;
-    }
 
-    const response = await fetch(streamUrl, {
-      signal,
-      headers,
-    });
-
-    if (!response.ok && response.status !== 206) {
-      throw new Error(
-        `Failed to download audio stream: HTTP ${response.status} ${response.statusText}`,
-      );
-    }
-
-    if (totalBytes <= 0) {
-      const cl = response.headers.get("Content-Length");
-      const cr = response.headers.get("Content-Range");
-      if (cr) {
-        const totalMatch = cr.match(/\/(\d+)$/);
-        if (totalMatch?.[1]) totalBytes = Number.parseInt(totalMatch[1], 10);
-      } else if (cl) {
-        totalBytes = existingBytes + Number.parseInt(cl, 10);
-      }
-    }
-
-    if (!response.body) {
-      throw new Error("Response body is empty or not streamable");
-    }
-
-    const reader = response.body.getReader();
-
-    while (true) {
+    while (totalBytes <= 0 || downloadedBytes < totalBytes) {
       if (signal?.aborted) {
         throw new Error("Download aborted by user");
       }
 
-      const { done, value } = await reader.read();
-      if (done) break;
+      const chunkEnd =
+        totalBytes > 0 ? Math.min(downloadedBytes + 2097152 - 1, totalBytes - 1) : undefined;
+      const rangeHeader =
+        chunkEnd !== undefined
+          ? `bytes=${downloadedBytes}-${chunkEnd}`
+          : `bytes=${downloadedBytes}-`;
 
-      if (value) {
-        await writable.write(value);
-        downloadedBytes += value.byteLength;
+      const response = await fetch(streamUrl, {
+        signal,
+        headers: {
+          ...headers,
+          Range: rangeHeader,
+        },
+      });
 
-        const now = Date.now();
-        let speedBytesPerSec: number | undefined;
-        let estimatedTimeSeconds: number | undefined;
-
-        if (now - lastSpeedTime >= 800) {
-          const elapsedSec = (now - lastSpeedTime) / 1000;
-          const diffBytes = downloadedBytes - lastSpeedBytes;
-          speedBytesPerSec = Math.round(diffBytes / elapsedSec);
-          if (speedBytesPerSec > 0 && totalBytes > downloadedBytes) {
-            estimatedTimeSeconds = Math.round((totalBytes - downloadedBytes) / speedBytesPerSec);
-          }
-          lastSpeedTime = now;
-          lastSpeedBytes = downloadedBytes;
-        }
-
-        const percent =
-          totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
-
-        onProgress?.({
-          bookId: meta.bookId,
-          status: "downloading",
-          downloadedBytes,
-          totalBytes,
-          progressPercent: percent,
-          speedBytesPerSec,
-          estimatedTimeSeconds,
-        });
+      if (!response.ok && response.status !== 206) {
+        throw new Error(
+          `Failed to download audio stream: HTTP ${response.status} ${response.statusText}`,
+        );
       }
+
+      if (totalBytes <= 0) {
+        const cr = response.headers.get("Content-Range");
+        if (cr) {
+          const totalMatch = cr.match(/\/(\d+)$/);
+          if (totalMatch?.[1]) totalBytes = Number.parseInt(totalMatch[1], 10);
+        } else {
+          const cl = response.headers.get("Content-Length");
+          if (cl) totalBytes = downloadedBytes + Number.parseInt(cl, 10);
+        }
+      }
+
+      const chunkBuf = await response.arrayBuffer();
+      if (chunkBuf.byteLength === 0) break;
+
+      await writable.write(chunkBuf);
+      downloadedBytes += chunkBuf.byteLength;
+
+      const now = Date.now();
+      let speedBytesPerSec: number | undefined;
+      let estimatedTimeSeconds: number | undefined;
+
+      if (now - lastSpeedTime >= 800) {
+        const elapsedSec = (now - lastSpeedTime) / 1000;
+        const diffBytes = downloadedBytes - lastSpeedBytes;
+        speedBytesPerSec = Math.round(diffBytes / elapsedSec);
+        if (speedBytesPerSec > 0 && totalBytes > downloadedBytes) {
+          estimatedTimeSeconds = Math.round((totalBytes - downloadedBytes) / speedBytesPerSec);
+        }
+        lastSpeedTime = now;
+        lastSpeedBytes = downloadedBytes;
+      }
+
+      const percent =
+        totalBytes > 0 ? Math.min(100, Math.round((downloadedBytes / totalBytes) * 100)) : 0;
+
+      onProgress?.({
+        bookId: meta.bookId,
+        status: "downloading",
+        downloadedBytes,
+        totalBytes,
+        progressPercent: percent,
+        speedBytesPerSec,
+        estimatedTimeSeconds,
+      });
+
+      if (totalBytes > 0 && downloadedBytes >= totalBytes) break;
     }
 
     await writable.close();

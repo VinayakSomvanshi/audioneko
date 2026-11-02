@@ -312,7 +312,7 @@ describe("Origin Private File System (OPFS) Download Manager", () => {
     await downloadBookToOpfs(meta);
 
     // Range must have requested starting from 4 bytes!
-    expect(requestedRange).toBe("bytes=4-");
+    expect(requestedRange?.startsWith("bytes=4-")).toBe(true);
 
     const isDone = await isBookDownloaded("book_resume_test");
     expect(isDone).toBe(true);

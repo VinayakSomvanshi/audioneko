@@ -320,6 +320,20 @@ export async function handleAudioStreamRequest(
     });
   }
 
+  // 2.5 Handle OPTIONS preflight requests
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "Range, Authorization, Content-Type",
+        "Access-Control-Expose-Headers":
+          "Content-Range, Content-Length, Accept-Ranges, X-Audioneko-Tier",
+      },
+    });
+  }
+
   // 3. Handle HEAD requests (probed by audio players to determine content-length and accept-ranges)
   if (request.method === "HEAD") {
     return new Response(null, {
@@ -329,6 +343,11 @@ export async function handleAudioStreamRequest(
         "Content-Length": totalSize.toString(),
         "Accept-Ranges": "bytes",
         "Cache-Control": "public, max-age=604800, s-maxage=604800",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "Range, Authorization, Content-Type",
+        "Access-Control-Expose-Headers":
+          "Content-Range, Content-Length, Accept-Ranges, X-Audioneko-Tier",
       },
     });
   }
@@ -376,142 +395,57 @@ export async function handleAudioStreamRequest(
   }
 
   // 6. Direct Stream or Edge Chunk-Cache Stream
-  // If the client requested an explicit small range (< CHUNK_SIZE):
-  if (requestedLength < CHUNK_SIZE) {
-    // If range is within a single chunk, check Edge Cache first
-    const chunkIndex = Math.floor(start / CHUNK_SIZE);
-    const { chunkStart, chunkEnd } = getChunkBounds(start, totalSize);
+  // Bound requested range to 1 chunk (2 MB) if open-ended or exceeding chunk size,
+  // ensuring zero isolate OOMs, 0 Google Drive rate limit spikes, and clean edge caching.
+  const chunkIndex = Math.floor(start / CHUNK_SIZE);
+  const { chunkStart, chunkEnd } = getChunkBounds(start, totalSize);
+  const targetEnd = Math.min(Math.min(end, chunkEnd), totalSize - 1);
+  const requestedSliceLength = targetEnd - start + 1;
 
-    const cache =
-      typeof caches !== "undefined" && "default" in caches
-        ? (caches as unknown as { default: Cache }).default
-        : null;
-
-    if (cache && chunkEnd >= end) {
-      try {
-        const url = new URL(request.url);
-        const chunkUrl = `${url.origin}/cdn-cache/audio/${fileId}/chunk-${chunkIndex}`;
-        const cacheKey = new Request(chunkUrl, { method: "GET" });
-        const cached = await cache.match(cacheKey);
-        if (cached) {
-          const buf = await cached.arrayBuffer();
-          const chunkData = new Uint8Array(buf);
-          const sliceStart = start - chunkStart;
-          const sliceEnd = sliceStart + requestedLength;
-          if (sliceEnd <= chunkData.byteLength) {
-            const slice = chunkData.subarray(sliceStart, sliceEnd);
-            return new Response(slice, {
-              status: 206,
-              headers: {
-                "Content-Type": metadata.mimeType,
-                "Accept-Ranges": "bytes",
-                "Content-Range": `bytes ${start}-${end}/${totalSize}`,
-                "Content-Length": requestedLength.toString(),
-                "Cache-Control": "public, max-age=604800, s-maxage=604800",
-                "X-Content-Type-Options": "nosniff",
-                "X-Audioneko-Tier": "Edge-Cache-Hit",
-              },
-            });
-          }
-        }
-      } catch {
-        // Fallback to fetch
-      }
-    }
-
-    // Direct Google Drive fetch for explicit small range (e.g. metadata probes)
-    const driveRange = `bytes=${start}-${end}`;
-    const driveRes = await customFetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Range: driveRange,
-        },
-      },
+  try {
+    const { data, fromCache } = await getOrFetchChunk(
+      fileId,
+      chunkIndex,
+      chunkStart,
+      chunkEnd,
+      accessToken,
+      request.url,
+      customFetch,
     );
 
-    if (!driveRes.ok && driveRes.status !== 206) {
-      const errorText = await driveRes.text();
-      return new Response(
-        JSON.stringify({ error: `Google Drive API error [${driveRes.status}]: ${errorText}` }),
-        {
-          status: driveRes.status === 403 ? 429 : 502,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
+    const sliceStart = start - chunkStart;
+    const sliceEnd = Math.min(data.byteLength, sliceStart + requestedSliceLength);
+    const slice = data.subarray(sliceStart, sliceEnd);
 
     const responseHeaders = new Headers();
     responseHeaders.set("Content-Type", metadata.mimeType);
     responseHeaders.set("Accept-Ranges", "bytes");
-    responseHeaders.set("Cache-Control", "public, max-age=604800, s-maxage=604800");
+    responseHeaders.set("Content-Range", `bytes ${start}-${targetEnd}/${totalSize}`);
+    responseHeaders.set("Content-Length", slice.byteLength.toString());
+    responseHeaders.set("Cache-Control", "public, max-age=2592000, s-maxage=2592000");
+    responseHeaders.set("Access-Control-Allow-Origin", "*");
+    responseHeaders.set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+    responseHeaders.set("Access-Control-Allow-Headers", "Range, Authorization, Content-Type");
+    responseHeaders.set(
+      "Access-Control-Expose-Headers",
+      "Content-Range, Content-Length, Accept-Ranges, X-Audioneko-Tier",
+    );
     responseHeaders.set("X-Content-Type-Options", "nosniff");
-    responseHeaders.set("X-Audioneko-Tier", "Google-Drive-Direct-Stream");
+    responseHeaders.set("X-Audioneko-Tier", fromCache ? "Edge-Cache-Chunk" : "Google-Drive-Chunk");
 
-    const contentRange =
-      driveRes.headers.get("content-range") || `bytes ${start}-${end}/${totalSize}`;
-    responseHeaders.set("Content-Range", contentRange);
-
-    const contentLength = driveRes.headers.get("content-length") || requestedLength.toString();
-    responseHeaders.set("Content-Length", contentLength);
-
-    return new Response(driveRes.body, {
+    return new Response(slice as unknown as BodyInit, {
       status: 206,
       headers: responseHeaders,
     });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const status = message.includes("429") ? 429 : 502;
+    return new Response(JSON.stringify({ error: message }), {
+      status,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   }
-
-  // 7. Tier 3: Edge Chunk-Cache Progressive Stream (for continuous audio streaming)
-  let currentOffset = start;
-  const targetEnd = end;
-
-  const stream = new ReadableStream({
-    async pull(controller) {
-      if (currentOffset > targetEnd) {
-        controller.close();
-        return;
-      }
-
-      const chunkIndex = Math.floor(currentOffset / CHUNK_SIZE);
-      const chunkStart = chunkIndex * CHUNK_SIZE;
-      const chunkEnd = Math.min(chunkStart + CHUNK_SIZE - 1, totalSize - 1);
-
-      try {
-        const { data } = await getOrFetchChunk(
-          fileId,
-          chunkIndex,
-          chunkStart,
-          chunkEnd,
-          accessToken,
-          request.url,
-          customFetch,
-        );
-
-        const sliceStart = currentOffset - chunkStart;
-        const bytesRemaining = targetEnd - currentOffset + 1;
-        const sliceEnd = Math.min(data.byteLength, sliceStart + bytesRemaining);
-        const slice = data.subarray(sliceStart, sliceEnd);
-
-        controller.enqueue(slice);
-        currentOffset += slice.byteLength;
-      } catch (err) {
-        controller.error(err);
-      }
-    },
-  });
-
-  const responseHeaders = new Headers();
-  responseHeaders.set("Content-Type", metadata.mimeType);
-  responseHeaders.set("Accept-Ranges", "bytes");
-  responseHeaders.set("Cache-Control", "public, max-age=604800, s-maxage=604800");
-  responseHeaders.set("X-Content-Type-Options", "nosniff");
-  responseHeaders.set("X-Audioneko-Tier", "Edge-Cache-Chunk-Stream");
-  responseHeaders.set("Content-Range", `bytes ${start}-${end}/${totalSize}`);
-  responseHeaders.set("Content-Length", requestedLength.toString());
-
-  return new Response(stream, {
-    status: 206,
-    headers: responseHeaders,
-  });
 }

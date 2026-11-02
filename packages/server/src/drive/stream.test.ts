@@ -181,8 +181,10 @@ describe("Audio Stream Engine & Range Proxy", () => {
     expect(response.headers.get("Accept-Ranges")).toBe("bytes");
   });
 
-  it("streams directly from Google Drive API with piped stream and zero-latency headers", async () => {
+  it("streams directly from Google Drive API with chunk caching and zero-latency headers", async () => {
     const mockAudioBytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+    const mockFullChunk = new Uint8Array(CHUNK_SIZE);
+    mockFullChunk.set(mockAudioBytes, 0);
 
     const mockEnv = {
       GOOGLE_SA_KEY: JSON.stringify({ client_email: "test@sa.com", private_key: "dummy" }),
@@ -202,21 +204,13 @@ describe("Audio Stream Engine & Range Proxy", () => {
     } as unknown as Env;
 
     const mockFetch = vi.fn().mockResolvedValue(
-      new Response(
-        new ReadableStream({
-          start(controller) {
-            controller.enqueue(mockAudioBytes);
-            controller.close();
-          },
-        }),
-        {
-          status: 206,
-          headers: {
-            "Content-Range": `bytes 0-7/${50 * 1024 * 1024}`,
-            "Content-Length": "8",
-          },
+      new Response(mockFullChunk, {
+        status: 206,
+        headers: {
+          "Content-Range": `bytes 0-${CHUNK_SIZE - 1}/${50 * 1024 * 1024}`,
+          "Content-Length": CHUNK_SIZE.toString(),
         },
-      ),
+      }),
     );
 
     const request = new Request("https://audioneko.app/api/stream/file_123", {
@@ -234,12 +228,12 @@ describe("Audio Stream Engine & Range Proxy", () => {
     expect(response.status).toBe(206);
     expect(response.headers.get("Content-Range")).toBe(`bytes 0-7/${50 * 1024 * 1024}`);
     expect(response.headers.get("Content-Length")).toBe("8");
-    expect(response.headers.get("X-Audioneko-Tier")).toBe("Google-Drive-Direct-Stream");
+    expect(response.headers.get("X-Audioneko-Tier")).toBe("Google-Drive-Chunk");
     const body = new Uint8Array(await response.arrayBuffer());
     expect(body).toEqual(mockAudioBytes);
   });
 
-  it("serves large / open-ended range requests via Edge Chunk-Cache progressive stream", async () => {
+  it("serves large / open-ended range requests via bounded 2 MB Edge Chunk-Cache", async () => {
     const chunkData = new Uint8Array(CHUNK_SIZE).fill(42);
 
     const mockEnv = {
@@ -283,17 +277,13 @@ describe("Audio Stream Engine & Range Proxy", () => {
 
     expect(response.status).toBe(206);
     expect(response.headers.get("Content-Range")).toBe(
-      `bytes 0-${10 * 1024 * 1024 - 1}/${10 * 1024 * 1024}`,
+      `bytes 0-${CHUNK_SIZE - 1}/${10 * 1024 * 1024}`,
     );
-    expect(response.headers.get("X-Audioneko-Tier")).toBe("Edge-Cache-Chunk-Stream");
+    expect(response.headers.get("Content-Length")).toBe(CHUNK_SIZE.toString());
+    expect(response.headers.get("X-Audioneko-Tier")).toBe("Google-Drive-Chunk");
 
-    // Read first chunk from stream
-    const reader = response.body?.getReader();
-    expect(reader).toBeDefined();
-    const readResult = await reader?.read();
-    expect(readResult?.done).toBe(false);
-    expect(readResult?.value?.byteLength).toBe(CHUNK_SIZE);
-    expect(readResult?.value?.[0]).toBe(42);
-    await reader?.cancel();
+    const body = new Uint8Array(await response.arrayBuffer());
+    expect(body.byteLength).toBe(CHUNK_SIZE);
+    expect(body[0]).toBe(42);
   });
 });
