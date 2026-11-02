@@ -91,9 +91,12 @@ export function getChunkBounds(
 }
 
 const memoryMetaCache = new Map<string, { meta: DriveFileMetadata; expiresAt: number }>();
+const hotChunkMemoryCache = new Map<string, { data: Uint8Array; expiresAt: number }>();
+const MAX_HOT_CHUNKS = 8; // 8 * 2 MB = 16 MB max hot cache in Worker RAM
 
 export function _resetMetadataMemoryCache(): void {
   memoryMetaCache.clear();
+  hotChunkMemoryCache.clear();
 }
 
 /**
@@ -171,6 +174,16 @@ export async function getOrFetchChunk(
   requestUrl: string,
   customFetch: typeof fetch = fetch,
 ): Promise<{ data: Uint8Array; fromCache: boolean }> {
+  const now = Date.now();
+  const memKey = `${fileId}-${chunkIndex}`;
+
+  // Tier 0: Check Worker Isolate RAM cache (< 0.1ms instant hit)
+  const memCached = hotChunkMemoryCache.get(memKey);
+  if (memCached && memCached.expiresAt > now) {
+    return { data: memCached.data, fromCache: true };
+  }
+
+  // Tier 1: Check Cloudflare Edge Cache API (caches.default, ~5ms-10ms)
   const cache =
     typeof caches !== "undefined" && "default" in caches
       ? (caches as unknown as { default: Cache }).default
@@ -186,7 +199,13 @@ export async function getOrFetchChunk(
       if (cached) {
         const buf = await cached.arrayBuffer();
         if (buf.byteLength > 0) {
-          return { data: new Uint8Array(buf), fromCache: true };
+          const data = new Uint8Array(buf);
+          if (hotChunkMemoryCache.size >= MAX_HOT_CHUNKS) {
+            const firstKey = hotChunkMemoryCache.keys().next().value;
+            if (firstKey) hotChunkMemoryCache.delete(firstKey);
+          }
+          hotChunkMemoryCache.set(memKey, { data, expiresAt: now + 300_000 }); // 5 min RAM cache
+          return { data, fromCache: true };
         }
       }
     } catch {
@@ -194,7 +213,7 @@ export async function getOrFetchChunk(
     }
   }
 
-  // Fetch chunk from Google Drive API with retry
+  // Tier 2: Fetch chunk from Google Drive API with automatic retry
   const driveRange = `bytes=${chunkStart}-${chunkEnd}`;
   let driveRes: Response | null = null;
   let lastError: Error | null = null;
@@ -229,7 +248,16 @@ export async function getOrFetchChunk(
   const chunkBuf = await driveRes.arrayBuffer();
   const data = new Uint8Array(chunkBuf);
 
-  // Store in Cloudflare Edge Cache API (HTTP 200 response is fully cacheable)
+  // Store in Tier 0 Worker RAM cache
+  if (data.byteLength > 0) {
+    if (hotChunkMemoryCache.size >= MAX_HOT_CHUNKS) {
+      const firstKey = hotChunkMemoryCache.keys().next().value;
+      if (firstKey) hotChunkMemoryCache.delete(firstKey);
+    }
+    hotChunkMemoryCache.set(memKey, { data, expiresAt: now + 300_000 });
+  }
+
+  // Store in Tier 1 Cloudflare Edge Cache API (HTTP 200 response is fully cacheable)
   if (cache && cacheKey && data.byteLength > 0) {
     try {
       const cacheResponse = new Response(data, {

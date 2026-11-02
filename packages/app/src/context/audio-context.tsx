@@ -466,7 +466,60 @@ export function AudioProvider({ children }: { children: ReactNode }) {
     sleepTimerRef.current = timer;
     const unsubTimer = timer.subscribe(setSleepTimerState);
 
+    let isPrewarming = false;
+    let lastPrewarmedOffset = -1;
+
+    const checkProactivePrewarm = (bufferedAheadSecs: number) => {
+      const book = currentBookRef.current;
+      if (
+        !book ||
+        audio.paused ||
+        activeBlobUrlRef.current ||
+        downloadManager.isDownloadedSync(book.id) ||
+        isPrewarming
+      ) {
+        return;
+      }
+
+      const ct = audio.currentTime;
+      const dur = durationRef.current || book.durationSeconds || 0;
+      if (dur <= 0 || ct >= dur - 20) return;
+
+      // If buffer ahead is under 40 seconds on an active stream, warm up next chunk in edge cache
+      if (bufferedAheadSecs < 40) {
+        isPrewarming = true;
+        const avgBytesPerSec = book.fileSizeBytes && dur > 0 ? book.fileSizeBytes / dur : 16384;
+        const targetTime = ct + bufferedAheadSecs + 25;
+        const targetByte = Math.min(
+          Math.floor(targetTime * avgBytesPerSec),
+          Math.max(0, (book.fileSizeBytes || 1) - 1),
+        );
+        const chunkIndex = Math.floor(targetByte / 2097152);
+        const chunkStart = chunkIndex * 2097152;
+        const chunkEnd = Math.min(
+          chunkStart + 2097152 - 1,
+          Math.max(0, (book.fileSizeBytes || 1) - 1),
+        );
+
+        if (chunkEnd > chunkStart && lastPrewarmedOffset !== chunkStart) {
+          lastPrewarmedOffset = chunkStart;
+          fetch(`/api/stream/${book.id}`, {
+            headers: { Range: `bytes=${chunkStart}-${chunkEnd}` },
+          })
+            .catch(() => {})
+            .finally(() => {
+              setTimeout(() => {
+                isPrewarming = false;
+              }, 4000);
+            });
+        } else {
+          isPrewarming = false;
+        }
+      }
+    };
+
     const updateBufferedRange = () => {
+      let bufferedAhead = 0;
       if (audio.buffered.length > 0) {
         const ct = audio.currentTime;
         let highest = 0;
@@ -476,6 +529,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
           const end = audio.buffered.end(i);
           if (ct >= start && ct <= end) {
             setBufferedTime(end);
+            bufferedAhead = end - ct;
             matched = true;
             break;
           }
@@ -483,8 +537,10 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         }
         if (!matched && highest > 0) {
           setBufferedTime(highest);
+          bufferedAhead = Math.max(0, highest - ct);
         }
       }
+      checkProactivePrewarm(bufferedAhead);
     };
 
     const onProgress = () => {
@@ -674,9 +730,47 @@ export function AudioProvider({ children }: { children: ReactNode }) {
         progressTracker.flush(book.id, a.currentTime, a.duration || durationRef.current || 0);
       }
     };
+
+    const onNetworkOnline = () => {
+      const a = audioRef.current;
+      const book = currentBookRef.current;
+      if (a && book && isPlayingRef.current && (a.paused || a.readyState < 3)) {
+        console.log("[audioneko] Network online; auto-resuming playback");
+        const pos = a.currentTime;
+        a.src = `/api/stream/${book.id}#t=${pos}`;
+        a.currentTime = pos;
+        audioEngine.playWithRamp(a).catch(() => {});
+      }
+    };
+
+    const onNetworkOffline = () => {
+      const book = currentBookRef.current;
+      if (book) {
+        getDownloadedAudioBlobUrl(book.id)
+          .then((blobUrl) => {
+            if (blobUrl && audioRef.current && currentBookRef.current?.id === book.id) {
+              console.log("[audioneko] Network offline; hot-swapping to local OPFS copy");
+              const pos = audioRef.current.currentTime;
+              if (activeBlobUrlRef.current && activeBlobUrlRef.current !== blobUrl) {
+                URL.revokeObjectURL(activeBlobUrlRef.current);
+              }
+              activeBlobUrlRef.current = blobUrl;
+              audioRef.current.src = `${blobUrl}#t=${pos}`;
+              audioRef.current.currentTime = pos;
+              if (isPlayingRef.current) {
+                audioEngine.playWithRamp(audioRef.current).catch(() => {});
+              }
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
     window.addEventListener("beforeunload", onBeforeUnload);
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("focus", onWindowFocus);
+    window.addEventListener("online", onNetworkOnline);
+    window.addEventListener("offline", onNetworkOffline);
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("durationchange", onDurationChange);
@@ -696,6 +790,8 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("beforeunload", onBeforeUnload);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("focus", onWindowFocus);
+      window.removeEventListener("online", onNetworkOnline);
+      window.removeEventListener("offline", onNetworkOffline);
       unsubTimer();
       timer.cancel();
       audio.pause();
